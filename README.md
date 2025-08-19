@@ -1,18 +1,11 @@
-<!--
- * @Author       : baizs_work_pc_ubuntu zhongshan.bai@vitalchem.com
- * @Date         : 2024-12-06 11:26:58
- * @LastEditors  : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
- * @LastEditTime : 2025-08-19 14:45:18
- * @FilePath     : /GAME FOR PEACE/README.md
- * @Description  : 
- * 
- * Copyright (c) 2024 by vitalchem, All Rights Reserved. 
--->
-# calib_reflectivity
 
-# 激光雷达反射率标定相关的算法 
+# game_for_peace_unpacker
+
+# 和平精英解包工具 
 
 ---
+
+`pak_file`参数可在`launch.json`中的`args`中配置
 
 ## 一、子目录说明
 - `data`   数据
@@ -94,7 +87,3 @@ if (WIN32)
   )
 endif ()
 ```
-
-## 六、计算流程
-
-### alpha 版
