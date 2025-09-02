@@ -248,8 +248,13 @@ int main(int argc, const char *argv[]) {
     for (int x = 0; x < MountPointLength - 9; x++) {
         MountPoint[x] = MountPoint[x + 9];
     }
+
+    // 打印从 .pak 文件索引中读取到的原始挂载点路径 Debug用
+    printf("Debug: Original Mount Point Length = %u\n", MountPointLength);
+    printf("Debug: Mount Point Path = %s\n", MountPoint);
+
     read_data(&NumOfEntry, IndexData, 4);
-    
+
     // 分配内存来存储所有文件条目的元数据
     Entry *entry = (Entry*)malloc(NumOfEntry * sizeof(Entry));
     if (!entry) {
@@ -327,7 +332,7 @@ int main(int argc, const char *argv[]) {
             
             read_data(&ENTRY, IndexData, 4);
             
-            // 构建完整的文件路径
+            // 构建完整的文件路径 小天v3_头盔护甲背包白体_全枪据点快切_范围_自瞄
             memset(path, 0, 1024);
             snprintf(path, 1024, "%s%s%s", MountPoint, DIR_NAME, Filename);
             

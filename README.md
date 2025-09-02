@@ -1,3 +1,13 @@
+<!--
+ * @Author       : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
+ * @Date         : 2025-09-02 16:42:02
+ * @LastEditors  : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
+ * @LastEditTime : 2025-09-02 16:43:06
+ * @FilePath     : /game_for_peace_unpacker/README.md
+ * @Description  : 
+ * 
+ * Copyright (c) 2025 by vitalchem, All Rights Reserved. 
+-->
 
 # game_for_peace_unpacker
 
@@ -6,6 +16,18 @@
 ---
 
 `pak_file`参数可在`launch.json`中的`args`中配置
+
+grep搜索：
+
+搜索当前目录下所有 .dat 文件中是否包含 "mk14"	grep -l "mk14" *.dat
+
+递归搜索某个目录下的 .dat 文件	grep -rl "mk14" /path/to/dir --include="*.dat"
+
+忽略大小写搜索	grep -ril "mk14" *.dat
+
+如果你有 .dat 文件是二进制文件，grep 可能默认跳过。你可以加 -a 参数把它当作文本处理：
+
+grep -la "mk14" *.dat
 
 ## 一、子目录说明
 - `data`   数据
