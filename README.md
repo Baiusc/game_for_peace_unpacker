@@ -2,7 +2,7 @@
  * @Author       : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
  * @Date         : 2025-09-02 16:42:02
  * @LastEditors  : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
- * @LastEditTime : 2025-09-02 16:43:06
+ * @LastEditTime : 2025-09-03 17:20:27
  * @FilePath     : /game_for_peace_unpacker/README.md
  * @Description  : 
  * 
@@ -11,11 +11,18 @@
 
 # game_for_peace_unpacker
 
-# 和平精英解包工具 
+# 和平精英解包/打包/paks/obb改文件 
 
 ---
+明文解包：
+
+src/game_for_peace_unpack.c
 
 `pak_file`参数可在`launch.json`中的`args`中配置
+
+解包/打包 bms 江川工具 修改后可在PC端运行：
+
+python/bms.py
 
 grep搜索：
 
