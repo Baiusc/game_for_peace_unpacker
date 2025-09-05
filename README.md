@@ -2,7 +2,7 @@
  * @Author       : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
  * @Date         : 2025-09-02 16:42:02
  * @LastEditors  : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
- * @LastEditTime : 2025-09-03 17:20:27
+ * @LastEditTime : 2025-09-04 16:31:06
  * @FilePath     : /game_for_peace_unpacker/README.md
  * @Description  : 
  * 
@@ -26,15 +26,66 @@ python/bms.py
 
 grep搜索：
 
-搜索当前目录下所有 .dat 文件中是否包含 "mk14"	grep -l "mk14" *.dat
+搜索当前目录下所有 .dat 文件中是否包含 "mk14"	`grep -l "mk14" *.dat`
 
-递归搜索某个目录下的 .dat 文件	grep -rl "mk14" /path/to/dir --include="*.dat"
+递归搜索某个目录下的 .dat 文件	`grep -rl "mk14" /path/to/dir --include="*.dat"`
 
-忽略大小写搜索	grep -ril "mk14" *.dat
+忽略大小写搜索	`grep -ril "mk14" *.dat`
 
 如果你有 .dat 文件是二进制文件，grep 可能默认跳过。你可以加 -a 参数把它当作文本处理：
 
-grep -la "mk14" *.dat
+`grep -la "mk14" *.dat`
+
+当前使用的grep： BP_ShootWeaponProjectileBase_C
+
+`find . -name "*.dat" -print0 | xargs -0 grep -ail "BP_ShootWeaponBase_C"`
+
+find . -name "*.dat" -print0 | xargs -0 grep -ail "BP_ShootWeaponProjectileBase_C" | xargs grep -ail "GameDeviationAccuracy" | xargs grep -ail "CameraShakeTemplate_AimCameraMode"
+
+
+命令解析：
+
+find . -name "*.dat" -print0:
+
+find .：在当前目录 (.) 下开始查找文件。
+
+-name "*.dat"：只查找所有以 .dat 结尾的文件。
+
+-print0: 将找到的文件名以空字符 (\0) 分隔，而不是换行符。这能正确处理文件名中包含空格的情况。
+
+|: 管道符，将 find 命令的输出作为 xargs 命令的输入。
+
+xargs -0 grep -ail "BP_ShootWeaponBase_C":
+
+xargs -0: 接收 find 传来的以空字符分隔的文件名列表。
+
+grep -ail "BP_ShootWeaponBase_C": 对每个文件名执行 grep 命令，使用 -a (当作文本)、-i (忽略大小写) 和 -l (只列出文件名) 标志进行搜索。
+
+这个方法更加健壮，因为它强制 grep 逐个处理文件，并且 xargs 的 -0 选项确保了文件名能够被正确传递，有效地避免了之前遇到的“可执行文件格式错误”问题。
+
+## 零、dat对应关系
+- `./file_0/00000009.dat`   BP_ShootWeaponBase_C
+- `./file_0/00000051.dat`   BP_ShootWeaponBase_C
+- `./file_0/00000013.dat`   BP_ShootWeaponProjectileBase_C
+- `./file_0/00000057.dat`   BP_ShootWeaponProjectileBase_C
+- `./file_1000/00001116.dat`   BP_ShootWeaponProjectileBase_C
+
+## 键值对功能说明书
+
+AccessoriesVRecoilFactor（配件垂直后坐力系数）0.55 表示配件将垂直后坐力降低至原始值的 55%  改为 0.01418
+
+AccessoriesHRecoilFactor（配件水平后坐力系数）0.9 表示配件将水平后坐力降低至原始值的 90%   改为 0.02418
+
+AccessoriesRecoveryFactor（配件后坐力恢复系数）0.65 表示配件将恢复速度提升至原始值的 65% （即加快恢复）。
+数值越大，准星在射击后更快回正（适合快速连续点射）。改为 0.9876
+
+GameDeviationFactor（全局偏差系数）数值越小，子弹落点越集中。从 3.024 改为 0.1418 据点
+
+CrossHairBurstSpeed（准星爆发速度）数值越低，准星扩散越平缓。从 18.0 改为 0.2418 跳弹
+
+CrossHairBurstIncreaseSpeed（准星爆发增速）数值越低，扩散速度变化更线性（后坐力表现更平滑）。从 3.5 改为 0.1418
+
+RecoilKickADS 代表 "Aim Down Sights Recoil Kick"，即开镜瞄准（ADS）时的后坐力冲击。从 0.15 改为 0.025123
 
 ## 一、子目录说明
 - `data`   数据
