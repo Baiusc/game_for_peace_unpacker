@@ -8,7 +8,8 @@
       "program": "${workspaceFolder}/build/PEACE_UNPACK",
       // "program": "${workspaceFolder}/build/PEACE_REPACK",
       "args": [
-        "${workspaceFolder}/paks/map_weapon_1.32.11.13800.pak"
+        "${workspaceFolder}/paks/map_lobby_1.32.11.13800_0.67.pak"
+        // "${workspaceFolder}/paks/game_patch_1.32.11.14059.pak"
       ],
       "stopAtEntry": false,
       "cwd": "${fileDirname}",

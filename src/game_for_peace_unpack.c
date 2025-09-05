@@ -272,9 +272,26 @@ int main(int argc, const char *argv[]) {
         read_data(&entry[Files].CompressionMethod, IndexData, 4);
         read_data(&entry[Files].CompressedLength, IndexData, 8);
         read_data(entry[Files].Dummy, IndexData, 21);
-        
+
+        // 以下是新增的打印语句
+        printf("--- 文件条目 %u ---\n", Files);
+        // 打印哈希值（以十六进制显示）
+        printf("FileHash: ");
+        for (int i = 0; i < 20; i++)
+        {
+            printf("%02x", entry[Files].FileHash[i]);
+        }
+        printf("\n");
+        // 打印文件偏移量、原始大小、压缩方法和压缩后大小
+        printf("FileOffset: 0x%llx (%llu)\n", entry[Files].FileOffset, entry[Files].FileOffset); // 同时打印十六进制和十进制
+        printf("FileSize: %llu\n", entry[Files].FileSize);
+        printf("CompressionMethod: %u\n", entry[Files].CompressionMethod);
+        printf("CompressedLength: %llu\n", entry[Files].CompressedLength);
+        printf("------------------------\n");
+
         // 如果有压缩，则读取压缩块信息
-        if (entry[Files].CompressionMethod != 0) {
+        if (entry[Files].CompressionMethod != 0)
+        {
             read_data(&entry[Files].NumOfBlocks, IndexData, 4);
             entry[Files].blocks = (CompressionBlock*)malloc(entry[Files].NumOfBlocks * sizeof(CompressionBlock));
             
@@ -287,10 +304,12 @@ int main(int argc, const char *argv[]) {
                 read_data(&entry[Files].blocks[i].start, IndexData, 8);
                 read_data(&entry[Files].blocks[i].end, IndexData, 8);
             }
-        } else {
+        }
+        else
+        {
             entry[Files].NumOfBlocks = 0;
         }
-        
+
         read_data(&entry[Files].CompressedBlockSize, IndexData, 4);
         read_data(&entry[Files].Encrypted, IndexData, 1);
     }
@@ -332,7 +351,7 @@ int main(int argc, const char *argv[]) {
             
             read_data(&ENTRY, IndexData, 4);
             
-            // 构建完整的文件路径 小天v3_头盔护甲背包白体_全枪据点快切_范围_自瞄
+            // 构建完整的文件路径 
             memset(path, 0, 1024);
             snprintf(path, 1024, "%s%s%s", MountPoint, DIR_NAME, Filename);
             
