@@ -14,8 +14,8 @@ import time
 from glob import glob
 
 # pak_file = "./paks/game_patch_1.32.11.14059.pak"
-pak_file = "./paks/map_lobby_1.32.11.13800_0.67.pak"
-dat_dir = "./unpack/dat_temp"
+pak_file = "./paks/game_patch_1.32.11.14059_SV5.pak"
+dat_dir = "./paks/dat_temp"
 
 # 定义解包函数dat_temp
 def jb():
