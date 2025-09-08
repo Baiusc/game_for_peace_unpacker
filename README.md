@@ -2,7 +2,7 @@
  * @Author       : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
  * @Date         : 2025-09-02 16:42:02
  * @LastEditors  : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
- * @LastEditTime : 2025-09-04 16:31:06
+ * @LastEditTime : 2025-09-08 17:30:22
  * @FilePath     : /game_for_peace_unpacker/README.md
  * @Description  : 
  * 
@@ -65,12 +65,38 @@ grep -ail "BP_ShootWeaponBase_C": 对每个文件名执行 grep 命令，使用 
 
 ## 零、dat对应关系
 - `./file_0/00000009.dat`   BP_ShootWeaponBase_C
-- `./file_0/00000051.dat`   BP_ShootWeaponBase_C
+- `./file_0/00000051.dat`   BP_ShootWeaponBase
 - `./file_0/00000013.dat`   BP_ShootWeaponProjectileBase_C
 - `./file_0/00000057.dat`   BP_ShootWeaponProjectileBase_C
 - `./file_1000/00001116.dat`   BP_ShootWeaponProjectileBase_C
 
 ## 键值对功能说明书
+
+
+
+
+SkeletalBodySetup 范围 find . -name "*.dat" -print0 | xargs -0 grep -ail "SkeletalBodySetup" 
+
+./Content/Arts_Player/Characters/Animation/Base_Skeleton/CH_Base_SK_PhysicsAsset.uasset
+
+CH_Base_SK_PhysicsAsset 骨骼box大小 范围  SkeletalBodySetup
+
+部位名称及其含义
+pelvis：骨盆。这是身体的中心，连接上半身和腿部。
+
+head：头部。角色的头，通常是游戏中最重要的命中区域，常用于爆头判定。
+
+thigh_r：右大腿。thigh 是大腿，_r 表示右侧（right）。
+
+calf_r：右小腿。calf 是小腿，_r 表示右侧。
+
+lowerarm_l：左前臂。lowerarm 是前臂，_l 表示左侧（left）。
+
+foot_l：左脚。foot 是脚，_l 表示左侧。
+
+spine_03：脊柱。spine 是脊柱，_03 通常表示这是脊柱的第三节或特定部位，用于区分不同的脊椎骨。
+
+upperarm_l：左上臂。upperarm 是上臂，_l 表示左侧。
 
 AccessoriesVRecoilFactor（配件垂直后坐力系数）0.55 表示配件将垂直后坐力降低至原始值的 55%  改为 0.01418
 
