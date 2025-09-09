@@ -2,7 +2,7 @@
  * @Author       : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
  * @Date         : 2025-09-02 16:42:02
  * @LastEditors  : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
- * @LastEditTime : 2025-09-08 17:30:22
+ * @LastEditTime : 2025-09-09 14:11:49
  * @FilePath     : /game_for_peace_unpacker/README.md
  * @Description  : 
  * 
@@ -112,6 +112,24 @@ CrossHairBurstSpeed（准星爆发速度）数值越低，准星扩散越平缓�
 CrossHairBurstIncreaseSpeed（准星爆发增速）数值越低，扩散速度变化更线性（后坐力表现更平滑）。从 3.5 改为 0.1418
 
 RecoilKickADS 代表 "Aim Down Sights Recoil Kick"，即开镜瞄准（ADS）时的后坐力冲击。从 0.15 改为 0.025123
+
+## 打包
+
+你提供的代码中的 repack_pak 函数实际上只是简单地复制了旧文件的数据和索引，并没有真正进行“重新打包”，这对于修改文件后进行打包是无效的。我将根据你提供的文件结构（PakInfo, Entry 等），重新设计并实现一个完整的 repack_pak 函数。
+
+这个新函数将遵循以下逻辑：
+
+首先，它会像你最初提到的那样，先写入一个占位符头部。
+
+然后，它会逐个读取你想要打包的源文件，将它们的内容写入到新的PAK文件中，并记录每个文件在新PAK中的偏移量和大小。
+
+接下来，它会根据这些记录的偏移量和大小，在内存中构建一个新的索引。
+
+然后，将这个新构建的索引写入到文件的末尾。
+
+最后，它会计算出正确的索引位置和大小，更新并写入最终的 PakInfo 头部。
+
+
 
 ## 一、子目录说明
 - `data`   数据

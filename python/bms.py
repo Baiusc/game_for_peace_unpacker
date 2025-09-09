@@ -2,7 +2,7 @@
 Author       : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
 Date         : 2025-08-21 10:10:50
 LastEditors  : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
-LastEditTime : 2025-09-09 11:53:43
+LastEditTime : 2025-09-09 14:58:22
 FilePath     : /game_for_peace_unpacker/python/bms.py
 Description  : 
 
@@ -13,8 +13,8 @@ import subprocess
 import time
 from glob import glob
 
-# pak_file = "./paks/map_weapon_1.33.12.14210.pak"
-pak_file = "./paks/game_patch_1.33.12.14226.pak"
+pak_file = "./paks/map_weapon_1.33.12.14210.pak"
+# pak_file = "./paks/game_patch_1.33.12.14227.pak"
 dat_dir = "./paks/dat_temp"
 
 # 定义解包函数dat_temp
