@@ -2,7 +2,7 @@
 Author       : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
 Date         : 2025-08-21 10:10:50
 LastEditors  : 昼星的学习PC 1148635540@qq.com
-LastEditTime : 2025-09-06 10:17:44
+LastEditTime : 2025-09-06 16:00:19
 FilePath     : \game_for_peace_unpacker\python\bms_win32.py
 Description  : 
 
@@ -13,9 +13,9 @@ import subprocess
 import time
 from glob import glob
 
-# pak_file = "./paks/game_patch_1.32.11.14059.pak"
-pak_file = "./paks/game_patch_1.32.11.14059_SV5.pak"
-dat_dir = "./paks/dat_temp"
+# 修改为以下方式（推荐使用 os.path 处理路径）
+pak_file = r"D:\EEE\Baiusc\game_for_peace_unpacker\paks\game_patch_1.32.11.14059.pak"
+dat_dir = r"D:\EEE\Baiusc\game_for_peace_unpacker\paks\dat_temp"
 
 # 定义解包函数dat_temp
 def jb():
