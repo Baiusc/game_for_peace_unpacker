@@ -141,26 +141,18 @@ for I = 0 < FILES
                 math CHUNK_OFFSET = OFFSET
 
             endif
-			if ENCRYPTED != 0
-			else
-				filexor ""
-			endif
-			
-			#if GUESS_NAMES == 0
-				if ZIP == 0
-					log NAME CHUNK_OFFSET CHUNK_SIZE 0 CHUNK_XSIZE	
-				else
-					clog NAME CHUNK_OFFSET CHUNK_ZSIZE CHUNK_SIZE 0 CHUNK_XSIZE
-				endif
-			/*else
-				if ZIP == 0
-					log MEMORY_FILE5 CHUNK_OFFSET CHUNK_SIZE 0 CHUNK_XSIZE			
-				else
-					clog MEMORY_FILE5 CHUNK_OFFSET CHUNK_ZSIZE CHUNK_SIZE 0 CHUNK_XSIZE
-				endif
-			endif*/	
-			
-            math TMP_SIZE - CHUNK_SIZE
+            
+            # 如果不猜测文件名
+            if ZIP == 0
+                log NAME CHUNK_OFFSET CHUNK_SIZE 0 CHUNK_XSIZE # 未压缩，直接记录
+                print "异常，分块，写入未压缩数据..."
+            else
+                clog NAME CHUNK_OFFSET CHUNK_ZSIZE CHUNK_SIZE 0 CHUNK_XSIZE # 压缩，解压后记录
+                # print "  解压并写入数据..."
+            endif
+            
+            math TMP_SIZE - CHUNK_SIZE # 更新剩余大小
+            # print "  剩余解压大小: %TMP_SIZE%"
         next x
         append
 		
@@ -197,8 +189,10 @@ for I = 0 < FILES
         endif
         if ZIP == 0
             log NAME OFFSET SIZE 0 XSIZE
+            print "异常，未分块，写入未压缩数据... NAME: %NAME% OFFSET: 0x%OFFSET|llx% SIZE: %SIZE% XSIZE: %XSIZE%""
         else
-            clog NAME OFFSET ZSIZE SIZE 0 XSIZE
+            clog NAME OFFSET ZSIZE SIZE 0 XSIZE # 压缩，解压后记录
+            # print "  解压并写入数据..."
         endif
     endif
 	filexor ""

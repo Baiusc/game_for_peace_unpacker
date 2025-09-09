@@ -58,6 +58,11 @@ for i = 0 < FILES
     get ZSIZE longlong TOC_FILE
 	getdstring DUMMY2 21 TOC_FILE
 
+    # print "文件偏移量: 0x%OFFSET|llx%"
+    print "原始大小: %SIZE%"
+    print "压缩类型 (ZIP): %ZIP%"
+    print "压缩后大小: %ZSIZE%"
+
 	if OFFSET != 0
 		print "Extraction complete!"
 		cleanexit
@@ -137,6 +142,7 @@ for i = 0 < FILES
 			#if GUESS_NAMES == 0
 				if ZIP == 0
 					log NAME CHUNK_OFFSET CHUNK_SIZE 0 CHUNK_XSIZE	
+                print "异常，分块，写入未压缩数据..."
 				else
 					clog NAME CHUNK_OFFSET CHUNK_ZSIZE CHUNK_SIZE 0 CHUNK_XSIZE
 				endif
@@ -184,6 +190,7 @@ for i = 0 < FILES
         endif
         if ZIP == 0
             log NAME OFFSET SIZE 0 XSIZE
+            print "异常，未分块，写入未压缩数据... NAME: %NAME% OFFSET: 0x%OFFSET|llx% SIZE: %SIZE% XSIZE: %XSIZE%""
         else
             clog NAME OFFSET ZSIZE SIZE 0 XSIZE
         endif
