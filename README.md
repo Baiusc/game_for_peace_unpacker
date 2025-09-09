@@ -2,7 +2,7 @@
  * @Author       : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
  * @Date         : 2025-09-02 16:42:02
  * @LastEditors  : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
- * @LastEditTime : 2025-09-09 14:11:49
+ * @LastEditTime : 2025-09-09 17:47:14
  * @FilePath     : /game_for_peace_unpacker/README.md
  * @Description  : 
  * 
@@ -14,6 +14,9 @@
 # 和平精英解包/打包/paks/obb改文件 
 
 ---
+
+打包目前存在问题
+
 明文解包：
 
 src/game_for_peace_unpack.c
