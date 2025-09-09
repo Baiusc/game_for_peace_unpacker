@@ -174,7 +174,7 @@ for I = 0 < FILES            # 循环遍历所有文件
             # 如果不猜测文件名
             if ZIP == 0
                 log NAME CHUNK_OFFSET CHUNK_SIZE 0 CHUNK_XSIZE # 未压缩，直接记录
-                # print "  写入未压缩数据..."
+                print "异常，分块，写入未压缩数据..."
             else
                 clog NAME CHUNK_OFFSET CHUNK_ZSIZE CHUNK_SIZE 0 CHUNK_XSIZE # 压缩，解压后记录
                 # print "  解压并写入数据..."
@@ -201,9 +201,11 @@ for I = 0 < FILES            # 循环遍历所有文件
 			filexor ""
         endif
         if ZIP == 0
-            log NAME OFFSET SIZE 0 XSIZE # 未压缩，直接记录
+            log NAME OFFSET SIZE 0 XSIZE
+            print "异常，未分块，写入未压缩数据... NAME: %NAME% OFFSET: 0x%OFFSET|llx% SIZE: %SIZE% XSIZE: %XSIZE%""
         else
             clog NAME OFFSET ZSIZE SIZE 0 XSIZE # 压缩，解压后记录
+            # print "  解压并写入数据..."
         endif
     endif
 	filexor ""              # 关闭异或
