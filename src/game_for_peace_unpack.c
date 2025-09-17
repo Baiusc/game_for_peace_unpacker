@@ -665,43 +665,50 @@ void update_pak_by_dat(const char* pak_file, const char* dat_dir) {
             continue;
         }
 
-        uint8_t* in_data = (uint8_t*)malloc(new_entries[i].FileSize);
+        uint8_t* in_data = (uint8_t*)malloc(original_entries[i].FileSize);
         if (!in_data) {
             perror("Failed to allocate memory for input data");
             close(dat_file);
             continue;
         }
-        read(dat_file, in_data, new_entries[i].FileSize);
+        read(dat_file, in_data, original_entries[i].FileSize);
         close(dat_file);
 
-        uint8_t* compressed_data = (uint8_t*)malloc(new_entries[i].FileSize);
+        uint8_t* compressed_data = (uint8_t*)malloc(original_entries[i].FileSize);
         if (!compressed_data) {
             perror("Failed to allocate memory for compressed data");
             free(in_data);
             continue;
         }
-        size_t compressed_size = new_entries[i].FileSize;
+        size_t compressed_size = original_entries[i].FileSize;
         
-        int ret = ZLIB_compress(in_data, new_entries[i].FileSize, compressed_data, &compressed_size);
+        int ret = ZLIB_compress(in_data, original_entries[i].FileSize, compressed_data, &compressed_size);
         if (ret != Z_OK) {
             fprintf(stderr, "ZLIB compression failed for file %s\n", new_entries[i].filename);
             free(in_data);
             free(compressed_data);
             continue;
         }
-        
+
         // 打印更新前的文件信息
         printf("准备写入文件: %s\n", new_entries[i].filename);
-        if (i < NumOfEntry) {
-            printf("  - 文件偏移量: 新值=%lu, 原来值=%lu\n", current_data_offset, original_entries[i].FileOffset);
-            printf("  - 压缩后大小: 新值=%zu, 原来值=%lu\n", compressed_size, original_entries[i].CompressedLength);
-        } else {
+        if (i < NumOfEntry)
+        {
+            // 计算差值（新值 - 原值）
+            long size_diff = (long)(compressed_size - original_entries[i].CompressedLength);
+            printf("  - 压缩后大小: 新值=%zu, 原来值=%lu, 差值=%+ld\n",
+                   compressed_size,
+                   original_entries[i].CompressedLength,
+                   size_diff);
+        }
+        else
+        {
             printf("  - 这是新增的文件，无原始条目可供比较。\n");
         }
-        
+
         // 更新条目信息，这里只更新偏移量和压缩后大小。
-        new_entries[i].FileOffset = current_data_offset;
-        new_entries[i].CompressedLength = compressed_size;
+        // new_entries[i].FileOffset = current_data_offset;
+        // new_entries[i].CompressedLength = compressed_size;
         
         // 写入压缩数据到 .pak 文件。
         write(pakFile, compressed_data, compressed_size);
