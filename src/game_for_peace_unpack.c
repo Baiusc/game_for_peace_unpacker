@@ -531,102 +531,133 @@ Entry* get_files_from_dir(const char* dat_dir, uint32_t* num_files) {
     *num_files = count;
     return entries;
 }
-// 新的更新函数，可以根据 .dat 目录更新 .pak 文件
-void update_pak_by_dat(const char* pak_file, const char* dat_dir, const char* output_pak_file) {
-    printf("Updating '%s' with files from '%s' into new file '%s'...\n", pak_file, dat_dir, output_pak_file);
 
-    int InPakFile = open(pak_file, O_RDONLY);
-    if (InPakFile == -1) {
-        perror("Failed to open input pak file");
+// 此函数根据 .dat 目录中的文件更新现有的 .pak 文件。
+// 它只会替换原始文件的数据区域，而保留索引和头部信息区域。
+void update_pak_by_dat(const char* pak_file, const char* dat_dir) {
+    // 打印状态信息。
+    printf("Updating '%s' with files from '%s'...\n", pak_file, dat_dir);
+
+    // 1. 读取原始 pak 文件的元数据 (PakInfo) 和索引数据
+    // 以读写模式打开 pak 文件。
+    int pakFile = open(pak_file, O_RDWR);
+    if (pakFile == -1) {
+        perror("Failed to open pak file for read/write");
         return;
     }
-    
-    // 1. 读取原始 pak 文件的元数据 (PakInfo) 和索引数据
+
     struct stat st;
     if (stat(pak_file, &st) == -1) {
-        perror("Failed to get input file size");
-        close(InPakFile);
-        return;
-    }
-    
-    PakInfo info;
-    lseek(InPakFile, -sizeof(PakInfo), SEEK_END);
-    if (read(InPakFile, &info, sizeof(PakInfo)) != sizeof(PakInfo)) {
-        perror("Failed to read pak header");
-        close(InPakFile);
-        return;
-    }
-    
-    info.offset ^= OFFSET_KEY;
-    info.encrypted ^= 0x6c;
-    
-    uint64_t index_data_size = st.st_size - info.offset - sizeof(PakInfo);
-    uint8_t *index_data = (uint8_t*)malloc(index_data_size);
-    if (!index_data) {
-        perror("Memory allocation for index failed");
-        close(InPakFile);
+        perror("Failed to get file size");
+        close(pakFile);
         return;
     }
 
-    if (pread(InPakFile, index_data, index_data_size, info.offset) != index_data_size) {
-        perror("Failed to read index data from input pak");
+    PakInfo info;
+    lseek(pakFile, -sizeof(PakInfo), SEEK_END);
+    if (read(pakFile, &info, sizeof(PakInfo)) != sizeof(PakInfo)) {
+        perror("Failed to read pak header");
+        close(pakFile);
+        return;
+    }
+
+    // 解密头部信息，以便获取正确的索引偏移量和大小。
+    uint64_t index_offset = info.offset ^ OFFSET_KEY;
+    uint64_t index_data_size = st.st_size - index_offset - sizeof(PakInfo);
+
+    // 为索引数据分配内存。
+    uint8_t* index_data = (uint8_t*)malloc(index_data_size);
+    if (!index_data) {
+        perror("Memory allocation for index failed");
+        close(pakFile);
+        return;
+    }
+
+    // 读取原始索引数据。
+    if (pread(pakFile, index_data, index_data_size, index_offset) != index_data_size) {
+        perror("Failed to read index data from pak file");
         free(index_data);
-        close(InPakFile);
+        close(pakFile);
         return;
     }
     
-    if (info.encrypted) {
+    // 如果 PakInfo 中的加密标志为真，则调用解密函数。
+    if ((info.encrypted ^ 0x6c) != 0) {
         DecryptData(index_data, index_data_size);
     }
     
-    // 2. 复制原始数据到新文件
-    int OutPakFile = open(output_pak_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-    if (OutPakFile == -1) {
-        perror("Failed to open output pak file");
+    // 解析原始索引数据以获取文件条目列表
+    uint32_t NumOfEntry;
+    uint8_t* index_data_ptr = index_data;
+
+    // 跳过挂载点数据
+    uint32_t MountPointLength;
+    memcpy(&MountPointLength, index_data_ptr, sizeof(MountPointLength));
+    index_data_ptr += sizeof(MountPointLength) + MountPointLength;
+
+    // 读取文件条目总数
+    memcpy(&NumOfEntry, index_data_ptr, sizeof(NumOfEntry));
+    index_data_ptr += sizeof(NumOfEntry);
+    
+    // 为原始条目列表分配内存
+    Entry* original_entries = (Entry*)malloc(NumOfEntry * sizeof(Entry));
+    if (!original_entries) {
+        fprintf(stderr, "Memory allocation for original entries failed!\n");
         free(index_data);
-        close(InPakFile);
+        close(pakFile);
         return;
     }
 
-    off_t data_size_to_copy = info.offset;
-    uint8_t *buffer = (uint8_t*)malloc(CHUNK_SIZE);
-    if (!buffer) {
-        perror("Memory allocation for buffer failed");
-        free(index_data);
-        close(InPakFile);
-        close(OutPakFile);
-        return;
-    }
-    
-    lseek(InPakFile, 0, SEEK_SET);
-    off_t bytes_copied = 0;
-    while (bytes_copied < data_size_to_copy) {
-        size_t bytes_to_read = (data_size_to_copy - bytes_copied > CHUNK_SIZE) ? CHUNK_SIZE : (data_size_to_copy - bytes_copied);
-        ssize_t bytes_read = read(InPakFile, buffer, bytes_to_read);
-        if (bytes_read <= 0) {
-            perror("Error reading from input pak");
-            break;
+    // 遍历索引数据，解析并保存每个文件条目的信息
+    for (uint32_t Files = 0; Files < NumOfEntry; Files++) {
+        memcpy(original_entries[Files].FileHash, index_data_ptr, 20);
+        index_data_ptr += 20;
+        memcpy(&original_entries[Files].FileOffset, index_data_ptr, 8);
+        index_data_ptr += 8;
+        memcpy(&original_entries[Files].FileSize, index_data_ptr, 8);
+        index_data_ptr += 8;
+        memcpy(&original_entries[Files].CompressionMethod, index_data_ptr, 4);
+        index_data_ptr += 4;
+        memcpy(&original_entries[Files].CompressedLength, index_data_ptr, 8);
+        index_data_ptr += 8;
+        memcpy(original_entries[Files].Dummy, index_data_ptr, 21);
+        index_data_ptr += 21;
+
+        if (original_entries[Files].CompressionMethod != 0) {
+            memcpy(&original_entries[Files].NumOfBlocks, index_data_ptr, 4);
+            index_data_ptr += 4;
+            // 跳过 CompressionBlock 数据，因为我们只关心偏移量和大小
+            index_data_ptr += original_entries[Files].NumOfBlocks * sizeof(CompressionBlock);
+        } else {
+            original_entries[Files].NumOfBlocks = 0;
         }
-        write(OutPakFile, buffer, bytes_read);
-        bytes_copied += bytes_read;
+
+        memcpy(&original_entries[Files].CompressedBlockSize, index_data_ptr, 4);
+        index_data_ptr += 4;
+        memcpy(&original_entries[Files].Encrypted, index_data_ptr, 1);
+        index_data_ptr += 1;
     }
 
-    free(buffer);
-    
-    // 3. 遍历 .dat 目录，压缩并写入新文件
+    // 2. 遍历 .dat 目录，压缩并写入新数据
+    // 将文件截断到旧数据区域的末尾，即索引区域的起始位置。
+    ftruncate(pakFile, index_offset);
+    lseek(pakFile, 0, SEEK_SET);
+
     uint32_t dat_file_count;
+    // 获取新文件的列表。
     Entry* new_entries = get_files_from_dir(dat_dir, &dat_file_count);
     if (!new_entries) {
         fprintf(stderr, "No files found in directory %s\n", dat_dir);
         free(index_data);
-        close(InPakFile);
-        close(OutPakFile);
+        free(original_entries);
+        close(pakFile);
         return;
     }
-    
-    uint64_t new_data_start_offset = lseek(OutPakFile, 0, SEEK_CUR);
-    printf("New data start offset: %lu\n", new_data_start_offset);
 
+    // 记录新的文件数据起始偏移量。
+    uint64_t current_data_offset = 0;
+    
+    // 遍历新文件，压缩并写入文件。
     for (uint32_t i = 0; i < dat_file_count; ++i) {
         int dat_file = open(new_entries[i].filename, O_RDONLY);
         if (dat_file == -1) {
@@ -659,81 +690,62 @@ void update_pak_by_dat(const char* pak_file, const char* dat_dir, const char* ou
             continue;
         }
         
-        // 更新条目信息
-        new_entries[i].FileOffset = lseek(OutPakFile, 0, SEEK_CUR);
-        new_entries[i].CompressedLength = compressed_size;
-        new_entries[i].NumOfBlocks = 1; // 简化为单个块
-        new_entries[i].blocks = (CompressionBlock*)malloc(sizeof(CompressionBlock));
-        if (!new_entries[i].blocks) {
-             perror("Failed to allocate memory for blocks");
-             free(in_data);
-             free(compressed_data);
-             continue;
+        // 打印更新前的文件信息
+        printf("准备写入文件: %s\n", new_entries[i].filename);
+        if (i < NumOfEntry) {
+            printf("  - 文件偏移量: 新值=%lu, 原来值=%lu\n", current_data_offset, original_entries[i].FileOffset);
+            printf("  - 压缩后大小: 新值=%zu, 原来值=%lu\n", compressed_size, original_entries[i].CompressedLength);
+        } else {
+            printf("  - 这是新增的文件，无原始条目可供比较。\n");
         }
-        new_entries[i].blocks[0].start = new_entries[i].FileOffset;
-        new_entries[i].blocks[0].end = new_entries[i].FileOffset + compressed_size;
         
-        // 写入压缩数据
-        write(OutPakFile, compressed_data, compressed_size);
+        // 更新条目信息，这里只更新偏移量和压缩后大小。
+        new_entries[i].FileOffset = current_data_offset;
+        new_entries[i].CompressedLength = compressed_size;
+        
+        // 写入压缩数据到 .pak 文件。
+        write(pakFile, compressed_data, compressed_size);
+        current_data_offset += compressed_size;
 
         free(in_data);
         free(compressed_data);
     }
     
-    // 4. 将原始索引和新条目信息合并，并写入新文件
-    // 这里需要一个更复杂的逻辑来处理索引的修改和重写。
-    // 由于原始索引数据结构复杂，这里简化为只追加新文件的索引。
-    // 在实际应用中，需要根据原始索引的格式，修改、删除或添加新的文件条目。
-    
-    uint64_t new_index_offset = lseek(OutPakFile, 0, SEEK_CUR);
-    printf("New index offset: %lu\n", new_index_offset);
-
-    // 首先写入原始的索引数据
-    write(OutPakFile, index_data, index_data_size);
-
-    // 然后写入新文件的索引条目
-    // 这是一个简化版，在实际中需要将新条目整合到原始索引结构中
-    for (uint32_t i = 0; i < dat_file_count; ++i) {
-        // 写入简化后的条目信息
-        write(OutPakFile, &new_entries[i].FileOffset, 8);
-        write(OutPakFile, &new_entries[i].FileSize, 8);
-        write(OutPakFile, &new_entries[i].CompressionMethod, 4);
-        write(OutPakFile, &new_entries[i].CompressedLength, 8);
-        // ... 写入其他字段
+    // 3. 检查新旧数据区大小是否一致
+    if (current_data_offset != index_offset) {
+        fprintf(stderr, "Error: New data size (%lu) does not match original data size (%lu). This will corrupt the file. Aborting.\n", current_data_offset, index_offset);
+    } else {
+        printf("New data size matches original data size. The original index and header remain valid.\n");
     }
 
-    // 5. 更新并写入新的 PakInfo
-    PakInfo new_info = info;
-    new_info.offset = new_index_offset ^ OFFSET_KEY;
-    new_info.size = (lseek(OutPakFile, 0, SEEK_CUR) - new_index_offset) ^ SIZE_KEY;
-    write(OutPakFile, &new_info, sizeof(PakInfo));
-    
-    // 6. 清理内存和文件句柄
+    // 4. 清理内存和文件句柄
     for (uint32_t i = 0; i < dat_file_count; ++i) {
         free(new_entries[i].filename);
         free(new_entries[i].blocks);
     }
     free(new_entries);
+    free(original_entries);
     free(index_data);
-    close(InPakFile);
-    close(OutPakFile);
+    close(pakFile);
     
-    printf("Update completed successfully.\n");
+    if (current_data_offset == index_offset) {
+        printf("Update completed successfully.\n");
+    }
 }
 
 int main(void) {
     // 您可以更改这个变量来切换模式
     // 设置为 true 来执行 update
     // 设置为 false 来执行 unpack
-    bool update_mode = false;
+    bool update_mode = true;
 
-    const char* pak_path = "../paks/map_weapon_1.33.12.14210.pak";
+    const char* pak_path = "../paks/game_patch_1.33.12.14226.pak";
     const char* dat_path = "../paks/dat_temp";
-    const char* output_pak = "../paks/game_patch_1.33.12.14226new.pak";
+    // const char* output_pak = "../paks/game_patch_1.33.12.14226new.pak";
 
     if (update_mode) {
         // --- 更新模式 ---
-        update_pak_by_dat(pak_path, dat_path, output_pak);
+        update_pak_by_dat(pak_path, dat_path);
     } else {
         // --- 解包模式 ---
         unpack_pak(pak_path, dat_path);
