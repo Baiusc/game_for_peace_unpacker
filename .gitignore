@@ -97,3 +97,4 @@ unpack/
 *.exe
 *.dat
 *.pak
+tool/

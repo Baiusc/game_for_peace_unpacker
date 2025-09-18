@@ -2,7 +2,7 @@
  * @Author       : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
  * @Date         : 2025-09-02 16:42:02
  * @LastEditors  : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
- * @LastEditTime : 2025-09-09 17:47:14
+ * @LastEditTime : 2025-09-18 14:14:08
  * @FilePath     : /game_for_peace_unpacker/README.md
  * @Description  : 
  * 
@@ -75,12 +75,17 @@ grep -ail "BP_ShootWeaponBase_C": 对每个文件名执行 grep 命令，使用 
 
 ## 键值对功能说明书
 
-
-
-
 SkeletalBodySetup 范围 find . -name "*.dat" -print0 | xargs -0 grep -ail "SkeletalBodySetup" 
 
+打印文件名+文件大小字节 find . -name "*.dat" -type f -exec grep -ail "SkeletalBodySetup" {} + | xargs -I {} stat --format="%s %n" {}
+
+find . -name "*.uasset" -type f -exec grep -ail "SkeletalBodySetup" {} + | xargs -I {} stat --format="%s %n" {}
+
 ./Content/Arts_Player/Characters/Animation/Base_Skeleton/CH_Base_SK_PhysicsAsset.uasset
+
+5893字节 ./file_6/00000365.dat
+
+17035字节
 
 CH_Base_SK_PhysicsAsset 骨骼box大小 范围  SkeletalBodySetup
 

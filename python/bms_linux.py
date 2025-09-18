@@ -2,7 +2,7 @@
 Author       : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
 Date         : 2025-08-21 10:10:50
 LastEditors  : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
-LastEditTime : 2025-09-09 17:44:19
+LastEditTime : 2025-09-18 14:35:28
 FilePath     : /game_for_peace_unpacker/python/bms_linux.py
 Description  : 
 
@@ -13,8 +13,8 @@ import subprocess
 import time
 from glob import glob
 
-# pak_file = "./paks/game_patch_1.32.11.14059.pak"
-pak_file = "./paks/game_patch_1.32.11.14059_SV5.pak"
+# pak_file = "./paks/map_lobby_1.33.12.14210.pak"
+pak_file = "./paks/game_patch_1.33.12.14265.pak"
 dat_dir = "./paks/dat_temp"
 
 # 定义解包函数dat_temp
@@ -23,7 +23,7 @@ def jb():
     print(f"解包目录: {dat_dir}")
     # 执行解包命令（去掉 qemu-i386 不需要安卓模拟PC环境）
     command = [
-        "./python/quickbms",  # 直接运行 quickbms
+        "./python/quickbms_linux",  # 直接运行 quickbms
         "./python/解包.bms",  # 确保路径正确
         pak_file, 
         dat_dir
@@ -42,7 +42,7 @@ def db():
     print("请选择要打包的 PAK 文件：")
     # 执行打包命令
     command = [
-        "./python/quickbms", 
+        "./python/quickbms_linux", 
         "-w", "-r", "-r", 
         "./python/解包.bms", 
         pak_file, # 第一个参数：原始 PAK 文件

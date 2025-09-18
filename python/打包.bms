@@ -190,7 +190,7 @@ for i = 0 < FILES
         endif
         if ZIP == 0
             log NAME OFFSET SIZE 0 XSIZE
-            print "异常，未分块，写入未压缩数据... NAME: %NAME% OFFSET: 0x%OFFSET|llx% SIZE: %SIZE% XSIZE: %XSIZE%""
+            print "未分块，写入未压缩数据... NAME: %NAME% OFFSET: 0x%OFFSET|llx% SIZE: %SIZE% XSIZE: %XSIZE%""
         else
             clog NAME OFFSET ZSIZE SIZE 0 XSIZE
         endif
