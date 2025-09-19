@@ -2,7 +2,7 @@
  * @Author       : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
  * @Date         : 2025-09-02 16:42:02
  * @LastEditors  : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
- * @LastEditTime : 2025-09-18 14:14:08
+ * @LastEditTime : 2025-09-19 10:03:14
  * @FilePath     : /game_for_peace_unpacker/README.md
  * @Description  : 
  * 
@@ -77,7 +77,7 @@ grep -ail "BP_ShootWeaponBase_C": 对每个文件名执行 grep 命令，使用 
 
 SkeletalBodySetup 范围 find . -name "*.dat" -print0 | xargs -0 grep -ail "SkeletalBodySetup" 
 
-打印文件名+文件大小字节 find . -name "*.dat" -type f -exec grep -ail "SkeletalBodySetup" {} + | xargs -I {} stat --format="%s %n" {}
+20250919最新：打印文件名+文件大小字节 find . -name "*.dat" -type f -exec grep -ail "SkeletalBodySetup" {} + | xargs -I {} stat --format="%s %n" {}
 
 find . -name "*.uasset" -type f -exec grep -ail "SkeletalBodySetup" {} + | xargs -I {} stat --format="%s %n" {}
 

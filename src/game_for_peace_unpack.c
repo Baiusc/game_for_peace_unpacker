@@ -752,8 +752,8 @@ int main(void) {
     // 设置为 false 来执行 unpack
     bool update_mode = false;
 
-    // const char* pak_path = "../paks/map_lobby_1.33.12.14210.pak";
-    const char* pak_path = "../paks/game_patch_1.32.11.14059.pak";
+    const char* pak_path = "../paks/map_lobby_1.33.12.14210.pak";
+    // const char* pak_path = "../paks/game_patch_1.32.11.14059.pak";
     const char* dat_path = "../paks/dat_temp";
     // const char* output_pak = "../paks/game_patch_1.33.12.14226new.pak";
     if (update_mode) {
