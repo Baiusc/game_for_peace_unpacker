@@ -13,9 +13,9 @@ import subprocess
 import time
 from glob import glob
 
-# pak_file = "./paks/game_patch_1.32.11.14059.pak"
-pak_file = "./paks/game_patch_1.32.11.14059_SV5.pak"
-dat_dir = "./paks/dat_temp"
+# 修改为以下方式（推荐使用 os.path 处理路径）
+pak_file = r"D:\EEE\Baiusc\game_for_peace_unpacker\paks\game_patch_1.32.11.14059.pak"
+dat_dir = r"D:\EEE\Baiusc\game_for_peace_unpacker\paks\dat_temp"
 
 # 定义解包函数dat_temp
 def jb():

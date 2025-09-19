@@ -6,6 +6,13 @@ math GUESS_NAMES = 0	# set it to 1 in case if you want to extract files with gue
 						# GUESS_NAMES DOESN'T WORK AT THE MOMENT
 quickbmsver "0.8.4"
 
+
+math NO_TAIL_INFO = 1   # set it to 1 for archives with corrupt/missing tail information
+math VERSION = 3        # set it to 3 if NO_TAIL_INFO = 1 for most of modern games
+math GUESS_NAMES = 0	# set it to 1 in case if you want to extract files with guessing their names
+						# GUESS_NAMES DOESN'T WORK AT THE MOMENT
+quickbmsver "0.8.4"
+
 math TOC_FILE = 0
 math TOC_FILE5 = -5
 #math MEM_UEXP = -10
