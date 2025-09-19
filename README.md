@@ -2,7 +2,7 @@
  * @Author       : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
  * @Date         : 2025-09-02 16:42:02
  * @LastEditors  : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
- * @LastEditTime : 2025-09-19 10:03:14
+ * @LastEditTime : 2025-09-19 13:33:36
  * @FilePath     : /game_for_peace_unpacker/README.md
  * @Description  : 
  * 
@@ -15,7 +15,7 @@
 
 ---
 
-打包目前存在问题
+打包目前存在问题：打包大obb文件会出现未替换而是添加的情况，导致大小膨胀
 
 明文解包：
 
@@ -67,6 +67,15 @@ grep -ail "BP_ShootWeaponBase_C": 对每个文件名执行 grep 命令，使用 
 这个方法更加健壮，因为它强制 grep 逐个处理文件，并且 xargs 的 -0 选项确保了文件名能够被正确传递，有效地避免了之前遇到的“可执行文件格式错误”问题。
 
 ## 零、dat对应关系
+
+打印当前文件夹下 map_lobby_1.33.12.14210.pak 文件的实际大小： ls -l map_lobby_1.33.12.14210.pak
+
+打印当前文件夹下 game_patch_1.32.11.14059.pak 文件的实际大小：ls -l game_patch_1.32.11.14059.pak
+
+ls -l map_lobby_1.32.11.13800_0.67.pak
+
+
+map_lobby_1.33.12.14210.pak 794.6 MB (794598863 字节)
 - `./file_0/00000009.dat`   BP_ShootWeaponBase_C
 - `./file_0/00000051.dat`   BP_ShootWeaponBase
 - `./file_0/00000013.dat`   BP_ShootWeaponProjectileBase_C
@@ -78,6 +87,8 @@ grep -ail "BP_ShootWeaponBase_C": 对每个文件名执行 grep 命令，使用 
 SkeletalBodySetup 范围 find . -name "*.dat" -print0 | xargs -0 grep -ail "SkeletalBodySetup" 
 
 20250919最新：打印文件名+文件大小字节 find . -name "*.dat" -type f -exec grep -ail "SkeletalBodySetup" {} + | xargs -I {} stat --format="%s %n" {}
+
+搜索文件大小为25651字节的.dat文件并打印文件名和大小：find . -name "*.dat" -type f -size 25651c -exec stat --format="%s %n" {} \;
 
 find . -name "*.uasset" -type f -exec grep -ail "SkeletalBodySetup" {} + | xargs -I {} stat --format="%s %n" {}
 
