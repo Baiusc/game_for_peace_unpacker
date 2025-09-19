@@ -9,7 +9,7 @@
       // "program": "${workspaceFolder}/build/PEACE_REPACK",
       "args": [
         // "${workspaceFolder}/paks/onreadypak_413496情绪天线.pak"
-        "${workspaceFolder}/paks/game_patch_1.32.11.14059.pak"
+        "${workspaceFolder}/paks/game_patch_1.33.12.14267.pak"
       ],
       "stopAtEntry": false,
       "cwd": "${fileDirname}",
