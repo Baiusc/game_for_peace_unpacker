@@ -183,17 +183,22 @@ int unicode_to_utf8(const char *input, size_t input_len, char *out, size_t outpu
 }
 
 // 提取单个文件函数，现在接受输出目录作为参数
-void extract(int PakFile, Entry entry, const char* output_dir) {
+void extract(int PakFile, Entry entry, const char *output_dir)
+{
     char filename[1024];
-    
-    if (counters.files_in_folder >= 1000) {
-        counters.folder_index++;
-        counters.files_in_folder = 0;
+
+    // 根据文件总数来更新文件夹索引。例如，当文件总数达到1000、2000等时，更新文件夹名称。
+    if (counters.file_index > 0 && counters.file_index % 1000 == 0)
+    {
+        counters.folder_index = counters.file_index;
     }
 
-    // 目录命名规范: file_0, file_1, etc.
-    snprintf(filename, 1024, "%s/file_%d/%08d.dat", output_dir, counters.folder_index, counters.files_in_folder);
-    counters.files_in_folder++;
+    // 目录命名规范: file_0, file_1000, etc.
+    // 文件名则使用8位零填充的绝对文件索引。
+    snprintf(filename, 1024, "%s/file_%d/%08d.dat", output_dir, counters.folder_index, counters.file_index);
+
+    // 递增文件总数，以便下次使用。
+    counters.file_index++;
     
     int OutFile = create_file(filename);
     
@@ -416,7 +421,7 @@ void unpack_pak(const char *pak_file, const char *output_dir) {
             
             read_data(&ENTRY, IndexData, 4);
             extract(PakFile, entry[ENTRY], output_dir);
-            counters.file_index++;
+            // counters.file_index++;
         }
     }
     
