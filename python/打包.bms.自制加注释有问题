@@ -42,10 +42,15 @@ else
     goto 0
     set NAME string ""
 	set BASE_NAME string ""
+    print "进入备用模式，文件总数设置为: %FILES|lx%"
+    print "文件最大偏移量: 0x%MAX_OFF|llx%"
 endif
 
 math CHUNK_SIZE = 0x10000   # just in case...
 for i = 0 < FILES
+    print "--------------------------------------"
+    print "正在处理文件 %i%"
+
 	string NAME p "%08d" i
 	string NAME + ".dat"
 
@@ -58,7 +63,13 @@ for i = 0 < FILES
     get ZSIZE longlong TOC_FILE
 	getdstring DUMMY2 21 TOC_FILE
 
+    # print "文件偏移量: 0x%OFFSET|llx%"
+    print "原始大小: %SIZE%"
+    print "压缩类型 (ZIP): %ZIP%"
+    print "压缩后大小: %ZSIZE%"
+
 	if OFFSET != 0
+        print "遇到非零偏移量 (%OFFSET|llx%)，判断为文件结束标志。"
 		print "Extraction complete!"
 		cleanexit
 	endif
@@ -137,8 +148,10 @@ for i = 0 < FILES
 			#if GUESS_NAMES == 0
 				if ZIP == 0
 					log NAME CHUNK_OFFSET CHUNK_SIZE 0 CHUNK_XSIZE	
+                    print "分块，写入未压缩数据..."
 				else
 					clog NAME CHUNK_OFFSET CHUNK_ZSIZE CHUNK_SIZE 0 CHUNK_XSIZE
+                    print "分块，写入压缩数据..."
 				endif
 			/*else
 				if ZIP == 0
@@ -168,6 +181,7 @@ for i = 0 < FILES
 			log NAME 0 SIZE TOC_FILE5	
 			log MEMORY_FILE5 0 0
 		endif*/
+        print "完成分块写入，共 %CHUNKS% 块。"
     else
         # the file offset points to an entry containing
         # the "same" OFFSET ZSIZE SIZE ZIP HASH ZERO fields,
@@ -184,17 +198,32 @@ for i = 0 < FILES
         endif
         if ZIP == 0
             log NAME OFFSET SIZE 0 XSIZE
+            print "未分块，写入未压缩数据... NAME: %NAME% OFFSET: 0x%OFFSET|llx% SIZE: %SIZE% XSIZE: %XSIZE%""
         else
             clog NAME OFFSET ZSIZE SIZE 0 XSIZE
         endif
     endif
+    print "--- DEBUG ---"
 	filexor ""
     encryption "" ""
 
+
     if ALTERNATIVE_MODE != 0
+
+        print "--- 跳转前 ---"
+        print "当前偏移量 (OFFSET): 0x%OFFSET|llx%"
+        print "当前文件压缩后大小 (ZSIZE): %ZSIZE%"
+
         math OFFSET + ZSIZE
+
+        print "--- 跳转后 ---"
+        print "新偏移量 (OFFSET): 0x%OFFSET|llx%"
+
         goto OFFSET
+        
         if OFFSET == MAX_OFF
+            print "OFFSET: 0x%OFFSET|llx%"
+            print "MAX_OFF: 0x%MAX_OFF|llx%"
             break
         endif
         if VERSION >= 8

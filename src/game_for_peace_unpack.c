@@ -406,6 +406,7 @@ void unpack_pak(const char *pak_file, const char *output_dir) {
             if (FilenameSize > 0) {
                 read_data(Filename, IndexData, FilenameSize);
             } else {
+                printf("FilenameSize = '%d' \n", FilenameSize);
                 read_data(Filename, IndexData, -FilenameSize * 2);
                 if (unicode_to_utf8(Filename, -FilenameSize * 2, Filename, sizeof(Filename)) == -1) {
                     printf("failed to convert UTF-16LE filename into UTF-8!\n");
@@ -744,9 +745,10 @@ int main(void) {
     // 您可以更改这个变量来切换模式
     // 设置为 true 来执行 update
     // 设置为 false 来执行 unpack
-    bool update_mode = true;
+    bool update_mode = false;
 
-    const char* pak_path = "../paks/map_lobby_1.33.12.14210.pak";
+    // const char* pak_path = "../paks/map_lobby_1.33.12.14210.pak";
+    const char* pak_path = "../paks/game_patch_1.32.11.14059.pak";
     const char* dat_path = "../paks/dat_temp";
     // const char* output_pak = "../paks/game_patch_1.33.12.14226new.pak";
     if (update_mode) {

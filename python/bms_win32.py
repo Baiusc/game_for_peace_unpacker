@@ -1,9 +1,9 @@
 '''
 Author       : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
 Date         : 2025-08-21 10:10:50
-LastEditors  : 昼星的学习PC 1148635540@qq.com
-LastEditTime : 2025-09-06 10:17:44
-FilePath     : \game_for_peace_unpacker\python\bms_win32.py
+LastEditors  : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
+LastEditTime : 2025-09-18 16:03:00
+FilePath     : /game_for_peace_unpacker/python/bms_win32.py
 Description  : 
 
 Copyright (c) 2025 by vitalchem, All Rights Reserved. 
@@ -44,7 +44,7 @@ def db():
     command = [
         "./python/quickbms_win32.exe", 
         "-w", "-r", "-r", 
-        "./python/解包.bms", 
+        "./python/打包.bms", 
         pak_file, # 第一个参数：原始 PAK 文件
         dat_dir # 第二个参数：包含 .dat 文件的文件夹
     ]

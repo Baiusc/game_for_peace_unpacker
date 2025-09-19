@@ -8,8 +8,8 @@
       "program": "${workspaceFolder}/build/PEACE_UNPACK",
       // "program": "${workspaceFolder}/build/PEACE_REPACK",
       "args": [
-        "${workspaceFolder}/paks/onreadypak_413496情绪天线.pak"
-        // "${workspaceFolder}/paks/game_patch_1.33.12.14226.pak"
+        // "${workspaceFolder}/paks/onreadypak_413496情绪天线.pak"
+        "${workspaceFolder}/paks/game_patch_1.33.12.14226.pak"
       ],
       "stopAtEntry": false,
       "cwd": "${fileDirname}",

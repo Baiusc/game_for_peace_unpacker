@@ -1,230 +1,217 @@
-math NO_TAIL_INFO = 1  # 设置为1，用于处理尾部信息损坏或缺失的档案
-math VERSION = 3       # 如果 NO_TAIL_INFO=1，大多数现代游戏都将此版本设置为3
-math GUESS_NAMES = 0   # 设置为1以猜测文件名称，目前此功能无法使用
-quickbmsver "0.8.4"    # 要求 QuickBMS 的版本
 
-math TOC_FILE = 0      # 目录文件句柄（通常是主文件）
-math TOC_FILE5 = -5    # 备用内存文件句柄，用于某些操作
+
+math NO_TAIL_INFO = 1   # set it to 1 for archives with corrupt/missing tail information
+math VERSION = 3        # set it to 3 if NO_TAIL_INFO = 1 for most of modern games
+math GUESS_NAMES = 0	# set it to 1 in case if you want to extract files with guessing their names
+						# GUESS_NAMES DOESN'T WORK AT THE MOMENT
+quickbmsver "0.8.4"
+
+math TOC_FILE = 0
+math TOC_FILE5 = -5
 #math MEM_UEXP = -10
-#math MEM_UBULK = -15
+#math MEM_UBULK = -15 
 
-# 设置你的 AES 密钥，可以为文本、C 字符串或 umodel 十六进制
+# set your AES_KEY here as text or C string ("\x11\x22...") or umodel hex (0x1122...)
 set AES_KEY binary ""
 putarray 10 -1 ""
 math AES_KEY_IS_SET = 0
 
-math ALTERNATIVE_MODE = 0  # 备用模式，用于处理特殊结构的档案
+math ALTERNATIVE_MODE = 0
 
-get ARCHIVE_NAME basename    # 获取档案的文件名（不含路径）
-get ARCHIVE_PATH FILEPATH    # 获取档案的路径
+get ARCHIVE_NAME basename
+get ARCHIVE_PATH FILEPATH  
 
-math CHUNK_OFFSET_ABSOLUTE = -1 # 默认启用，-1表示未确定，0表示相对，1表示绝对
+math CHUNK_OFFSET_ABSOLUTE = -1 # default, enabled
 
 # 1 = HIT
-math WORKAROUND = 0          # 特殊游戏的临时解决方案
+math WORKAROUND = 0
 
 if NO_TAIL_INFO != 0
-    get OFFSET asize             # 获取文件大小作为偏移量
-    math ALTERNATIVE_MODE = 1    # 启用备用模式
+    get OFFSET asize
+    math ALTERNATIVE_MODE = 1
 else
-	# 如果尾部信息完整，不需要此部分
+	# not required
 endif
 
 if ALTERNATIVE_MODE == 0
-    get FILES long TOC_FILE      # 获取文件总数
+    get FILES long TOC_FILE
 else
-    math FILES = 0x7fffffff      # 在备用模式下，将文件数设置为int32的最大值 2,147,483,647 以进行循环
-    math MAX_OFF = OFFSET        # 记录最大偏移量（文件大小）
-    goto 0                       # 回到文件开头
+    math FILES = 0x7fffffff
+    math MAX_OFF = OFFSET
+    goto 0
     set NAME string ""
 	set BASE_NAME string ""
 endif
 
 math runtimed = 0
 math filecount = 0
-math CHUNK_SIZE = 0x10000    # 默认块大小
-print "FILES Size: %FILES%"  # 在备用模式下，此值将为int32的最大值 2,147,483,647 
-for I = 0 < FILES            # 循环遍历所有文件
+math CHUNK_SIZE = 0x10000   # just in case...
+for I = 0 < FILES
     if runtimed == filecount
-        string namez = "file_"   # 生成文件名前缀
-        string namez + filecount
-        string namez + "/"
-        math filecount + 1000
+       string namez = "file_"
+       string namez + filecount
+       string namez + "/"
+       math filecount + 1000
     endif
     math runtimed + 1
     
-    string name = namez      # 组合文件名
-    string namesz p "%08d" i # 格式化索引为8位数字
+    string name = namez
+    string namesz p "%08d" i
     string name + namesz
-    string name + ".dat"     # 添加文件扩展名
+    string name + ".dat"
 
-    savepos TMP_OFF TOC_FILE # 保存当前文件指针位置
+    savepos TMP_OFF TOC_FILE
 	
-    getdstring HASH 20       # 读取20字节的哈希值 20
-    get OFFSET longlong TOC_FILE # 读取文件偏移量 8
-    get SIZE longlong TOC_FILE   # 读取文件原始大小（解压后）8
-    get ZIP long TOC_FILE        # 读取压缩类型 4
-    get ZSIZE longlong TOC_FILE  # 读取压缩后大小 8
-	getdstring DUMMY2 21 TOC_FILE # 读取21字节的填充/未知数据 21
+	getdstring HASH 20
+	get OFFSET longlong TOC_FILE
+	get SIZE longlong TOC_FILE
+	get ZIP long TOC_FILE
+    get ZSIZE longlong TOC_FILE
+	getdstring DUMMY2 21 TOC_FILE
 
-    # print "文件偏移量: 0x%OFFSET|llx%"
-    print "原始大小: %SIZE%"
-    print "压缩类型 (ZIP): %ZIP%"
-    print "压缩后大小: %ZSIZE%"
-
-    if OFFSET != 0               # 如果偏移量不为0，可能已到达文件列表末尾
-		print "Extraction complete!" # 打印完成信息并退出
+	if OFFSET != 0
+		print "Extraction complete!"
 		cleanexit
 	endif
 	
-    math CHUNKS = 0              # 块数
-    math ENCRYPTED = 0           # 是否加密
+    math CHUNKS = 0
+    math ENCRYPTED = 0
     if VERSION >= 3
         if ZIP != 0
-            get CHUNKS long TOC_FILE # 获取块数
-            print "CHUNKS: %CHUNKS%" # 打印块数
+            get CHUNKS long TOC_FILE
             for x = 0 < CHUNKS
-                get CHUNK_OFFSET longlong TOC_FILE # 获取块偏移量
-                get CHUNK_END_OFFSET longlong TOC_FILE # 获取块结束偏移量
-                putarray 0 x CHUNK_OFFSET    # 将偏移量存入数组
-                putarray 1 x CHUNK_END_OFFSET # 将结束偏移量存入数组
+                get CHUNK_OFFSET longlong TOC_FILE
+                get CHUNK_END_OFFSET longlong TOC_FILE
+                putarray 0 x CHUNK_OFFSET
+                putarray 1 x CHUNK_END_OFFSET
             next x
         endif
-		get CHUNK_SIZE long TOC_FILE # 获取块大小
+		get CHUNK_SIZE long TOC_FILE
         if WORKAROUND == 2
         else
-            get ENCRYPTED byte TOC_FILE # 获取加密标志
-        endif        
+            get ENCRYPTED byte TOC_FILE
+        endif       
     endif
     if WORKAROUND == 1
-        if ARCHIVE_NAME == "0"
-            math ENCRYPTED = 0 # 针对特定游戏的加密设置
+        if ARCHIVE_NAME == "0"  # HIT game only!
+            math ENCRYPTED = 0
         endif
     endif
     if ALTERNATIVE_MODE != 0
         savepos TMP_OFF TOC_FILE
         math OFFSET + TMP_OFF
-        # print "ALTERNATIVE_MODE = %ALTERNATIVE_MODE%"
     endif
 
-    #comtype copy    # 用于AES解密，但目前不启用
+    #comtype copy    # for AES, do not enable or quickbms 0.9.2 will fail
     if ZIP & 1
-		comtype zlib     # 设置为 zlib 压缩
+		comtype zlib
 	elif ZIP & 0x06
-		comtype zstd     # 设置为 zstd 压缩
+		comtype zstd
     else
-        math ZIP = 0     # 没有压缩
+        math ZIP = 0
     endif
 	
-	filexor 0x79         # 设置文件异或密钥
-    if CHUNKS > 0             # 如果文件分为多个块
-        print "模式：分块模式"
-        # print "  CHUNKS: %CHUNKS%"
+	filexor 0x79
+    if CHUNKS > 0
         #log NAME 0 0
-        append                 # 启用追加模式
+        append
         math TMP_SIZE = SIZE
-        # print "  TMP_SIZE (SIZE): %TMP_SIZE%"
-
-        if CHUNK_OFFSET_ABSOLUTE < 0 && OFFSET != 0
-            # print "  检测到 CHUNK_OFFSET_ABSOLUTE 模式"
-            getarray CHUNK_OFFSET 0 0
-            if CHUNK_OFFSET u< OFFSET || VERSION >= 5
-                math CHUNK_OFFSET_ABSOLUTE = 0
-                # print "  CHUNK_OFFSET_ABSOLUTE 被设置为 0"
-            else
-                math CHUNK_OFFSET_ABSOLUTE = 1
-                # print "  CHUNK_OFFSET_ABSOLUTE 被设置为 1"
-            endif
-        endif
-
-        for x = 0 < CHUNKS   # 循环处理每个块
-            # print "---"
-            # print "  处理第 %x% 个块"
+		if CHUNK_OFFSET_ABSOLUTE < 0 && OFFSET != 0
+			getarray CHUNK_OFFSET 0 0
+			if CHUNK_OFFSET u< OFFSET || VERSION >= 5
+				math CHUNK_OFFSET_ABSOLUTE = 0
+			else
+				math CHUNK_OFFSET_ABSOLUTE = 1
+			endif
+		endif
+        for x = 0 < CHUNKS
             getarray CHUNK_OFFSET 0 x
             getarray CHUNK_END_OFFSET 1 x
-            # print "  CHUNK_OFFSET: 0x%CHUNK_OFFSET|llx%"
-            # print "  CHUNK_END_OFFSET: 0x%CHUNK_END_OFFSET|llx%"
-
-            math CHUNK_ZSIZE = CHUNK_END_OFFSET # 计算压缩后大小
+            math CHUNK_ZSIZE = CHUNK_END_OFFSET
             math CHUNK_ZSIZE - CHUNK_OFFSET
-            # print "  CHUNK_ZSIZE: %CHUNK_ZSIZE% bytes"
-
-            math CHUNK_XSIZE = CHUNK_ZSIZE      # 异或大小
-
+            math CHUNK_XSIZE = CHUNK_ZSIZE
             if ENCRYPTED != 0
-                print "  文件内容已加密"
+                #callfunction SET_AES_KEY 1
+                #math CHUNK_XSIZE x 16
             endif
-
             if TMP_SIZE u< CHUNK_SIZE
                 math CHUNK_SIZE = TMP_SIZE
-                # print "  调整 CHUNK_SIZE 为 %CHUNK_SIZE%"
             endif
-            
             if CHUNK_OFFSET_ABSOLUTE == 0
                 math CHUNK_OFFSET = OFFSET
-                # print "  使用相对偏移量: 0x%CHUNK_OFFSET|llx%"
-            endif
 
-            if ENCRYPTED != 0
-            else
-                filexor "" # 如果未加密，关闭异或
-                # print "  异或解密已关闭"
             endif
-            
-            # 如果不猜测文件名
-            if ZIP == 0
-                log NAME CHUNK_OFFSET CHUNK_SIZE 0 CHUNK_XSIZE # 未压缩，直接记录
-                print "异常，分块，写入未压缩数据..."
-            else
-                clog NAME CHUNK_OFFSET CHUNK_ZSIZE CHUNK_SIZE 0 CHUNK_XSIZE # 压缩，解压后记录
-                # print "  解压并写入数据..."
-            endif
-            
-            math TMP_SIZE - CHUNK_SIZE # 更新剩余大小
-            # print "  剩余解压大小: %TMP_SIZE%"
+			if ENCRYPTED != 0
+			else
+				filexor ""
+			endif
+			
+			#if GUESS_NAMES == 0
+				if ZIP == 0
+					log NAME CHUNK_OFFSET CHUNK_SIZE 0 CHUNK_XSIZE	
+				else
+					clog NAME CHUNK_OFFSET CHUNK_ZSIZE CHUNK_SIZE 0 CHUNK_XSIZE
+				endif
+			/*else
+				if ZIP == 0
+					log MEMORY_FILE5 CHUNK_OFFSET CHUNK_SIZE 0 CHUNK_XSIZE			
+				else
+					clog MEMORY_FILE5 CHUNK_OFFSET CHUNK_ZSIZE CHUNK_SIZE 0 CHUNK_XSIZE
+				endif
+			endif*/	
+			
+            math TMP_SIZE - CHUNK_SIZE
         next x
         append
 		
-    else                     # 如果文件没有分块
-        print "模式：未分块模式"
-        # print "关键变量值："
-        # print "  BASE_OFF: 0x%BASE_OFF|x%"
-        # print "  TMP_OFF: 0x%TMP_OFF|x%"
-        # print "  OFFSET: 0x%OFFSET|llx%"
+		/*if GUESS_NAMES == 1
+			get SIZE asize TOC_FILE5
+			if SIZE > 4
+				goto 0 TOC_FILE5
+				callfunction GET_NAME 1	
+			endif	
+			if UEXP == 1
+				string TEMP_NAME = NAME
+				log MEM_UEXP 0 SIZE TOC_FILE5
+			elif UBULK == 1
+				string TEMP_NAME = NAME
+				log MEM_UBULK 0 SIZE TOC_FILE5
+			endif
+			log NAME 0 SIZE TOC_FILE5	
+			log MEMORY_FILE5 0 0
+		endif*/
+    else
+        # the file offset points to an entry containing
+        # the "same" OFFSET ZSIZE SIZE ZIP HASH ZERO fields,
+        # just an additional backup... so let's skip them
         savepos BASE_OFF TOC_FILE
         math BASE_OFF - TMP_OFF
-        math OFFSET + BASE_OFF # 重新计算偏移量
+        math OFFSET + BASE_OFF
 
         math XSIZE = ZSIZE
         if ENCRYPTED != 0
-        else
+            #callfunction SET_AES_KEY 1
+            #math XSIZE x 16
+		else
 			filexor ""
         endif
         if ZIP == 0
             log NAME OFFSET SIZE 0 XSIZE
-            print "异常，未分块，写入未压缩数据... NAME: %NAME% OFFSET: 0x%OFFSET|llx% SIZE: %SIZE% XSIZE: %XSIZE%""
         else
-            clog NAME OFFSET ZSIZE SIZE 0 XSIZE # 压缩，解压后记录
-            # print "  解压并写入数据..."
+            clog NAME OFFSET ZSIZE SIZE 0 XSIZE
         endif
     endif
-	filexor ""              # 关闭异或
-    encryption "" ""        # 关闭加密
+	filexor ""
+    encryption "" ""
 
-    if ALTERNATIVE_MODE != 0 # 如果是备用模式
-        # print "模式：备用模式"
-        # print "关键变量值："
-        print "  OFFSET (当前): 0x%OFFSET|llx%"
-        print "  ZSIZE: %ZSIZE%"
+    if ALTERNATIVE_MODE != 0
         math OFFSET + ZSIZE
-        goto OFFSET          # 跳转到下一个文件的偏移量
-        print "  OFFSET (下一个): 0x%OFFSET|llx%"
-        if OFFSET == MAX_OFF # 如果到达文件末尾
+        goto OFFSET
+        if OFFSET == MAX_OFF
             break
         endif
         if VERSION >= 8
-            padding 0x800 # 填充字节
+            padding 0x800   # necessary for WitchIt
         endif
     endif
-    print "--------------------------------------"
 next i
