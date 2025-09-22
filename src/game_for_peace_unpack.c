@@ -184,16 +184,16 @@ int main(int argc, const char *argv[]) {
     }
     
     // 获取文件总大小
-    off_t total = lseek(PakFile, 0, SEEK_END);
-    lseek(PakFile, 0, SEEK_SET);
+    off_t total = lseek(PakFile, 0, SEEK_END); // 将文件指针移动到文件末尾，返回值是文件总大小
+    lseek(PakFile, 0, SEEK_SET); // 将文件指针重新移回文件开头，确保后续读取从文件起始位置开始
     
-    // 从文件末尾倒数45字节处读取文件头
+    // 从文件末尾倒数45字节处读取文件头，如果定位失败（返回-1）
     if (lseek(PakFile, -45, SEEK_END) == -1) {
         printf("failed to seek file position\n");
         return 1;
     }
     
-    if (read(PakFile, &info, 45) != 45) {
+    if (read(PakFile, &info, 45) != 45) { // 从当前位置读取45字节到 info 结构体中
         printf("Failed to read pak header at -45\n");
         return 1;
     }
@@ -203,8 +203,8 @@ int main(int argc, const char *argv[]) {
     info.encrypted ^= 0x6C;
     
     // 通过lseek计算索引数据的实际大小
-    int64_t size = lseek(PakFile, -info.offset, SEEK_END); 
-    size -= 45;
+    int64_t size = lseek(PakFile, -info.offset, SEEK_END);  
+    size -= 45; // 索引数据大小 = (文件总大小) - (索引数据起始位置) - (文件头大小45)
     
     // 检查索引数据大小是否合理（小于50MB）
     if (size > 52428800) {
@@ -221,7 +221,7 @@ int main(int argc, const char *argv[]) {
         return 1;
     }
 
-    // 将索引数据读入内存
+    // 将索引数据读入内存 从 Pak 文件的 info.offset 位置开始，读取 size 字节的数据到 IndexData 内存区域
     if (pread(PakFile, IndexData, size, info.offset) != size) {
         fprintf(stderr, "Failed to load index data\n");
         return 1;
@@ -264,7 +264,7 @@ int main(int argc, const char *argv[]) {
         return 1;
     }
     
-    // 遍历并读取所有文件条目的元数据
+    // 遍历并读取所有文件条目的元数据  （解包onread关羽赵云宇宙等包时，从这里开始会遇到加密问题）
     for (uint32_t Files = 0; Files < NumOfEntry; Files++) {
         read_data(entry[Files].FileHash, IndexData, 20);
         read_data(&entry[Files].FileOffset, IndexData, 8);
@@ -288,6 +288,13 @@ int main(int argc, const char *argv[]) {
         printf("CompressionMethod: %u\n", entry[Files].CompressionMethod);
         printf("CompressedLength: %llu\n", entry[Files].CompressedLength);
         printf("------------------------\n");
+
+        if (entry[Files].CompressionMethod != 0 && entry[Files].CompressionMethod != 1) {
+            // 数据可能被加密，需要解密
+            printf("检测到可能加密的数据 (CompressionMethod = %u)\n", entry[Files].CompressionMethod);
+            entry[Files].CompressionMethod^= 0x8924B0E3298B7069;
+            printf("CompressionMethod: %u\n", entry[Files].CompressionMethod);
+        }
 
         // 如果有压缩，则读取压缩块信息
         if (entry[Files].CompressionMethod != 0)
