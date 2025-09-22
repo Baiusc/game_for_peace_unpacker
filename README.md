@@ -2,7 +2,7 @@
  * @Author       : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
  * @Date         : 2025-09-02 16:42:02
  * @LastEditors  : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
- * @LastEditTime : 2025-09-19 13:33:36
+ * @LastEditTime : 2025-09-21 13:39:24
  * @FilePath     : /game_for_peace_unpacker/README.md
  * @Description  : 
  * 
@@ -230,3 +230,31 @@ if (WIN32)
   )
 endif ()
 ```
+
+
+(ros:noetic)baiusc@bzs-work-pc:/media/baiusc/DATA1/Linux/ShareFolder_Linux_Win/0919自制范围+M4$ find . -name "*.dat" -type f -exec grep -ai "SkeletalBodySetup" {} +
+./00006365.dat:ConeLimitU�ConstraintBone1�܊ConstraintBone2��2%ConstraintInstance�hm�ConstraintProfileProperties�>ConstraintSetupP>}�CTF_UseSimpleAsComplex�ԫsDefault__PhysicsAsset�s7�#Default__PhysicsConstraintTemplate�W�{
+                                                             efault__SkeletalBodySetup�~��DefaultInstance�I�EAngularConstraintMotion�dV�ECollisionTraceFlag:���FloatProperty����foot_l��d�foot_r����hand_l�hand_r۔,�head̰�
+                                                          IntProperty��6J
+./00006365.dat:JointName$�KAggregateGeom�={'	KBoxElem'pf
+                                                           KSphereElemx���
+                                                                          KSphylElem�͂�LengthI[
+
+              lowerarm_l�jr�
+PhysicsAsset5P��PhysicsConstraintTemplate���UPos2��	PriAxis294zUProfileInstance{���Radius���O	RotationB�xRotator�i��	SecAxis27<��SkeletalBodySetup�g�'SkeletalBodySetupsR��l
+                       SphereElems΀F�
+                                     SphylElems6�e�	spine_03��OStructPropertSwing1Motion\itDegreesy���
+Swing2Motions$thigh_l�E�thigh_r`>LuThumbnailInfo�L3�TwistConstraintf#
+./范围/00006365.dat:ConeLimitU�ConstraintBone1�܊ConstraintBone2��2%ConstraintInstance�hm�ConstraintProfileProperties�>ConstraintSetupP>}�CTF_UseSimpleAsComplex�ԫsDefault__PhysicsAsset�s7�#Default__PhysicsConstraintTemplate�W�{
+                                                                  efault__SkeletalBodySetup�~��DefaultInstance�I�EAngularConstraintMotion�dV�ECollisionTraceFlag:���FloatProperty����foot_l��d�foot_r����hand_l�hand_r۔,�head̰�
+                                                               IntProperty��6J
+./范围/00006365.dat:JointName$�KAggregateGeom�={'	KBoxElem'pf
+                                                                   KSphereElemx���
+  KSphylElem�͂�LengthI[
+
+                      lowerarm_l�jr�
+PhysicsAsset5P��PhysicsConstraintTemplate���UPos2��	PriAxis294zUProfileInstance{���Radius���O	RotationB�xRotator�i��	SecAxis27<��SkeletalBodySetup�g�'SkeletalBodySetupsR��l
+                       SphereElems΀F�
+                                     SphylElems6�e�	spine_03��OStructPropertSwing1Motion\itDegreesy���
+(ros:noetic)baiusc@bzs-work-pc:/media/baiusc/DATA1/Linux/ShareFolder_Linux_Win/0919自制范围+M4$ 
+

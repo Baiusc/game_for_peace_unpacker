@@ -2,7 +2,7 @@
 Author       : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
 Date         : 2025-08-21 10:10:50
 LastEditors  : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
-LastEditTime : 2025-09-19 16:19:32
+LastEditTime : 2025-09-21 08:41:10
 FilePath     : /game_for_peace_unpacker/python/bms_linux.py
 Description  : 
 
@@ -15,7 +15,7 @@ from glob import glob
 
 
 # pak_file = "./paks/game_patch_1.32.11.14059.pak"
-pak_file = "./paks/game_patch_1.33.12.14267.pak"
+pak_file = "./paks/game_patch_1.33.12.14269.pak"
 
 # pak_file = "./paks/map_lobby_1.33.12.14210.pak"
 # pak_file = "./paks/map_weapon_1.33.12.14210.pak"
