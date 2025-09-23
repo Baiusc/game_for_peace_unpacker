@@ -1,3 +1,13 @@
+'''
+Author       : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
+Date         : 2025-09-23 08:54:54
+LastEditors  : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
+LastEditTime : 2025-09-23 08:54:55
+FilePath     : /game_for_peace_unpacker/py_script/比较dat字节大小.py
+Description  : 
+
+Copyright (c) 2025 by vitalchem, All Rights Reserved. 
+'''
 import os
 from typing import Dict, List, Tuple
 
@@ -87,6 +97,6 @@ def check_my_files(my_dir: str, src_dir: str, max_show_matches: int = 200):
     print("="*80)
 
 if __name__ == "__main__":
-    my_dir = "./paks/dat_temp"
+    my_dir = "./release/RE枪补V3发布20250923/my_dat枪数量18"
     src_dir = "./paks/dat_原厂14283/file_0"
     check_my_files(my_dir, src_dir)
