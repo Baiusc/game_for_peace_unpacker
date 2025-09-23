@@ -15,6 +15,12 @@
 
 ---
 
+## 一、子目录说明
+- `data`   数据
+- `doc`   文档
+- `include`   头
+- `src`   源文件
+
 打包目前存在问题：打包大obb文件会出现未替换而是添加的情况，导致大小膨胀
 
 明文解包：
@@ -149,13 +155,6 @@ RecoilKickADS 代表 "Aim Down Sights Recoil Kick"，即开镜瞄准（ADS）时
 最后，它会计算出正确的索引位置和大小，更新并写入最终的 PakInfo 头部。
 
 
-
-## 一、子目录说明
-- `data`   数据
-- `doc`   文档
-- `include`   头
-- `src`   源文件
-
 ## 二、Git
 推送`git push origin main`
 
@@ -257,4 +256,5 @@ PhysicsAsset5P��PhysicsConstraintTemplate���UPos2��	PriAxis294zUPr
                        SphereElems΀F�
                                      SphylElems6�e�	spine_03��OStructPropertSwing1Motion\itDegreesy���
 (ros:noetic)baiusc@bzs-work-pc:/media/baiusc/DATA1/Linux/ShareFolder_Linux_Win/0919自制范围+M4$ 
+
 
