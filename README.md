@@ -2,7 +2,7 @@
  * @Author       : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
  * @Date         : 2025-09-02 16:42:02
  * @LastEditors  : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
- * @LastEditTime : 2025-09-21 13:39:24
+ * @LastEditTime : 2025-09-23 10:45:30
  * @FilePath     : /game_for_peace_unpacker/README.md
  * @Description  : 
  * 
@@ -14,6 +14,10 @@
 # 和平精英解包/打包/paks/obb改文件 
 
 ---
+
+# Android Stutio 绝对路径启动模拟器 手动启动模拟器并启用可写系统
+
+/home/baiusc/Android/Sdk/emulator/emulator -avd Medium_Phone_API_36.1 -writable-system -no-snapshot
 
 打包目前存在问题：打包大obb文件会出现未替换而是添加的情况，导致大小膨胀
 
