@@ -1,20 +1,12 @@
-'''
-Author       : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
-Date         : 2025-08-21 10:10:50
-LastEditors  : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
-LastEditTime : 2025-09-24 13:26:19
-FilePath     : /game_for_peace_unpacker/python/bms_linux.py
-Description  : 
 
-Copyright (c) 2025 by vitalchem, All Rights Reserved. 
-'''
+
 import os
 import subprocess
 import time
 from glob import glob
 
 
-pak_file = "./paks/game_patch_1.33.12.14280.pak"
+pak_file = "./paks/game_patch_1.33.12.14280原厂.pak"
 # pak_file = "./paks/game_patch_1.33.12.14283.pak"
 
 # pak_file = "./paks/map_lobby_1.33.12.14210.pak"
