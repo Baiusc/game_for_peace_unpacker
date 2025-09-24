@@ -248,14 +248,15 @@ def main():
     # swap_config = [(403251, 413497)] #  仅白T <=> 赵云2。效果：白色天线常亮+黑色天线呼吸灯
     # swap_config = [(403251, 413494), (405011, 413497)] #  白T <=> 关羽2 。棕鞋 <=> 赵云2 。效果：
     # swap_config = [(403251, 413507), (405011, 413498)] #  白T <=> 沙丘主。棕鞋 <=> 赵云3 。效果：
-    swap_config = [(403251, 423100), (405011, 423101)] #  白T <=> 哪吒2。棕鞋 <=> 哪吒3 。效果：
+    swap_config = [(403251, 423099), (405011, 423100)] #  白T <=> 哪吒2。棕鞋 <=> 哪吒3 。效果：
 
     swap_in_dat(target_dat, swap_config)
 
     # 第二次批量替换配置（完整大表）
     # target_code = "405009" # 红色高帮运动鞋
     # target_code = "405017" # 特训学院靴子
-    target_code = "405011"   # 棕鞋
+    # target_code = "405011"   # 棕鞋 效果：很多人都是 透明鞋 透明衣
+    target_code = "423100"   # 哪吒2 效果：
 
     replacements = [(str(old), target_code) for old in ID_LIST]
     patch_ids(target_dat, replacements)
