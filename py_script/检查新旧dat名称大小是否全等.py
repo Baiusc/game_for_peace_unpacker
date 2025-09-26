@@ -1,3 +1,13 @@
+'''
+Author       : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
+Date         : 2025-09-25 16:22:15
+LastEditors  : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
+LastEditTime : 2025-09-25 16:24:22
+FilePath     : /game_for_peace_unpacker/py_script/检查新旧dat名称大小是否全等.py
+Description  : 
+
+Copyright (c) 2025 by vitalchem, All Rights Reserved. 
+'''
 import os
 from typing import Dict, List, Tuple
 
@@ -93,6 +103,6 @@ def check_my_files(my_dir: str, src_dir: str, max_show_matches: int = 200):
 
 
 if __name__ == "__main__":
-    my_dir = "./release/RE枪补V3发布20250924/my_dat枪数量28"
-    src_dir = "./paks/dat_原厂14283/file_0"
+    my_dir = "./release/RE枪补V3发布20250924/my_dat枪数量22没改6把栓狙"
+    src_dir = "./paks/dat_temp/file_0"
     check_my_files(my_dir, src_dir)

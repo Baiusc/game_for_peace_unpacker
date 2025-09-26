@@ -106,7 +106,7 @@ auto_skin_final.py
     812018 -- 默认鞋子(子类女鞋)
     812019 -- 默认鞋子(子类男鞋)
     812020 -- 默认鞋子(子类鞋)
-    405017 =  特训学院鞋子 以上都可以隐藏自身天线
+    405017 =  特训学院鞋子 隐藏自身天线
 """
 ID_LIST = [
     405001,405002,405004,405005,
@@ -183,6 +183,21 @@ ID_LIST = [
     815037
 ]
 
+"""仓库已有的鞋子：
+特训学院靴子  青年教官鞋子  橘黑制服鞋子  深蓝色名流皮鞋  红色运动鞋
+白色伏地魔鞋子  滨海假日凉鞋 黄色名流皮鞋  热血青春竞技靴  千禧之恋靴子  
+战地督导靴子  丛林猎人鞋  缤纷果语凉鞋 魔术贴红色网球鞋 魔术贴紫色网球鞋
+"""
+ID_LIST_MY = [
+    405017,405036,405040,405043,405059,
+    405055,405196,405100,405116,405131,
+    405176,405221,405222,405124,405117]
+ID_LIST_SWAP = [
+    413493,413494,413495, # 关羽
+    413506,413507,413508, # 沙丘
+    413655,413656,413657, # 宇宙意志-塞卢姆
+    413818,413819,413820, # 圣域龙灵-瑞拉
+    413849,413850,413851] # 金蛇镇世-烛九
 
 # ============ 工具函数 ============
 
@@ -278,11 +293,163 @@ def patch_ids(dat_path: Path, replacements: List[Tuple[str, str]]):
                     replaced += 1
                     pos += len(old_bytes)
 
-                if replaced > 0:
+                if replaced > 1:
                     print(f"  [OK] {old_str} ({to_hex(old_bytes)}) → {new_str} ({to_hex(new_bytes)}) 替换 {replaced} 次")
         finally:
             mm.close()
     print("[DONE] 批量替换完成\n")
+
+def patch_ptrs_by_ids(dat_path: Path, replacements: List[Tuple[str, str]]):
+    """
+    批量替换 dat 文件中的指针：
+    根据 (old_id, new_id) 配置，将 old_id 的指针替换为 new_id 的指针
+    """
+    def to_hex(b: bytes) -> str:
+        return " ".join(f"{x:02X}" for x in b)
+
+    # 上下文字节
+    prefix = b"\x00\x00\x00"
+    suffix = b"\x00"
+
+    print(f"[STEP] 开始批量替换指针 -> {dat_path}")
+    with dat_path.open("r+b") as f:
+        mm = mmap.mmap(f.fileno(), 0)
+        try:
+            for old_id, new_id in replacements:
+                old_id_bytes = old_id.encode("utf-8")
+                new_id_bytes = new_id.encode("utf-8")
+
+                # 构造块
+                old_block = prefix + old_id_bytes + suffix
+                new_block = prefix + new_id_bytes + suffix
+
+                # 先找到 new_id 的指针
+                pos_new = mm.find(new_block)
+                if pos_new == -1:
+                    print(f"  [WARN] 未找到 new_id={new_id}")
+                    continue
+
+                new_ptr_start = pos_new + len(new_block)
+                new_ptr = mm[new_ptr_start:new_ptr_start+5]
+
+                print(f"  [INFO] new_id={new_id} 指针={to_hex(new_ptr)} (offset={new_ptr_start})")
+
+                # 替换 old_id 的所有指针
+                pos = 0
+                replaced = 0
+                while True:
+                    pos = mm.find(old_block, pos)
+                    if pos == -1:
+                        break
+
+                    old_ptr_start = pos + len(old_block)
+                    old_ptr = mm[old_ptr_start:old_ptr_start+5]
+
+                    # 打印上下文
+                    start = max(pos - 12, 0)
+                    end = min(old_ptr_start + 5 + 12, mm.size())
+                    context_bytes = mm[start:end]
+                    print(f"  [MATCH] old_id={old_id} offset={pos:06} | {to_hex(context_bytes)}")
+
+                    # 替换指针
+                    mm[old_ptr_start:old_ptr_start+5] = new_ptr
+                    replaced += 1
+                    pos = old_ptr_start + 5
+
+                if replaced > 1:
+                    print(f"  [OK] old_id={old_id} ({to_hex(old_ptr)}) → new_id={new_id} ({to_hex(new_ptr)}) 替换 {replaced} 次")
+        finally:
+            mm.close()
+    print("[DONE] 批量指针替换完成\n")
+
+def swap_id_and_ptr_in_dat(dat_path: Path, swaps: List[Tuple[str, str]]):
+    """
+    在 dat 文件中互换 old_id 和 new_id 的 ID 与指针
+    """
+    def to_hex(b: bytes) -> str:
+        return " ".join(f"{x:02X}" for x in b)
+
+    prefix = b"\x00\x00\x00"
+    suffix = b"\x00"
+
+    print(f"[STEP] 开始互换 ID+指针 -> {dat_path}")
+    with dat_path.open("r+b") as f:
+        mm = mmap.mmap(f.fileno(), 0)
+        try:
+            for old_id, new_id in swaps:
+                old_block = prefix + old_id.encode("utf-8") + suffix
+                new_block = prefix + new_id.encode("utf-8") + suffix
+
+                pos_old = mm.find(old_block)
+                pos_new = mm.find(new_block)
+                if pos_old == -1 or pos_new == -1:
+                    print(f"  [WARN] 未找到 old_id={old_id} 或 new_id={new_id}")
+                    continue
+
+                old_ptr_start = pos_old + len(old_block)
+                new_ptr_start = pos_new + len(new_block)
+                old_ptr = mm[old_ptr_start:old_ptr_start+5]
+                new_ptr = mm[new_ptr_start:new_ptr_start+5]
+
+                # 构造完整块（ID+指针）
+                block_old = old_block + old_ptr
+                block_new = new_block + new_ptr
+
+                # 长度必须相等才能交换
+                if len(block_old) != len(block_new):
+                    print(f"  [WARN] old_id={old_id}, new_id={new_id} 块长度不同，跳过")
+                    continue
+
+                # 逐字节互换
+                mm[pos_old:pos_old+len(block_old)] = block_new
+                mm[pos_new:pos_new+len(block_new)] = block_old
+
+                print(f"  [OK] 已互换 old_id={old_id}, new_id={new_id} (包含指针)")
+        finally:
+            mm.close()
+    print("[DONE] 互换 ID+指针 完成\n")
+
+def swap_ptr_in_dat(dat_path: Path, swaps: List[Tuple[str, str]]):
+    """
+    在 dat 文件中互换 old_id 和 new_id 的指针（仅交换指针，不动 ID）
+    """
+    def to_hex(b: bytes) -> str:
+        return " ".join(f"{x:02X}" for x in b)
+
+    prefix = b"\x00\x00\x00"
+    suffix = b"\x00"
+
+    print(f"[STEP] 开始互换指针 -> {dat_path}")
+    with dat_path.open("r+b") as f:
+        mm = mmap.mmap(f.fileno(), 0)
+        try:
+            for old_id, new_id in swaps:
+                old_block = prefix + old_id.encode("utf-8") + suffix
+                new_block = prefix + new_id.encode("utf-8") + suffix
+
+                pos_old = mm.find(old_block)
+                pos_new = mm.find(new_block)
+                if pos_old == -1 or pos_new == -1:
+                    print(f"  [WARN] 未找到 old_id={old_id} 或 new_id={new_id}")
+                    continue
+
+                old_ptr_start = pos_old + len(old_block)
+                new_ptr_start = pos_new + len(new_block)
+                old_ptr = mm[old_ptr_start:old_ptr_start+5]
+                new_ptr = mm[new_ptr_start:new_ptr_start+5]
+
+                if len(old_ptr) != len(new_ptr):
+                    print(f"  [WARN] old_id={old_id}, new_id={new_id} 指针长度不同，跳过")
+                    continue
+
+                # 交换指针
+                mm[old_ptr_start:old_ptr_start+5] = new_ptr
+                mm[new_ptr_start:new_ptr_start+5] = old_ptr
+
+                print(f"  [OK] 已互换 old_id={old_id}, new_id={new_id} 的指针")
+        finally:
+            mm.close()
+    print("[DONE] 互换指针完成\n")
 
 # ============ 主流程 ============
 def main():
@@ -290,30 +457,50 @@ def main():
     target_dat = Path("./release/RE天线V1发布20250924/dat_ue_14280自制/00001357.dat")
 
     # 第一次 swap 配置（示例）
-    # swap_config = [(403251, 413497), (405011, 413498)] #  白T <=> 赵云2 。棕鞋 <=> 赵云3
-    # swap_config = [(403251, 413497)] #  仅白T <=> 赵云2。效果：白色天线常亮+黑色天线呼吸灯
+    swap_config = [(403251, 413497), (405011, 413498)] #  白T <=> 赵云2 。棕鞋 <=> 赵云3
+    # swap_config = [(403251, 413497)] #  仅白T <=> 赵云2。效果：白色天线常亮+黑色天线呼吸灯 透明衣
     # swap_config = [(403251, 413494), (405011, 413497)] #  白T <=> 关羽2 。棕鞋 <=> 赵云2 。效果：
     # swap_config = [(403251, 413507), (405011, 413498)] #  白T <=> 沙丘主。棕鞋 <=> 赵云3 。效果：
     # swap_config = [(403251, 423099), (405011, 423100)] #  白T <=> 哪吒2。棕鞋 <=> 哪吒3 。效果：
     # swap_config = [(403251, 413497), (503003, 413498)] #  白T <=> 赵云2 。三级甲 <=> 赵云3
 
 
-    # swap_in_dat(target_dat, swap_config)
+    # swap_in_dat(target_dat, swap_config) # 仅交换ID
 
-    # 第二次批量替换配置（完整大表）
+    swap_config_str = [(str(old), str(new)) for old, new in swap_config] 
+    swap_id_and_ptr_in_dat(target_dat, swap_config_str) # 交换ID、指针
+    # swap_ptr_in_dat(target_dat, swap_config_str)
+
+    swap_config_my = list(zip(ID_LIST_MY, ID_LIST_SWAP))
+    swap_config_my = swap_config_my[1:]  # 跳过第1组，从第2组开始
+    # swap_config_my = swap_config_my[:3]  # 只保留前3组，跳过之后的所有
+    # swap_config_my = swap_config_my[::3]  # 每隔 3 个取 1 个（0, 3, 6, 9, 12...）
+    # swap_config_my = swap_config_my[2::3]  # 从索引2开始，每隔3个取1个（2,5,8,11,...）
+    swap_config_my_str = [(str(old), str(new)) for old, new in swap_config_my] 
+    swap_id_and_ptr_in_dat(target_dat, swap_config_my_str) # 交换ID、指针
+
+    # 第二次批量替换配置
     # target_code = "405009" # 红色高帮运动鞋
-    # target_code = "405017" # 特训学院靴子 古法不理解 效果： 
+    target_code = "405017" # 特训学院靴子 古法不理解 效果： 透明鞋 透明衣
     # target_code = "405011"   # 棕鞋 效果：很多人都是 透明鞋 透明衣
     # target_code = "423100"   # 哪吒2 效果：很多人都是 透明鞋 透明衣
-    target_code = "413497"   # 赵云2 效果：
+    # target_code = "413496"   # 赵云2 效果：
 
-    replacements = [(str(old), target_code) for old in ID_LIST]
-    patch_ids(target_dat, replacements)
+    # replace_config = [(str(old), target_code) for old in ID_LIST]
+    # patch_ids(target_dat, replace_config)
 
-    replace_config = [(str(old), str(new)) for old, new in [(403251, 413498),(503001, 413498), (503002, 413498), (503003, 413498)]]
-    patch_ids(target_dat, replace_config)
+    # replace_config = [(str(old), str(new)) for old, new in [(403251, 413498),(503001, 413498), (503002, 413498), (503003, 413498)]]
+    # patch_ids(target_dat, replace_config)
 
+    # 413701 -- 无面战甲角色  430359  角色-无面战甲
 
+    # replace_config = [(str(old), str(new)) for old, new in [(413701, 413497),(430359, 413497), # 无面战甲
+    #                                                         (403251, 413498),(405011, 413498), # 白T棕鞋
+    #                                                         (503001, 413498), (503002, 413498), (503003, 413498), # 123级甲
+    #                                                         (405017, 413498), (812018, 413498), (812019, 413498),(812020, 413498)]] # 特训鞋，默认3鞋
+    # replace_config = [(str(old), str(new)) for old, new in [(413497, 403251),(413498, 405011)]] # 白T棕鞋
+    # patch_ptrs_by_ids(target_dat, replace_config)
+    # patch_ids(target_dat, replace_config)
     print("[ALL DONE] 处理完成！结果已写回:", target_dat)
 
 
