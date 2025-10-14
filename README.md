@@ -2,7 +2,7 @@
  * @Author       : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
  * @Date         : 2025-09-02 16:42:02
  * @LastEditors  : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
- * @LastEditTime : 2025-09-24 14:43:33
+ * @LastEditTime : 2025-10-13 17:04:58
  * @FilePath     : /game_for_peace_unpacker/README.md
  * @Description  : 
  * 
@@ -94,9 +94,25 @@ map_lobby_1.33.12.14210.pak 794.6 MB (794598863 字节)
 
 ## 键值对功能说明书
 
+bEnableExtraSphereCollision ExtraSphereCollisioConfig 	启用额外的球形碰撞体。它意味着投射物除了本身的碰撞体外，还会使用一个额外的、通常更大的球形碰撞体来进行命中检测。
+
+RadiusScaleCurve 半径缩放曲线引用。 这是最重要的配置之一。它引用了一个曲线资产 (ObjectPropertyData)，意味着这个额外球形碰撞体的半径不是固定的，而是随着时间、速度或距离等因素动态变化的。这在游戏中常用于： 1. 增加远距离命中容错率（"子弹磁铁"）：在远距离，投射物的碰撞体积增大，使玩家更容易命中目标。 2. 优化高速移动检测： 确保在极高速下，即使主碰撞体穿透了，这个更大的扩展碰撞体也能正确触发命中。
+
+find . -type f -name '*BP_Player*Bullet*'
+find . -type f -name '*Bullet*Template*'
+示例 (搜索 "Weapon" 或 "Damage" 或 "Mesh" 并在上下各打印 3 行):
+
+find . -type f -name "*.uasset" -exec grep -H -E 'BP_PlayerBoltBullet|BP_PlayerSPAS12ShotgunBullet' -C 3 {} +
+find . -type f -name "*.uasset" -exec grep -H -l -E 'BulletTemplate' {} +
+find . -type f -name "*.uasset" -exec grep -H -l -E 'BP_PlayerSPAS12ShotgunBullet' {} +
+
+{"$type":"UAssetAPI.PropertyTypes.Objects.ObjectPropertyData, UAssetAPI","Name":"BulletTemplate","ArrayIndex":0,"IsZero":false,"PropertyTagFlags":"None","PropertyTagExtensions":"NoExtension","Value":-20}
+
+SphereRadius 子弹球体半径 BP_PlayerRifleBullet.uasset BP_PlayerSniperBullet_ BP_PlayerDMRBullet_
+
 SkeletalBodySetup 范围 find . -name "*.dat" -print0 | xargs -0 grep -ail "SkeletalBodySetup" 
 
-20250919最新：打印文件名+文件大小字节 find . -name "*.dat" -type f -exec grep -ail "SkeletalBodySetup" {} + | xargs -I {} stat --format="%s %n" {}
+20250919最新：打印文件名+文件大小字节 find . -name "*.dat" -type f -exec grep -al "SkeletalBodySetup" {} + | xargs -I {} stat --format="%s %n" {}
 
 搜索文件大小为25651字节的.dat文件并打印文件名和大小：find . -name "*.dat" -type f -size 25651c -exec stat --format="%s %n" {} \;
 
@@ -233,32 +249,30 @@ if (WIN32)
   )
 endif ()
 ```
+(ros:noetic)baiusc@bzs-work-pc:/media/baiusc/DATA1/Repositories/ReposMyself/pubg-unpacker/game_for_peace_unpacker/paks$ find . -type f -name "*.uasset" -exec grep -H -l -E 'bEnableExtraSphereCollision' {} +
+./ShadowTrackerExtra_map_lobby原厂/Content/BluePrints/Weapon/PlayerWeapon/RifleGun/BP_PlayerBoltBullet_Big.uasset
+./ShadowTrackerExtra_map_lobby原厂/Content/BluePrints/Weapon/PlayerWeapon/RifleGun/BP_PlayerDMRBullet_Big.uasset
+./ShadowTrackerExtra_map_lobby原厂/Content/BluePrints/Weapon/PlayerWeapon/RifleGun/BP_PlayerSniperBullet_Big.uasset
+./ShadowTrackerExtra_map_weapon原厂/Content/BluePrints/Weapon/PlayerWeapon/RifleGun/BP_PlayerCompoundBowBullet_Big.uasset
+./ShadowTrackerExtra_map_weapon原厂/Content/BluePrints/Weapon/PlayerWeapon/RifleGun/BP_PlayerHurtBoltBullet_Big.uasset
+
+(ros:noetic)baiusc@bzs-work-pc:/media/baiusc/DATA1/Repositories/ReposMyself/pubg-unpacker/game_for_peace_unpacker/paks$ find . -type f -name "*.uasset" -exec grep -H -l -E 'RadiusScaleCurve' {} +
+./ShadowTrackerExtra_map_lobby原厂/Content/BluePrints/Weapon/PlayerWeapon/RifleGun/BP_PlayerBoltBullet_Big.uasset
+./ShadowTrackerExtra_map_lobby原厂/Content/BluePrints/Weapon/PlayerWeapon/RifleGun/BP_PlayerDMRBullet_Big.uasset
+./ShadowTrackerExtra_map_lobby原厂/Content/BluePrints/Weapon/PlayerWeapon/RifleGun/BP_PlayerSniperBullet_Big.uasset
+./ShadowTrackerExtra_map_weapon原厂/Content/BluePrints/Weapon/PlayerWeapon/RifleGun/BP_PlayerCompoundBowBullet_Big.uasset
+(ros:noetic)baiusc@bzs-work-pc:/media/baiusc/DATA1/Repositories/ReposMyself/pubg-unpacker/game_for_peace_unpacker/paks$ 
 
 
-(ros:noetic)baiusc@bzs-work-pc:/media/baiusc/DATA1/Linux/ShareFolder_Linux_Win/0919自制范围+M4$ find . -name "*.dat" -type f -exec grep -ai "SkeletalBodySetup" {} +
-./00006365.dat:ConeLimitU�ConstraintBone1�܊ConstraintBone2��2%ConstraintInstance�hm�ConstraintProfileProperties�>ConstraintSetupP>}�CTF_UseSimpleAsComplex�ԫsDefault__PhysicsAsset�s7�#Default__PhysicsConstraintTemplate�W�{
-                                                             efault__SkeletalBodySetup�~��DefaultInstance�I�EAngularConstraintMotion�dV�ECollisionTraceFlag:���FloatProperty����foot_l��d�foot_r����hand_l�hand_r۔,�head̰�
-                                                          IntProperty��6J
-./00006365.dat:JointName$�KAggregateGeom�={'	KBoxElem'pf
-                                                           KSphereElemx���
-                                                                          KSphylElem�͂�LengthI[
+BP_PlayerBoltBullet.uasset 普通十字弩的投射物
+BP_PlayerBoltBullet.uexp
 
-              lowerarm_l�jr�
-PhysicsAsset5P��PhysicsConstraintTemplate���UPos2��	PriAxis294zUProfileInstance{���Radius���O	RotationB�xRotator�i��	SecAxis27<��SkeletalBodySetup�g�'SkeletalBodySetupsR��l
-                       SphereElems΀F�
-                                     SphylElems6�e�	spine_03��OStructPropertSwing1Motion\itDegreesy���
-Swing2Motions$thigh_l�E�thigh_r`>LuThumbnailInfo�L3�TwistConstraintf#
-./范围/00006365.dat:ConeLimitU�ConstraintBone1�܊ConstraintBone2��2%ConstraintInstance�hm�ConstraintProfileProperties�>ConstraintSetupP>}�CTF_UseSimpleAsComplex�ԫsDefault__PhysicsAsset�s7�#Default__PhysicsConstraintTemplate�W�{
-                                                                  efault__SkeletalBodySetup�~��DefaultInstance�I�EAngularConstraintMotion�dV�ECollisionTraceFlag:���FloatProperty����foot_l��d�foot_r����hand_l�hand_r۔,�head̰�
-                                                               IntProperty��6J
-./范围/00006365.dat:JointName$�KAggregateGeom�={'	KBoxElem'pf
-                                                                   KSphereElemx���
-  KSphylElem�͂�LengthI[
+BP_PlayerCompoundBowBullet_Big.uasset 复合弓的投射物
+BP_PlayerCompoundBowBullet_Big.uexp
 
-                      lowerarm_l�jr�
-PhysicsAsset5P��PhysicsConstraintTemplate���UPos2��	PriAxis294zUProfileInstance{���Radius���O	RotationB�xRotator�i��	SecAxis27<��SkeletalBodySetup�g�'SkeletalBodySetupsR��l
-                       SphereElems΀F�
-                                     SphylElems6�e�	spine_03��OStructPropertSwing1Motion\itDegreesy���
-(ros:noetic)baiusc@bzs-work-pc:/media/baiusc/DATA1/Linux/ShareFolder_Linux_Win/0919自制范围+M4$ 
+BP_PlayerHurtBoltBullet_Big.uasset 爆炸猎弓的投射物
+BP_PlayerHurtBoltBullet_Big.uexp
 
+BP_PlayerSPAS12ShotgunBullet.uasset  SPAS-12 霰弹的投射物行为
+BP_PlayerSPAS12ShotgunBullet.uexp
 

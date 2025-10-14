@@ -1,3 +1,13 @@
+'''
+Author       : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
+Date         : 2025-09-30 15:54:56
+LastEditors  : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
+LastEditTime : 2025-09-30 15:54:56
+FilePath     : /game_for_peace_unpacker/py_script/按字节大小搜索.py
+Description  : 
+
+Copyright (c) 2025 by vitalchem, All Rights Reserved. 
+'''
 import os
 from typing import List
 
@@ -23,7 +33,7 @@ def search_single_file_by_byte_size(file_path: str, src_dir: str) -> List[str]:
     return matched_files
 
 # ========== 配置参数 ==========
-my_files_dir = "./release/RE枪补V3发布20250924/my_ue枪数n"  # 文件夹路径
+my_files_dir = "./release/RE枪补V4发布20250925/my_ue枪数n"  # 文件夹路径
 my_file_suffix = (".uasset", ".uexp")  # 文件后缀
 src_dir = "./paks/dat_原厂14283"  # 要搜索的目录
 is_rename = True  # 是否重命名 my 文件

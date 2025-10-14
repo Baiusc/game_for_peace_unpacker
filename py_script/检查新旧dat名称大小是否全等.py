@@ -1,14 +1,5 @@
-'''
-Author       : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
-Date         : 2025-09-25 16:22:15
-LastEditors  : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
-LastEditTime : 2025-09-25 16:24:22
-FilePath     : /game_for_peace_unpacker/py_script/检查新旧dat名称大小是否全等.py
-Description  : 
-
-Copyright (c) 2025 by vitalchem, All Rights Reserved. 
-'''
 import os
+import shutil 
 from typing import Dict, List, Tuple
 
 def build_size_index(src_dir: str) -> Dict[int, List[str]]:
@@ -18,7 +9,8 @@ def build_size_index(src_dir: str) -> Dict[int, List[str]]:
     size_map: Dict[int, List[str]] = {}
     for root, _, files in os.walk(src_dir):
         for f in files:
-            if not f.endswith('.dat'):
+            # 统一使用小写进行匹配，以确保不区分大小写
+            if not f.lower().endswith(('.dat', '.uasset', '.uexp')):
                 continue
             path = os.path.join(root, f)
             try:
@@ -36,7 +28,8 @@ def list_my_files(my_dir: str) -> List[Tuple[str, str, int]]:
     results: List[Tuple[str, str, int]] = []
     for root, _, files in os.walk(my_dir):
         for f in files:
-            if not f.endswith('.dat'):
+            # 统一使用小写进行匹配，以确保不区分大小写
+            if not f.lower().endswith(('.dat', '.uasset', '.uexp')):
                 continue
             path = os.path.join(root, f)
             try:
@@ -47,10 +40,10 @@ def list_my_files(my_dir: str) -> List[Tuple[str, str, int]]:
             results.append((f, path, sz))
     return results
 
-def check_my_files(my_dir: str, src_dir: str, max_show_matches: int = 200):
+def check_my_files(my_dir: str, src_dir: str, is_auto_rename: bool, max_show_matches: int = 200):
     """
     对 my_dir 中的每个 .dat，检查 src_dir 中是否存在相同字节大小且文件名相同的文件。
-    打印整齐的匹配/未匹配信息，并在文件名不匹配时显示匹配大小的 src 文件。
+    如果 is_auto_rename 为 True，将自动重命名 my_dir 中匹配大小但文件名不同的文件。
     """
     if not os.path.isdir(my_dir):
         print(f"错误: my_dir 不存在: {my_dir}")
@@ -67,12 +60,30 @@ def check_my_files(my_dir: str, src_dir: str, max_show_matches: int = 200):
         print("my_dir 中没有发现 .dat 文件。")
         return
 
+    # =================================================================
+    # 新增排序逻辑：按文件名的数字大小倒序 (从大到小) 排序
+    # =================================================================
+    def get_numeric_name(file_tuple: Tuple[str, str, int]) -> int:
+        # file_tuple[0] 是文件名，例如 '00000230.dat'
+        name = file_tuple[0]
+        try:
+            # 移除后缀，转换为整数进行比较
+            return int(name.replace('.dat', ''))
+        except ValueError:
+            # 如果文件名不符合数字格式，返回 0 或其他值确保其被处理
+            return 0 
+    
+    my_files.sort(key=get_numeric_name, reverse=True)
+    # =================================================================
+
     matched_count = 0
     unmatched_count = 0
+    renamed_count = 0
 
     print("\n" + "="*80)
     print("检测结果（按 my_dir 文件分组）")
-    print("="*80)
+    print(f"自动重命名模式: {'启用' if is_auto_rename else '禁用'}")
+    print("================================================================================")
 
     for name, path, size in my_files:
         matches = src_index.get(size, [])
@@ -90,19 +101,49 @@ def check_my_files(my_dir: str, src_dir: str, max_show_matches: int = 200):
         else:
             unmatched_count += 1
             if matches:
+                # 存在大小匹配但文件名不同的文件
                 print(f"my_dir_file: {name} | 文件名不匹配 | 匹配大小文件数: {len(matches)} | size: {size} bytes")
-                # 打印所有匹配大小但文件名不同的文件
+                
+                # --- 自动重命名逻辑 ---
+                if is_auto_rename:
+                    src_match_path = matches[0]
+                    new_name = os.path.basename(src_match_path)
+                    
+                    # 构造新的文件路径 (保持 my_dir 内部的目录结构)
+                    new_path = os.path.join(os.path.dirname(path), new_name)
+                    
+                    if os.path.exists(new_path):
+                         # 目标文件已存在，但由于是倒序处理，可能是之前的重命名操作遗留下的冲突
+                         print(f"    [重命名失败] 目标文件已存在，请手动检查或清理目标目录: {new_path}")
+                    else:
+                        try:
+                            os.rename(path, new_path)
+                            renamed_count += 1
+                            print(f"    [已重命名] {name} -> {new_name}")
+                            # 注意: 重命名后，原文件已不存在，但为了打印信息，我们继续使用旧的 name 变量。
+                        except OSError as e:
+                            print(f"    [重命名错误] 无法重命名 {path} 为 {new_path}: {e}")
+
+                # 打印所有匹配大小但文件名不同的文件（无论是否重命名）
                 for m in matches:
-                    print(f"    匹配大小但文件名不同 -> src_file: {os.path.basename(m)} | src_dir: {os.path.dirname(m)}")
+                    print(f"    匹配大小文件 -> src_file: {os.path.basename(m)} | src_dir: {os.path.dirname(m)}")
             else:
                 print(f"my_dir_file: {name} | 未找到匹配的 src 文件 | size: {size} bytes")
 
     print("\n" + "="*80)
     print(f"总计：my_dir 中文件数 {len(my_files)}；匹配数 {matched_count}；未匹配数 {unmatched_count}")
+    if is_auto_rename:
+        print(f"自动重命名文件数: {renamed_count}")
     print("="*80)
 
 
 if __name__ == "__main__":
-    my_dir = "./release/RE枪补V3发布20250924/my_dat枪数量22没改6把栓狙"
+    is_auto_rename = False # 设置为 True 启用自动重命名，设置为 False 仅进行检查
+
+    # my_dir = "./release/RE枪补V5发布20250930/my_dat20251013"
+    my_dir = "./release/RE天线V4发布20250930"
+    # src_dir = "./paks/dat_patch_14323原厂"
     src_dir = "./paks/dat_temp/file_0"
-    check_my_files(my_dir, src_dir)
+    # src_dir = "./paks/ShadowTrackerExtra_patch_14323原厂"
+    
+    check_my_files(my_dir, src_dir, is_auto_rename)
