@@ -2,7 +2,7 @@
 Author       : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
 Date         : 2025-08-21 10:10:50
 LastEditors  : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
-LastEditTime : 2025-10-13 17:28:46
+LastEditTime : 2025-10-14 16:36:54
 FilePath     : /game_for_peace_unpacker/python/bms_linux.py
 Description  : 
 
@@ -14,9 +14,9 @@ import time
 from glob import glob
 
 
-# pak_file = "./paks/game_patch_1.33.12.14323原厂（复件）.pak"
+pak_file = "./paks/game_patch_1.33.12.14323原厂（复件）.pak"
 # pak_file = "./paks/map_weapon_1.33.12.14210原厂（复件）.pak"
-pak_file = "./paks/game_patch_1.33.12.14320原厂（复件）.pak"
+# pak_file = "./paks/game_patch_1.33.12.14320原厂（复件）.pak"
 dat_dir = "./paks/dat_temp"
 
 # 定义解包函数dat_temp

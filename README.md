@@ -2,7 +2,7 @@
  * @Author       : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
  * @Date         : 2025-09-02 16:42:02
  * @LastEditors  : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
- * @LastEditTime : 2025-10-13 17:04:58
+ * @LastEditTime : 2025-10-14 16:33:23
  * @FilePath     : /game_for_peace_unpacker/README.md
  * @Description  : 
  * 
@@ -104,7 +104,7 @@ find . -type f -name '*Bullet*Template*'
 
 find . -type f -name "*.uasset" -exec grep -H -E 'BP_PlayerBoltBullet|BP_PlayerSPAS12ShotgunBullet' -C 3 {} +
 find . -type f -name "*.uasset" -exec grep -H -l -E 'BulletTemplate' {} +
-find . -type f -name "*.uasset" -exec grep -H -l -E 'BP_PlayerSPAS12ShotgunBullet' {} +
+find . -type f -name "*.uasset" -exec grep -H -l -E 'BP_PlayerBoltBullet_Big' {} +
 
 {"$type":"UAssetAPI.PropertyTypes.Objects.ObjectPropertyData, UAssetAPI","Name":"BulletTemplate","ArrayIndex":0,"IsZero":false,"PropertyTagFlags":"None","PropertyTagExtensions":"NoExtension","Value":-20}
 
@@ -263,6 +263,102 @@ endif ()
 ./ShadowTrackerExtra_map_weapon原厂/Content/BluePrints/Weapon/PlayerWeapon/RifleGun/BP_PlayerCompoundBowBullet_Big.uasset
 (ros:noetic)baiusc@bzs-work-pc:/media/baiusc/DATA1/Repositories/ReposMyself/pubg-unpacker/game_for_peace_unpacker/paks$ 
 
+(ros:noetic)baiusc@bzs-work-pc:/media/baiusc/DATA1/Repositories/ReposMyself/pubg-unpacker/game_for_peace_unpacker/paks$ find . -type f -name "*.uasset" -exec grep -H -l -E 'BP_PlayerBoltBullet' {} +
+./ShadowTrackerExtra_map_lobby原厂/Content/Arts_PlayerBluePrints/Weapon/MainWeapon/Other/CrossBow/BP_Other_CrossBow.uasset
+./ShadowTrackerExtra_map_lobby原厂/Content/BluePrints/Weapon/PlayerWeapon/RifleGun/BP_PlayerBoltBullet_Big.uasset
+./ShadowTrackerExtra_map_weapon原厂/Content/Arts_PlayerBluePrints/Weapon/MainWeapon/Other/CrossbowBorderland/BP_CrossbowBordBullet_Big.uasset
+./ShadowTrackerExtra_map_weapon原厂/Content/BluePrints/Weapon/PlayerWeapon/RifleGun/BP_PlayerBoltBullet.uasset
+
+(ros:noetic)baiusc@bzs-work-pc:/media/baiusc/DATA1/Repositories/ReposMyself/pubg-unpacker/game_for_peace_unpacker/paks$ find . -type f -name "*.uasset" -exec grep -H -l -E 'BP_PlayerBoltBullet_Big' {} +
+./ShadowTrackerExtra_map_lobby原厂/Content/Arts_PlayerBluePrints/Weapon/MainWeapon/Other/CrossBow/BP_Other_CrossBow.uasset
+./ShadowTrackerExtra_map_lobby原厂/Content/BluePrints/Weapon/PlayerWeapon/RifleGun/BP_PlayerBoltBullet_Big.uasset
+
+(ros:noetic)baiusc@bzs-work-pc:/media/baiusc/DATA1/Repositories/ReposMyself/pubg-unpacker/game_for_peace_unpacker/paks$ find . -type f -name "*.uasset" -exec grep -H -l -E 'BulletTemplate' {} +
+./ShadowTrackerExtra_map_filter原厂/Content/Arts_PlayerBluePrints/Vehicle/ArmedVehicle/BF_ArmedHelicopter/AH6/BF_AH6_Driver_Gatlin.uasset
+./ShadowTrackerExtra_map_filter原厂/Content/Arts_PlayerBluePrints/Vehicle/ArmedVehicle/BF_ArmedHelicopter/AH6/BF_AH6_Driver_GAU19B01.uasset
+./ShadowTrackerExtra_map_filter原厂/Content/Arts_PlayerBluePrints/Vehicle/ArmedVehicle/BF_ArmedHelicopter/AH6/BF_AH6_Driver_GAU19B02.uasset
+./ShadowTrackerExtra_map_filter原厂/Content/Arts_PlayerBluePrints/Vehicle/ArmedVehicle/BF_ArmedHelicopter/AH6/BF_AH6_Passenger_Gatlin.uasset
+./ShadowTrackerExtra_map_filter原厂/Content/Arts_PlayerBluePrints/Vehicle/ArmedVehicle/BF_ArmedHelicopter/AH6/BF_AH6_Passenger_GAU19B01.uasset
+./ShadowTrackerExtra_map_filter原厂/Content/Arts_PlayerBluePrints/Vehicle/ArmedVehicle/BF_ArmedHelicopter/AH6/BF_AH6_Passenger_RemoteGatlin.uasset
+./ShadowTrackerExtra_map_filter原厂/Content/Arts_PlayerBluePrints/Vehicle/ArmedVehicle/BF_ArmedHelicopter/Mi28/BF_Mi28_Passenger_RemoteGAU19B02.uasset
+./ShadowTrackerExtra_map_filter原厂/Content/Arts_PlayerBluePrints/Vehicle/ArmedVehicle/BF_ArmedHelicopter/UH60/BF_UH60_Passenger_Gatlin.uasset
+./ShadowTrackerExtra_map_filter原厂/Content/Arts_PlayerBluePrints/Vehicle/ArmedVehicle/BF_ArmedHelicopter/UH60/BF_UH60_Passenger_RemoteGatlin.uasset
+./ShadowTrackerExtra_map_filter原厂/Content/Arts_PlayerBluePrints/Vehicle/ArmedVehicle/BF_ArmedTankAttack/Gatlin_Tank_WEP_CROWS.uasset
+./ShadowTrackerExtra_map_filter原厂/Content/Arts_PlayerBluePrints/Vehicle/ArmedVehicle/BF_ArmedTankAttack/Gatlin_Tank_WEP_SK_WEP_M240.uasset
+./ShadowTrackerExtra_map_filter原厂/Content/Arts_PlayerBluePrints/Vehicle/ArmedVehicle/BF_ArmedTankAttack/VehCoaxialGatlin_BFAttackTank.uasset
+./ShadowTrackerExtra_map_filter原厂/Content/Arts_PlayerBluePrints/Vehicle/ArmedVehicle/BF_ArmedTankDefence/Gatlin_Tank_WEP_PKM.uasset
+./ShadowTrackerExtra_map_filter原厂/Content/Arts_PlayerBluePrints/Vehicle/ArmedVehicle/BF_ArmedTankDefence/VehCoaxialGatlin_BFDefenceTank.uasset
+./ShadowTrackerExtra_map_filter原厂/Content/Arts_PlayerBluePrints/Vehicle/ArmedVehicle/VehicleWeapons/VehGatlin.uasset
+./ShadowTrackerExtra_map_filter原厂/Content/Arts_PlayerBluePrints/Vehicle/ArmedVehicle/VehicleWeapons/VehGatlin_BFTank.uasset
+./ShadowTrackerExtra_map_lobby原厂/Content/Arts_PlayerBluePrints/Weapon/MainWeapon/BP_ShootWeaponBase.uasset
+./ShadowTrackerExtra_map_lobby原厂/Content/Arts_PlayerBluePrints/Weapon/MainWeapon/Other/CrossBow/BP_Other_CrossBow.uasset
+./ShadowTrackerExtra_map_lobby原厂/Content/Arts_PlayerBluePrints/Weapon/MainWeapon/Pistol/Flaregun/BP_Pistol_Flaregun.uasset
+./ShadowTrackerExtra_map_lobby原厂/Content/Arts_PlayerBluePrints/Weapon/MainWeapon/Pistol/SawedOff/BP_ShotGun_SawedOff.uasset
+./ShadowTrackerExtra_map_lobby原厂/Content/Arts_PlayerBluePrints/Weapon/MainWeapon/Rifle/M16A4/BP_Rifle_M16A4.uasset
+./ShadowTrackerExtra_map_lobby原厂/Content/Arts_PlayerBluePrints/Weapon/MainWeapon/Rifle/Mk47/BP_Rifle_Mk47.uasset
+./ShadowTrackerExtra_map_lobby原厂/Content/Arts_PlayerBluePrints/Weapon/MainWeapon/ShotGun/BP_ShotGunBase.uasset
+./ShadowTrackerExtra_map_lobby原厂/Content/Arts_PlayerBluePrints/Weapon/MainWeapon/Sniper/AWM/BP_Sniper_AWM.uasset
+./ShadowTrackerExtra_map_lobby原厂/Content/Arts_PlayerBluePrints/Weapon/MainWeapon/Sniper/Kar98K/BP_Sniper_Kar98k.uasset
+./ShadowTrackerExtra_map_lobby原厂/Content/Arts_PlayerBluePrints/Weapon/MainWeapon/Sniper/M24/BP_Sniper_M24.uasset
+./ShadowTrackerExtra_map_lobby原厂/Content/Arts_PlayerBluePrints/Weapon/MainWeapon/Sniper/Mini14/BP_Sniper_Mini14.uasset
+./ShadowTrackerExtra_map_lobby原厂/Content/Arts_PlayerBluePrints/Weapon/MainWeapon/Sniper/Mk14EBR/BP_Sniper_Mk14.uasset
+./ShadowTrackerExtra_map_lobby原厂/Content/Arts_PlayerBluePrints/Weapon/MainWeapon/Sniper/QBU/BP_Sniper_QBU.uasset
+./ShadowTrackerExtra_map_lobby原厂/Content/Arts_PlayerBluePrints/Weapon/MainWeapon/Sniper/SKS/BP_Sniper_SKS.uasset
+./ShadowTrackerExtra_map_lobby原厂/Content/Arts_PlayerBluePrints/Weapon/MainWeapon/Sniper/SLR/BP_Sniper_SLR.uasset
+./ShadowTrackerExtra_map_lobby原厂/Content/Arts_PlayerBluePrints/Weapon/MainWeapon/Sniper/VSS/BP_Sniper_VSS.uasset
+./ShadowTrackerExtra_map_lobby原厂/Content/Arts_PlayerBluePrints/Weapon/MainWeapon/Sniper/Win94/BP_Sniper_Win94.uasset
+./ShadowTrackerExtra_map_weapon原厂/Content/Arts_PlayerBluePrints/Weapon/MainWeapon/BP_ShootWeaponNewBase.uasset
+./ShadowTrackerExtra_map_weapon原厂/Content/Arts_PlayerBluePrints/Weapon/MainWeapon/BP_ShootWeaponProjectileBase.uasset
+./ShadowTrackerExtra_map_weapon原厂/Content/Arts_PlayerBluePrints/Weapon/MainWeapon/Other/CompoundBow/BP_Other_CompoundBow.uasset
+./ShadowTrackerExtra_map_weapon原厂/Content/Arts_PlayerBluePrints/Weapon/MainWeapon/Other/CrossbowBorderland/BP_Other_CrossbowBorderland.uasset
+./ShadowTrackerExtra_map_weapon原厂/Content/Arts_PlayerBluePrints/Weapon/MainWeapon/Other/HuntingBow/BP_Other_HuntingBow.uasset
+./ShadowTrackerExtra_map_weapon原厂/Content/Arts_PlayerBluePrints/Weapon/MainWeapon/Other/HuntingBow/BP_ShootWeaponBowBase.uasset
+./ShadowTrackerExtra_map_weapon原厂/Content/Arts_PlayerBluePrints/Weapon/MainWeapon/Other/M79SmokeGrenadeLauncher/BP_Other_M79SmokeGrenadeLauncher.uasset
+./ShadowTrackerExtra_map_weapon原厂/Content/Arts_PlayerBluePrints/Weapon/MainWeapon/Other/MG3/BP_Other_MG3.uasset
+./ShadowTrackerExtra_map_weapon原厂/Content/Arts_PlayerBluePrints/Weapon/MainWeapon/Other/Mortar/BP_Other_Mortar.uasset
+./ShadowTrackerExtra_map_weapon原厂/Content/Arts_PlayerBluePrints/Weapon/MainWeapon/Other/StunGun/BP_Other_StunGun.uasset
+./ShadowTrackerExtra_map_weapon原厂/Content/Arts_PlayerBluePrints/Weapon/MainWeapon/ShotGun/SPAS-12/BP_ShotGun_SPAS-12.uasset
+./ShadowTrackerExtra_map_weapon原厂/Content/Arts_PlayerBluePrints/Weapon/MainWeapon/Sniper/AMR/BP_Sniper_AMR.uasset
+./ShadowTrackerExtra_map_weapon原厂/Content/Arts_PlayerBluePrints/Weapon/MainWeapon/Sniper/M200/BP_Sniper_M200.uasset
+./ShadowTrackerExtra_map_weapon原厂/Content/Arts_PlayerBluePrints/Weapon/MainWeapon/Sniper/M417/BP_Rifle_M417.uasset
+./ShadowTrackerExtra_map_weapon原厂/Content/Arts_PlayerBluePrints/Weapon/MainWeapon/Sniper/MK12/BP_Sniper_MK12.uasset
+./ShadowTrackerExtra_map_weapon原厂/Content/Arts_PlayerBluePrints/Weapon/MainWeapon/Sniper/MK20/BP_Sniper_MK20.uasset
+./ShadowTrackerExtra_map_weapon原厂/Content/Arts_PlayerBluePrints/Weapon/MainWeapon/Sniper/Mosin/BP_Sniper_Mosin.uasset
+./ShadowTrackerExtra_map_weapon原厂/Content/Arts_PlayerBluePrints/Weapon/MainWeapon/Sniper/SVD/BP_Sniper_SVD.uasset
+./ShadowTrackerExtra_patch_14320原厂/Content/Actor_Timeliness/CG026_Resurrection/Blueprints/RevivalFlareGun/BP_Pistol_RevivalFlaregun.uasset
+./ShadowTrackerExtra_patch_14320原厂/Content/UGC/UGCGame/Weapon/MainWeapon/Pistol/Flaregun/BP_UGC_Pistol_Flaregun.uasset
+./ShadowTrackerExtra_patch_14323原厂/Content/Arts_PlayerBluePrints/Weapon/MainWeapon/Battlefield/AT4-A_BF/BP_Other_AT4-A_BF.uasset
+./ShadowTrackerExtra_patch_14323原厂/Content/Arts_PlayerBluePrints/Weapon/MainWeapon/BP_ShootWeaponBase.uasset
+./ShadowTrackerExtra_patch_14323原厂/Content/Arts_PlayerBluePrints/Weapon/MainWeapon/BP_ShootWeaponProjectileBase.uasset
+./ShadowTrackerExtra_patch_14323原厂/Content/Arts_PlayerBluePrints/Weapon/MainWeapon/Other/AT4-A/BP_Other_AT4-A.uasset
+./ShadowTrackerExtra_patch_14323原厂/Content/Arts_PlayerBluePrints/Weapon/MainWeapon/Other/CompoundBow/BP_Other_CompoundBow.uasset
+./ShadowTrackerExtra_patch_14323原厂/Content/Arts_PlayerBluePrints/Weapon/MainWeapon/Other/HuntingBow/BP_Other_HuntingBow.uasset
+./ShadowTrackerExtra_patch_14323原厂/Content/Arts_PlayerBluePrints/Weapon/MainWeapon/Other/HuntingBow/BP_ShootWeaponBowBase.uasset
+./ShadowTrackerExtra_patch_14323原厂/Content/Arts_PlayerBluePrints/Weapon/MainWeapon/Other/M3E1/BP_Other_M3E1.uasset
+./ShadowTrackerExtra_patch_14323原厂/Content/Arts_PlayerBluePrints/Weapon/MainWeapon/Other/MG3/BP_Other_MG3.uasset
+./ShadowTrackerExtra_patch_14323原厂/Content/Arts_PlayerBluePrints/Weapon/MainWeapon/Other/PanzerFaust/BP_Other_PanzerFaust.uasset
+./ShadowTrackerExtra_patch_14323原厂/Content/Arts_PlayerBluePrints/Weapon/MainWeapon/Pistol/FireworkGun/BP_Pistol_FireworkGun.uasset
+./ShadowTrackerExtra_patch_14323原厂/Content/Arts_PlayerBluePrints/Weapon/MainWeapon/Pistol/Flaregun/BP_Pistol_Flaregun.uasset
+./ShadowTrackerExtra_patch_14323原厂/Content/Arts_PlayerBluePrints/Weapon/MainWeapon/Sniper/AMR/BP_Sniper_AMR.uasset
+./ShadowTrackerExtra_patch_14323原厂/Content/Arts_PlayerBluePrints/Weapon/MainWeapon/Sniper/AWM/BP_Sniper_AWM.uasset
+./ShadowTrackerExtra_patch_14323原厂/Content/Arts_PlayerBluePrints/Weapon/MainWeapon/Sniper/Kar98K/BP_Sniper_Kar98k.uasset
+./ShadowTrackerExtra_patch_14323原厂/Content/Arts_PlayerBluePrints/Weapon/MainWeapon/Sniper/M200/BP_Sniper_M200.uasset
+./ShadowTrackerExtra_patch_14323原厂/Content/Arts_PlayerBluePrints/Weapon/MainWeapon/Sniper/M24/BP_Sniper_M24.uasset
+./ShadowTrackerExtra_patch_14323原厂/Content/Arts_PlayerBluePrints/Weapon/MainWeapon/Sniper/Mini14/BP_Sniper_Mini14.uasset
+./ShadowTrackerExtra_patch_14323原厂/Content/Arts_PlayerBluePrints/Weapon/MainWeapon/Sniper/Mk14EBR/BP_Sniper_Mk14.uasset
+./ShadowTrackerExtra_patch_14323原厂/Content/Arts_PlayerBluePrints/Weapon/MainWeapon/Sniper/Mosin/BP_Sniper_Mosin.uasset
+./ShadowTrackerExtra_patch_14323原厂/Content/Arts_PlayerBluePrints/Weapon/MainWeapon/Sniper/SKS/BP_Sniper_SKS.uasset
+./ShadowTrackerExtra_patch_14323原厂/Content/Arts_PlayerBluePrints/Weapon/MainWeapon/Sniper/SVD/BP_Sniper_SVD.uasset
+./ShadowTrackerExtra_patch_14323原厂/Content/Arts_Timeliness/GameMode/SuperPeople/BluePrints/CowBoy/Weapon/BP_Cowboy_Win94.uasset
+./ShadowTrackerExtra_patch_14323原厂/Content/Mod/BattleField/BluePrints/PlayerCareer/Engineer/SkillActor/BP_BattleFiledTurretWeapon.uasset
+./ShadowTrackerExtra_patch_14323原厂/Content/Mod/BattleField/BluePrints/Weapon/BattleField_Fort/BP_Other_Fort.uasset
+./ShadowTrackerExtra_patch_14323原厂/Content/Mod/BattleField/BluePrints/Weapon/MedicalGun_BF/BP_Pistol_MedicalGun_BF.uasset
+./ShadowTrackerExtra_patch_14323原厂/Content/Mod/Escape/Art_Player/Vehicle/PatrolCar/BP_Escape_PatrolCar_Gatlin.uasset
+./ShadowTrackerExtra_patch_14323原厂/Content/Mod/Escape/BluePrints/Weapon/MainWeapon/Other/RDCrossBow/BP_CG030_HandheldBow_Escape.uasset
+./ShadowTrackerExtra_patch_14323原厂/Content/UGC/UGCGame/Weapon/MainWeapon/BP_UGC_ShootWeaponBase.uasset
+./ShadowTrackerExtra_patch_14323原厂/Content/UGC/UGCGame/Weapon/MainWeapon/BP_UGC_ShootWeaponBowBase.uasset
+./ShadowTrackerExtra_patch_14323原厂/Content/UGC/UGCGame/Weapon/MainWeapon/BP_UGC_ShootWeaponNewBase.uasset
+
 
 BP_PlayerBoltBullet.uasset 普通十字弩的投射物
 BP_PlayerBoltBullet.uexp
@@ -270,7 +366,7 @@ BP_PlayerBoltBullet.uexp
 BP_PlayerCompoundBowBullet_Big.uasset 复合弓的投射物
 BP_PlayerCompoundBowBullet_Big.uexp
 
-BP_PlayerHurtBoltBullet_Big.uasset 爆炸猎弓的投射物
+BP_PlayerHurtBoltBullet_Big.uasset 爆炸猎弓的投射物 在用者：BP_Other_CrossBow
 BP_PlayerHurtBoltBullet_Big.uexp
 
 BP_PlayerSPAS12ShotgunBullet.uasset  SPAS-12 霰弹的投射物行为

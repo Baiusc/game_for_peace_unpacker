@@ -132,17 +132,17 @@ function select_pak_file {
 }
 
 # ================================================================
-# 解包函数（修复读取路径和工具调用）
+# 解包函数
 # ================================================================
 function jb_simplified {
-    local TOOL_CMD="./uexp解包.bms" # 修复：添加 ./
+    local TOOL_CMD="./uexp解包.bms" 
 
     select_pak_file || return 1
 
     local pak_full_path
     local pak_file
     
-    # *** 修复读取路径：使用 $TEMP_DIR ***
+    # 临时路径使用 $TEMP_DIR 
     pak_full_path=$(cat "$TEMP_DIR/selected_pak_path.txt")
     pak_file=$(cat "$TEMP_DIR/selected_pak_name.txt")
 
@@ -165,10 +165,10 @@ function jb_simplified {
 }
 
 # ================================================================
-# 打包函数（修复读取路径和工具调用）
+# 打包函数
 # ================================================================
 function db_simplified {
-    local TOOL_CMD="./uexp打包.bms" # 修复：添加 ./
+    local TOOL_CMD="./uexp打包.bms" 
 
     select_pak_file || return 1
 
