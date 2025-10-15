@@ -140,12 +140,12 @@ def check_my_files(my_dir: str, src_dir: str, is_auto_rename: bool, max_show_mat
 if __name__ == "__main__":
     is_auto_rename = False # 设置为 True 启用自动重命名，设置为 False 仅进行检查
 
-    my_dir = "./release/RE枪补V5发布20250930/my_dat20251013"
+    my_dir = "./release/RE枪补V5发布20250930/1013新增"
     # my_dir = "./release//RE范围V1发布20251014/待打包dat"
     # my_dir = "./paks/dat_temp"
-    # src_dir = "./paks/dat_patch_14323原厂"
+    src_dir = "./paks/dat_patch_14323原厂"
     # src_dir = "./paks/dat_map_weapon14210原厂"
-    src_dir = "./paks/ShadowTrackerExtra_patch_14323原厂"
+    # src_dir = "./paks/ShadowTrackerExtra_patch_14323原厂"
     # src_dir = "./release//RE范围V1发布20251014/待打包uexp"
     # === 手机uexp解包打包 ===
     # src_dir = "/run/user/1000/gvfs/mtp:host=Xiaomi_MI_8_UD_92daeda3/内部存储设备/Download/UEXP三合一/UEXP解包"
