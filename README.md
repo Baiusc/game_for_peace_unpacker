@@ -2,7 +2,7 @@
  * @Author       : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
  * @Date         : 2025-09-02 16:42:02
  * @LastEditors  : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
- * @LastEditTime : 2025-10-20 11:27:47
+ * @LastEditTime : 2025-10-20 11:43:23
  * @FilePath     : /game_for_peace_unpacker/README.md
  * @Description  : 
  * 
@@ -419,6 +419,7 @@ endif ()
 
 BP_PlayerM16A4Bullet_C
 Default__BP_PlayerM16A4Bullet_C
+意外自动改变的键值对Name: PlugComponentSlotMap   BreakThroughDampRateConfig
 /Game/BluePrints/Weapon/PlayerWeapon/RifleGun/BP_PlayerM16A4Bullet
 /Game/BluePrints/Weapon/PlayerWeapon/RifleGun/BP_PlayerRifleBullet
 
