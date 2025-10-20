@@ -2,7 +2,7 @@
 Author       : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
 Date         : 2025-09-28 15:32:10
 LastEditors  : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
-LastEditTime : 2025-09-28 15:35:12
+LastEditTime : 2025-10-20 17:00:34
 FilePath     : /game_for_peace_unpacker/py_script/搜索str关键词.py
 Description  : 
 
@@ -65,9 +65,11 @@ def search_files(src_dir: str, my_file_suffix: str, my_str: str, context_len: in
 if __name__ == "__main__":
     # 示例参数
     SRC_DIR = "./paks/dat_obb14210原厂" # 搜索目录
+    SRC_DIR = "./paks/dat_temp"
     MY_FILE_SUFFIX = ".dat"          # 文件后缀
     MY_STR = "SkeletalBodySetup"     # 搜索字符串
     MY_STR = "BaseColor"     # 搜索字符串
+    MY_STR = "dea0b64523798a67a16b4d9240d94c4a4a7c6b78"     # 搜索字符串
     CONTEXT_LEN = 64 * 4                 # 上下文长度（字符数）
 
     search_files(SRC_DIR, MY_FILE_SUFFIX, MY_STR, CONTEXT_LEN)

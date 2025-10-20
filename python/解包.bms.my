@@ -67,7 +67,7 @@ for I = 0 < FILES            # 循环遍历所有文件
     get ZSIZE longlong TOC_FILE  # 读取压缩后大小 8
 	getdstring DUMMY2 21 TOC_FILE # 读取21字节的填充/未知数据 21
 
-    # print "文件偏移量: 0x%OFFSET|llx%"
+    print "文件偏移量: 0x%OFFSET|llx%"
     print "原始大小: %SIZE%"
     print "压缩类型 (ZIP): %ZIP%"
     print "压缩后大小: %ZSIZE%"

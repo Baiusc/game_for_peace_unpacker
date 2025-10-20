@@ -5,6 +5,7 @@ from typing import List, Dict, Tuple
 
 # 硬编码配置
 SEARCH_DIR = "./tool/天线补丁包/天线0922"  # 搜索目录
+SEARCH_DIR = "./paks/dat_temp"
 OUTPUT_DIR = SEARCH_DIR          # 输出目录
 CONTEXT_BYTES = 32               # 上下文字节数
 
@@ -23,7 +24,7 @@ TARGET_PATTERNS = [
 ]
 # "343133343936" # 银枪赵云 【  413496--413496--角色-银枪赵云  】偏移量 0x1D960 
 TARGET_PATTERNS = [
-    "00892041b507" # 白T指针 
+    "215" # dat搜索关键词
 ]
 # 名称 id 偏移 指针
 MY_MAP = {
