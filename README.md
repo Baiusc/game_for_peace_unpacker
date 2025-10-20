@@ -2,7 +2,7 @@
  * @Author       : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
  * @Date         : 2025-09-02 16:42:02
  * @LastEditors  : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
- * @LastEditTime : 2025-10-20 10:04:05
+ * @LastEditTime : 2025-10-20 11:27:47
  * @FilePath     : /game_for_peace_unpacker/README.md
  * @Description  : 
  * 
@@ -106,7 +106,7 @@ find . -type f -name '*Bullet*Template*'
 
 find . -type f -name "*.uasset" -exec grep -H -E 'BP_PlayerBoltBullet|BP_PlayerSPAS12ShotgunBullet' -C 3 {} +
 find . -type f -name "*.uasset" -exec grep -H -l -E 'BulletTemplate' {} +
-find . -type f -name "*.uasset" -exec grep -H -l -E '_Knee' {} +
+find . -type f -name "*.uasset" -exec grep -H -l -E 'BP_PlayerAMRBullet' {} +
 
 {"$type":"UAssetAPI.PropertyTypes.Objects.ObjectPropertyData, UAssetAPI","Name":"BulletTemplate","ArrayIndex":0,"IsZero":false,"PropertyTagFlags":"None","PropertyTagExtensions":"NoExtension","Value":-20}
 
@@ -379,6 +379,48 @@ endif ()
 ./ShadowTrackerExtra_patch_14323原厂/Content/UGC/UGCGame/Weapon/MainWeapon/BP_UGC_ShootWeaponBase.uasset
 ./ShadowTrackerExtra_patch_14323原厂/Content/UGC/UGCGame/Weapon/MainWeapon/BP_UGC_ShootWeaponBowBase.uasset
 
+(ros:noetic)baiusc@bzs-work-pc:/media/baiusc/DATA1/Repositories/ReposMyself/pubg-unpacker/game_for_peace_unpacker/paks$ find . -type f -name '*BP_Player*Bullet*'
+./ShadowTrackerExtra_map_lobby原厂/Content/Arts_Scenes/Festival/CG05_WinnerAirdrop/BP_PlayerFlareGunBullet_Winner.uasset
+./ShadowTrackerExtra_map_lobby原厂/Content/Arts_Scenes/Festival/CG05_WinnerAirdrop/BP_PlayerFlareGunBullet_Winner.uexp
+./ShadowTrackerExtra_map_lobby原厂/Content/BluePrints/Weapon/PlayerWeapon/Pistol/BP_PlayerPistolBulletDamageType.uasset
+./ShadowTrackerExtra_map_lobby原厂/Content/BluePrints/Weapon/PlayerWeapon/Pistol/BP_PlayerPistolBulletDamageType.uexp
+./ShadowTrackerExtra_map_lobby原厂/Content/BluePrints/Weapon/PlayerWeapon/RifleGun/BP_PlayerM16A4Bullet.uexp
+./ShadowTrackerExtra_map_lobby原厂/Content/BluePrints/Weapon/PlayerWeapon/RifleGun/BP_PlayerBoltBullet_Big.uasset
+./ShadowTrackerExtra_map_lobby原厂/Content/BluePrints/Weapon/PlayerWeapon/RifleGun/BP_PlayerBoltBullet_Big.uexp
+./ShadowTrackerExtra_map_lobby原厂/Content/BluePrints/Weapon/PlayerWeapon/RifleGun/BP_PlayerDMRBullet_Big.uasset
+./ShadowTrackerExtra_map_lobby原厂/Content/BluePrints/Weapon/PlayerWeapon/RifleGun/BP_PlayerDMRBullet_Big.uexp
+./ShadowTrackerExtra_map_lobby原厂/Content/BluePrints/Weapon/PlayerWeapon/RifleGun/BP_PlayerFlareGunBullet.uasset
+./ShadowTrackerExtra_map_lobby原厂/Content/BluePrints/Weapon/PlayerWeapon/RifleGun/BP_PlayerFlareGunBullet.uexp
+./ShadowTrackerExtra_map_lobby原厂/Content/BluePrints/Weapon/PlayerWeapon/RifleGun/BP_PlayerM16A4Bullet.uasset
+./ShadowTrackerExtra_map_lobby原厂/Content/BluePrints/Weapon/PlayerWeapon/RifleGun/BP_PlayerRifleBullet.uasset
+./ShadowTrackerExtra_map_lobby原厂/Content/BluePrints/Weapon/PlayerWeapon/RifleGun/BP_PlayerRifleBullet.uexp
+./ShadowTrackerExtra_map_lobby原厂/Content/BluePrints/Weapon/PlayerWeapon/RifleGun/BP_PlayerRifleBulletDamageType.uasset
+./ShadowTrackerExtra_map_lobby原厂/Content/BluePrints/Weapon/PlayerWeapon/RifleGun/BP_PlayerRifleBulletDamageType.uexp
+./ShadowTrackerExtra_map_lobby原厂/Content/BluePrints/Weapon/PlayerWeapon/RifleGun/BP_PlayerShotgunBullet.uasset
+./ShadowTrackerExtra_map_lobby原厂/Content/BluePrints/Weapon/PlayerWeapon/RifleGun/BP_PlayerShotgunBullet.uexp
+./ShadowTrackerExtra_map_lobby原厂/Content/BluePrints/Weapon/PlayerWeapon/RifleGun/BP_PlayerSniperBullet.uasset
+./ShadowTrackerExtra_map_lobby原厂/Content/BluePrints/Weapon/PlayerWeapon/RifleGun/BP_PlayerSniperBullet.uexp
+./ShadowTrackerExtra_map_lobby原厂/Content/BluePrints/Weapon/PlayerWeapon/RifleGun/BP_PlayerSniperBulletDamageType.uasset
+./ShadowTrackerExtra_map_lobby原厂/Content/BluePrints/Weapon/PlayerWeapon/RifleGun/BP_PlayerSniperBulletDamageType.uexp
+./ShadowTrackerExtra_map_lobby原厂/Content/BluePrints/Weapon/PlayerWeapon/RifleGun/BP_PlayerSniperBullet_Big.uasset
+./ShadowTrackerExtra_map_lobby原厂/Content/BluePrints/Weapon/PlayerWeapon/RifleGun/BP_PlayerSniperBullet_Big.uexp
+./ShadowTrackerExtra_map_weapon原厂/Content/BluePrints/Weapon/PlayerWeapon/RifleGun/BP_PlayerAMRBulletDamageType.uasset
+./ShadowTrackerExtra_map_weapon原厂/Content/BluePrints/Weapon/PlayerWeapon/RifleGun/BP_PlayerAMRBulletDamageType.uexp
+./ShadowTrackerExtra_map_weapon原厂/Content/BluePrints/Weapon/PlayerWeapon/RifleGun/BP_PlayerBoltBullet.uasset
+./ShadowTrackerExtra_map_weapon原厂/Content/BluePrints/Weapon/PlayerWeapon/RifleGun/BP_PlayerBoltBullet.uexp
+./ShadowTrackerExtra_map_weapon原厂/Content/BluePrints/Weapon/PlayerWeapon/RifleGun/BP_PlayerCompoundBowBullet_Big.uasset
+./ShadowTrackerExtra_map_weapon原厂/Content/BluePrints/Weapon/PlayerWeapon/RifleGun/BP_PlayerCompoundBowBullet_Big.uexp
+./ShadowTrackerExtra_map_weapon原厂/Content/BluePrints/Weapon/PlayerWeapon/RifleGun/BP_PlayerHurtBoltBullet_Big.uasset
+./ShadowTrackerExtra_map_weapon原厂/Content/BluePrints/Weapon/PlayerWeapon/RifleGun/BP_PlayerHurtBoltBullet_Big.uexp
+./ShadowTrackerExtra_map_weapon原厂/Content/BluePrints/Weapon/PlayerWeapon/RifleGun/BP_PlayerRifleBulletImpact.uasset
+./ShadowTrackerExtra_map_weapon原厂/Content/BluePrints/Weapon/PlayerWeapon/RifleGun/BP_PlayerRifleBulletImpact.uexp
+./ShadowTrackerExtra_map_weapon原厂/Content/BluePrints/Weapon/PlayerWeapon/RifleGun/BP_PlayerSPAS12ShotgunBullet.uasset
+(ros:noetic)baiusc@bzs-work-pc:/media/baiusc/DATA1/Repositories/ReposMyself/pubg-unpacker/game_for_peace_unpacker/paks$ 
+
+BP_PlayerM16A4Bullet_C
+Default__BP_PlayerM16A4Bullet_C
+/Game/BluePrints/Weapon/PlayerWeapon/RifleGun/BP_PlayerM16A4Bullet
+/Game/BluePrints/Weapon/PlayerWeapon/RifleGun/BP_PlayerRifleBullet
 
 BP_PlayerBoltBullet.uasset 战术弩
 BP_PlayerBoltBullet.uexp
