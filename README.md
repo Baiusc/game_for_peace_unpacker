@@ -2,7 +2,7 @@
  * @Author       : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
  * @Date         : 2025-09-02 16:42:02
  * @LastEditors  : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
- * @LastEditTime : 2025-10-15 14:14:02
+ * @LastEditTime : 2025-10-20 10:04:05
  * @FilePath     : /game_for_peace_unpacker/README.md
  * @Description  : 
  * 
@@ -106,7 +106,7 @@ find . -type f -name '*Bullet*Template*'
 
 find . -type f -name "*.uasset" -exec grep -H -E 'BP_PlayerBoltBullet|BP_PlayerSPAS12ShotgunBullet' -C 3 {} +
 find . -type f -name "*.uasset" -exec grep -H -l -E 'BulletTemplate' {} +
-find . -type f -name "*.uasset" -exec grep -H -l -E 'BP_PlayerRifleBullet' {} +
+find . -type f -name "*.uasset" -exec grep -H -l -E '_Knee' {} +
 
 {"$type":"UAssetAPI.PropertyTypes.Objects.ObjectPropertyData, UAssetAPI","Name":"BulletTemplate","ArrayIndex":0,"IsZero":false,"PropertyTagFlags":"None","PropertyTagExtensions":"NoExtension","Value":-20}
 
