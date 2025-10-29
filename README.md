@@ -106,7 +106,7 @@ find . -type f -name '*Bullet*Template*'
 
 find . -type f -name "*.uasset" -exec grep -H -E 'BP_PlayerBoltBullet|BP_PlayerSPAS12ShotgunBullet' -C 3 {} +
 find . -type f -name "*.uasset" -exec grep -H -l -E 'BulletTemplate' {} +
-find . -type f -name "*.uasset" -exec grep -H -l -E 'BP_PlayerAMRBullet' {} +
+find . -type f -name "*.uasset" -exec grep -H -l -E 'CH_Base_SK_PhysicsAsset' {} +
 
 {"$type":"UAssetAPI.PropertyTypes.Objects.ObjectPropertyData, UAssetAPI","Name":"BulletTemplate","ArrayIndex":0,"IsZero":false,"PropertyTagFlags":"None","PropertyTagExtensions":"NoExtension","Value":-20}
 

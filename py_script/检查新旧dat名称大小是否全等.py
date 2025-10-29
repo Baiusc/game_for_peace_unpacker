@@ -141,8 +141,8 @@ if __name__ == "__main__":
     is_auto_rename = False # 设置为 True 启用自动重命名，设置为 False 仅进行检查
 
     # my_dir = "./release/RE枪补V5发布20250930/my_dat20251013"
-    my_dir = "./release/RE天线V4发布20250930"
-    # my_dir = "./release//RE范围V1发布20251014/待打包枪补+子弹模板dat"
+    # my_dir = "./release/RE天线V4发布20250930"
+    my_dir = "./release//RE范围V1发布20251014/1029站趴范围"
     # src_dir = "./release/RE枪补V5发布20250930/my_dat20251013"
     src_dir = "./paks/dat_temp"
     # src_dir = "./paks/dat_patch_14327原厂"

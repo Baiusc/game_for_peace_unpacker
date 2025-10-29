@@ -1,14 +1,5 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-auto_skin_final.py
-功能：
- 1. 直接处理指定 dat 文件
- 2. 先做一次 swap 美化
- 3. 再批量替换 ID → 405017
- 4. 打印实时进度
-"""
-
 import re
 import mmap
 from pathlib import Path
@@ -215,8 +206,8 @@ def swap_in_dat(dat_path: Path, swaps: List[Tuple[int, int]]):
             old_str = str(old_val).encode()
             new_str = str(new_val).encode()
             # 匹配前后固定长度 只匹配第一个搜索结果
-            pattern_old = rb'(.{8})' + re.escape(old_str) + rb'(.{10})'
-            pattern_new = rb'(.{8})' + re.escape(new_str) + rb'(.{10})'
+            pattern_old = rb'(.{108})' + re.escape(old_str) + rb'(.{110})'
+            pattern_new = rb'(.{108})' + re.escape(new_str) + rb'(.{110})'
 
             # DEBUG 找到所有匹配
             matches_old = list(re.finditer(pattern_old, data, flags=re.DOTALL))
@@ -457,7 +448,7 @@ def swap_ptr_in_dat(dat_path: Path, swaps: List[Tuple[str, str]]):
 # ============ 主流程 ============
 def main():
     # 直接指定要处理的 dat 文件
-    target_dat = Path("./release/RE天线V4发布20250930/00000285原厂（复件）.dat")
+    target_dat = Path("./release/RE天线V4发布20250930/00000284原厂（复件）.dat")
 
     # 第一次 swap 配置
     # swap_config = [(403251, 413497), (405011, 413498)] #  白T <=> 赵云2 。棕鞋 <=> 赵云3
@@ -472,7 +463,8 @@ def main():
     # swap_in_dat(target_dat, swap_config) # 仅交换ID
 
     SWAP_CONFIG_CORE_str = [(str(old), str(new)) for old, new in SWAP_CONFIG_CORE] 
-    swap_id_and_ptr_in_dat(target_dat, SWAP_CONFIG_CORE_str) # 交换ID、指针 3组核心交换
+    swap_in_dat(target_dat, SWAP_CONFIG_CORE) # 交换ID  3组核心交换
+    # swap_id_and_ptr_in_dat(target_dat, SWAP_CONFIG_CORE_str) # 交换ID、指针 3组核心交换
     # swap_ptr_in_dat(target_dat, swap_config_str)
 
     # # swap_config_my = list(zip(ID_LIST_MY, ID_LIST_SWAP))
@@ -482,7 +474,8 @@ def main():
     # swap_config_my = swap_config_my[2::3]  # 从索引2开始，每隔3个取1个（2,5,8,11,...）
     # swap_config_my_str = [(str(old), str(new)) for old, new in swap_config_my] 
     SWAP_CONFIG_PLUGIN_str = [(str(old), str(new)) for old, new in SWAP_CONFIG_PLUGIN] 
-    swap_id_and_ptr_in_dat(target_dat, SWAP_CONFIG_PLUGIN_str) # 交换ID、指针 n组扩展交换
+    swap_in_dat(target_dat, SWAP_CONFIG_PLUGIN) # 交换ID  3组核心交换
+    # swap_id_and_ptr_in_dat(target_dat, SWAP_CONFIG_PLUGIN_str) # 交换ID、指针 n组扩展交换
 
     # 第二次批量替换配置
     # target_code = "405009" # 红色高帮运动鞋
