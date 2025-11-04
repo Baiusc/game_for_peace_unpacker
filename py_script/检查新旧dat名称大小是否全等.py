@@ -89,24 +89,50 @@ def check_my_files(my_dir: str, src_dir: str, is_auto_rename: bool, max_show_mat
         matches = src_index.get(size, [])
         # 只保留同名文件
         exact_matches = [m for m in matches if os.path.basename(m) == name]
+        
+        # 排除掉精确匹配的文件，只看大小匹配但文件名不同的文件
+        size_only_matches = [m for m in matches if os.path.basename(m) != name]
 
         if exact_matches:
+            # 文件名和大小都匹配
             matched_count += 1
+            total = len(exact_matches)
+            # ... (打印逻辑保持不变)
+            # print(f"my_dir_file: {name} | src_file: {os.path.basename(m)} | ...") 
+            
+            # --- 新增逻辑：在精确匹配时，也检查是否存在大小匹配但文件名不同的文件，并提示 ---
+            if size_only_matches:
+                 print(f"my_dir_file: {name} | 文件名和大小匹配 | WARNING: 另有 {len(size_only_matches)} 个文件仅大小匹配！ | size: {size} bytes")
+            else:
+                 print(f"my_dir_file: {name} | 文件名和大小匹配 | size: {size} bytes")
+            
             total = len(exact_matches)
             to_show = exact_matches if total <= max_show_matches else exact_matches[:max_show_matches]
             for m in to_show:
-                print(f"my_dir_file: {name} | src_file: {os.path.basename(m)} | src_dir: {os.path.dirname(m)} | size: {size} bytes")
+                # 打印精确匹配的文件信息
+                 print(f"    精确匹配文件 -> src_file: {os.path.basename(m)} | src_dir: {os.path.dirname(m)}")
             if total > max_show_matches:
-                print(f"... 其余 {total - max_show_matches} 个匹配文件未显示")
+                print(f"    ... 其余 {total - max_show_matches} 个精确匹配文件未显示")
+
         else:
             unmatched_count += 1
             if matches:
                 # 存在大小匹配但文件名不同的文件
-                print(f"my_dir_file: {name} | 文件名不匹配 | 匹配大小文件数: {len(matches)} | size: {size} bytes")
+                match_count = len(matches)
+                
+                # --- 重点提示警告逻辑 ---
+                warning_tag = ""
+                if match_count > 1:
+                    warning_tag = " ⚠️ ⚠️ ⚠️ [警告: 多个匹配] ⚠️ ⚠️ ⚠️ "
+                elif match_count == 1:
+                    warning_tag = "[提示: 单个大小匹配]"
+
+                print(f"my_dir_file: {name} | 文件名不匹配 {warning_tag} | 匹配大小文件数: {match_count} | size: {size} bytes")
                 
                 # --- 自动重命名逻辑 ---
                 if is_auto_rename:
-                    src_match_path = matches[0]
+                    # 原逻辑是取 matches[0]
+                    src_match_path = matches[0] 
                     new_name = os.path.basename(src_match_path)
                     
                     # 构造新的文件路径 (保持 my_dir 内部的目录结构)
@@ -119,8 +145,7 @@ def check_my_files(my_dir: str, src_dir: str, is_auto_rename: bool, max_show_mat
                         try:
                             os.rename(path, new_path)
                             renamed_count += 1
-                            print(f"    [已重命名] {name} -> {new_name}")
-                            # 注意: 重命名后，原文件已不存在，但为了打印信息，我们继续使用旧的 name 变量。
+                            print(f"    [已重命名] {name} -> {new_name} (根据第一个匹配文件 {os.path.basename(src_match_path)} 重命名)")
                         except OSError as e:
                             print(f"    [重命名错误] 无法重命名 {path} 为 {new_path}: {e}")
 
@@ -131,6 +156,7 @@ def check_my_files(my_dir: str, src_dir: str, is_auto_rename: bool, max_show_mat
                 print(f"my_dir_file: {name} | 未找到匹配的 src 文件 | size: {size} bytes")
 
     print("\n" + "="*80)
+    # ... (结尾统计部分保持不变)
     print(f"总计：my_dir 中文件数 {len(my_files)}；匹配数 {matched_count}；未匹配数 {unmatched_count}")
     if is_auto_rename:
         print(f"自动重命名文件数: {renamed_count}")
@@ -141,11 +167,12 @@ if __name__ == "__main__":
     is_auto_rename = False # 设置为 True 启用自动重命名，设置为 False 仅进行检查
 
  
-    my_dir = "./release/RE武器发布/src_uasset"
+    my_dir = "./release/RE武器发布/src_dat2ue"
     # my_dir = "./release//RE范围V1发布20251014/1029站趴范围"
     # src_dir = "./release/RE枪补V5发布20250930/src_ue_tree原厂"
     # src_dir = "./paks/dat_temp"
-    src_dir = "./release/RE武器发布/my_dat"
+    # src_dir = "./release/RE武器发布/my_dat"
+    src_dir = "./paks/dat_uexp_map_weapon_14210/only_weapon"
     # src_dir = "/run/user/1000/gvfs/mtp:host=Xiaomi_MI_8_UD_92daeda3/内部存储设备/Download/UEXP三合一/UEXP解包"
     # src_dir = "./paks/dat_patch_14327原厂"
     # src_dir = "./paks/dat_map_weapon14210原厂"
