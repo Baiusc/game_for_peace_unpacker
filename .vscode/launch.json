@@ -8,7 +8,7 @@
       "program": "${workspaceFolder}/build/PEACE_UNPACK",
       // "program": "${workspaceFolder}/build/PEACE_REPACK",
       "args": [
-        "${workspaceFolder}/paks/game_patch_1.33.12.14363原厂（复件）.pak"
+        "${workspaceFolder}/paks/game_patch_1.33.12.14383原厂（复件）.pak"
         // "${workspaceFolder}/paks/game_patch_1.33.12.14325.pak"
         // "${workspaceFolder}/paks/map_lobby_1.33.12.14210原厂.pak"
         // "${workspaceFolder}/paks/onreadypak_413496.pak"

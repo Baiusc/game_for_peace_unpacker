@@ -6,6 +6,8 @@ from typing import List, Dict, Tuple
 # 硬编码配置
 SEARCH_DIR = "./tool/天线补丁包/天线0922"  # 搜索目录
 SEARCH_DIR = "./paks/dat_temp"
+SEARCH_DIR = "/run/user/1000/gvfs/mtp:host=Xiaomi_MI_8_UD_92daeda3/内部存储设备/Download/UEXP三合一/UEXP解包"
+SEARCH_DIR = "/media/baiusc/DATA1/Repositories/ReposMyself/pubg-unpacker/game_for_peace_unpacker/paks/14362解包uexp"
 OUTPUT_DIR = SEARCH_DIR          # 输出目录
 CONTEXT_BYTES = 32               # 上下文字节数
 
@@ -24,7 +26,8 @@ TARGET_PATTERNS = [
 ]
 # "343133343936" # 银枪赵云 【  413496--413496--角色-银枪赵云  】偏移量 0x1D960 
 TARGET_PATTERNS = [
-    "215" # dat搜索关键词
+    # 搜索包含 ID  802397 及其上下文的完整片段
+    "00000038303233393700", 
 ]
 # 名称 id 偏移 指针
 MY_MAP = {

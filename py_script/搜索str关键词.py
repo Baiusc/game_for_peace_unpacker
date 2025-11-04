@@ -2,7 +2,7 @@
 Author       : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
 Date         : 2025-09-28 15:32:10
 LastEditors  : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
-LastEditTime : 2025-10-27 17:22:43
+LastEditTime : 2025-11-03 09:44:17
 FilePath     : /game_for_peace_unpacker/py_script/搜索str关键词.py
 Description  : 
 
@@ -65,11 +65,13 @@ def search_files(src_dir: str, my_file_suffix: str, my_str: str, context_len: in
 if __name__ == "__main__":
     # 示例参数
     SRC_DIR = "./paks/ShadowTrackerExtra_14362" # 搜索目录
+    SRC_DIR = "/run/user/1000/gvfs/mtp:host=Xiaomi_MI_8_UD_92daeda3/内部存储设备/Download/UEXP三合一/UEXP解包"
     # SRC_DIR = "./paks/dat_temp"
-    MY_FILE_SUFFIX = ".dat"          # 文件后缀
+    MY_FILE_SUFFIX = ".uasset"          # 文件后缀
     MY_STR = "SkeletalBodySetup"     # 搜索字符串
     MY_STR = "BaseColor"     # 搜索字符串
     MY_STR = "BP_STRUCT_AvatarBPTable_type"     # 搜索字符串
+    # MY_STR = "BattleItem"     # 搜索字符串
     CONTEXT_LEN = 64 * 4                 # 上下文长度（字符数）
 
     search_files(SRC_DIR, MY_FILE_SUFFIX, MY_STR, CONTEXT_LEN)

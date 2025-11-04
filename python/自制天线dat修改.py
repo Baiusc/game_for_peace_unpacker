@@ -195,7 +195,8 @@ SWAP_CONFIG_CORE = [
 # 天线美化。扩展替换项
 SWAP_CONFIG_PLUGIN = [
 
-    (802397, 413508),    # 背包挂件-扫描仪 <=>  沙丘3 异瞳寒姬 430354   紫俏灵猫 绯色魅影
+# 幻影飞狐 413702 辉羽雀灵3 413862
+    (802397, 413702),    # 背包挂件-扫描仪 802397 背包挂件-无面战甲 802422  <=> 异瞳寒姬 413671 紫俏灵猫 413672 绯色魅影 413670 
     (503001, 413740),    # 1级甲 <=> 幽焰骑士3 
     (503002, 413497),    # 2级甲 <=> 赵云2 413497
     (503003, 413498)     # 3级甲 <=> 赵云3 413498
@@ -364,8 +365,7 @@ def patch_ptrs_by_ids(dat_path: Path, replacements: List[Tuple[str, str]]):
         finally:
             mm.close()
     print("[DONE] 批量指针替换完成\n")
-
-def swap_id_and_ptr_in_dat(dat_path: Path, swaps: List[Tuple[str, str]]):
+def swap_id_and_ptr_in_dat(dat_path: Path, swaps: List[Tuple[str, str]], need_print: bool = False):
     """
     在 dat 文件中互换 old_id 和 new_id 的 ID 与指针
     """
@@ -402,6 +402,23 @@ def swap_id_and_ptr_in_dat(dat_path: Path, swaps: List[Tuple[str, str]]):
                 if len(block_old) != len(block_new):
                     print(f"  [WARN] old_id={old_id}, new_id={new_id} 块长度不同，跳过")
                     continue
+                
+                # --- 新增的上下文打印逻辑 ---
+                if need_print:
+                    # 定义上下文字节数
+                    context_bytes = 24
+                    # 打印 old_id 块的上下文：前12字节+ID+指针+后12字节
+                    start_old = max(pos_old - context_bytes, 0)
+                    end_old = min(pos_old + len(block_old) + context_bytes, mm.size())
+                    context_old = mm[start_old:end_old]
+                    print(f"  [OLD_CTX] offset={pos_old:06} | 12+ID+PTR+12: {to_hex(context_old)}")
+
+                    # 打印 new_id 块的上下文：前12字节+ID+指针+后12字节
+                    start_new = max(pos_new - context_bytes, 0)
+                    end_new = min(pos_new + len(block_new) + context_bytes, mm.size())
+                    context_new = mm[start_new:end_new]
+                    print(f"  [NEW_CTX] offset={pos_new:06} | 12+ID+PTR+12: {to_hex(context_new)}")
+                # --------------------------
 
                 # 逐字节互换
                 mm[pos_old:pos_old+len(block_old)] = block_new
@@ -457,7 +474,7 @@ def swap_ptr_in_dat(dat_path: Path, swaps: List[Tuple[str, str]]):
 # ============ 主流程 ============
 def main():
     # 直接指定要处理的 dat 文件
-    target_dat = Path("./release/RE天线V4发布20250930/00000285原厂（复件）.dat")
+    target_dat = Path("./release/RE天线V4发布20250930/00000283原厂（复件）.dat")
 
     # 第一次 swap 配置
     # swap_config = [(403251, 413497), (405011, 413498)] #  白T <=> 赵云2 。棕鞋 <=> 赵云3
@@ -470,9 +487,9 @@ def main():
 
 
     # swap_in_dat(target_dat, swap_config) # 仅交换ID
-
+    is_need_print = False # 是否需要打印上下文
     SWAP_CONFIG_CORE_str = [(str(old), str(new)) for old, new in SWAP_CONFIG_CORE] 
-    swap_id_and_ptr_in_dat(target_dat, SWAP_CONFIG_CORE_str) # 交换ID、指针 3组核心交换
+    swap_id_and_ptr_in_dat(target_dat, SWAP_CONFIG_CORE_str, is_need_print) # 交换ID、指针 3组核心交换
     # swap_ptr_in_dat(target_dat, swap_config_str)
 
     # # swap_config_my = list(zip(ID_LIST_MY, ID_LIST_SWAP))
@@ -482,7 +499,7 @@ def main():
     # swap_config_my = swap_config_my[2::3]  # 从索引2开始，每隔3个取1个（2,5,8,11,...）
     # swap_config_my_str = [(str(old), str(new)) for old, new in swap_config_my] 
     SWAP_CONFIG_PLUGIN_str = [(str(old), str(new)) for old, new in SWAP_CONFIG_PLUGIN] 
-    swap_id_and_ptr_in_dat(target_dat, SWAP_CONFIG_PLUGIN_str) # 交换ID、指针 n组扩展交换
+    swap_id_and_ptr_in_dat(target_dat, SWAP_CONFIG_PLUGIN_str, is_need_print) # 交换ID、指针 n组扩展交换
 
     # 第二次批量替换配置
     # target_code = "405009" # 红色高帮运动鞋

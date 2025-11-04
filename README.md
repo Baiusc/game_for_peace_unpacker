@@ -2,7 +2,7 @@
  * @Author       : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
  * @Date         : 2025-09-02 16:42:02
  * @LastEditors  : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
- * @LastEditTime : 2025-10-20 11:43:23
+ * @LastEditTime : 2025-11-04 10:44:17
  * @FilePath     : /game_for_peace_unpacker/README.md
  * @Description  : 
  * 
@@ -446,3 +446,7 @@ Default__BP_Other_GM3_Bullet_C
 BP_PlayerRifleBullet_C
 
 Default__BP_PlayerRifleBullet_C
+
+20251029 准备明天来检查 285.dat 是不是从14362补丁pak解压出来的，版本是否对得上
+
+20251104 天线改为修改 283.dat 双向替换后，打包大小正常。也就是 BP_STRUCT_AvatarBPTable_type
