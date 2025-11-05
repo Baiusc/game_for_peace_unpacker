@@ -1,7 +1,7 @@
 找到目标: ShadowTrackerExtra/Content/UGC/UGCGame/Weapon/MainWeapon/ShotGun/S12K/BP_UGC_ShotGun_S12K.uasset
 
 --- 原始索引键值对 ---
-ENTRY Index: 419
+ENTRY Index: 429
 DIR_LEN: 52
 DIR_NAME: Content/UGC/UGCGame/Weapon/MainWeapon/ShotGun/S12K/
 DIR_FILES (Files in Dir): 2
@@ -10,12 +10,12 @@ Filename (UTF-8): BP_UGC_ShotGun_S12K.uasset
 
 --- 原始数据键值对 ---
 FileHash: dea0b64523798a67a16b4d9240d94c4a4a7c6b78
-FileOffset: 0x215f2a (2187050)
+FileOffset: 0x21f886 (2226310)
 FileSize (Original): 17131
 CompressionMethod: 1
 CompressedLength: 5808
 Dummy: 000000000000000000000000000000000000000000
 NumOfBlocks: 1
-Block 0: Start = 0x215f88, End = 0x21762a
+Block 0: Start = 0x21f8e4, End = 0x220f86
 CompressedBlockSize: 17131
 Encrypted: 0
