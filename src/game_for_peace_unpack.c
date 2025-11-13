@@ -2,7 +2,7 @@
  * @Author       : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
  * @Date         : 2025-11-04 11:55:58
  * @LastEditors  : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
- * @LastEditTime : 2025-11-13 15:42:35
+ * @LastEditTime : 2025-11-13 16:07:19
  * @FilePath     : /game_for_peace_unpacker/src/game_for_peace_unpack.c
  * @Description  : 找到补丁pak实例列表中的最后一个实例，将其替换为我的新实例（压缩数据、索引、路径）
  * 
@@ -214,8 +214,6 @@ int main(int argc, const char *argv[]) {
     // 通过lseek计算索引数据的实际大小
     int64_t size = lseek(PakFile, -info.offset, SEEK_END);  
     size -= 45; // 索引数据大小 = (文件总大小) - (索引数据起始位置) - (文件头大小45)
-    
-    // @@@ 修改PAK中的索引数据起始位置偏移量,将其改为 info.offset - new_size（由代码后续的索引新增size计算得来，因而此操作可放到最后）
 
     // 检查索引数据大小是否合理（小于50MB）
     if (size > 52428800) {
@@ -439,7 +437,7 @@ int main(int argc, const char *argv[]) {
             }
 
             // 调用提取函数，传入文件元数据和路径
-            // extract(PakFile, entry[ENTRY], path);
+            extract(PakFile, entry[ENTRY], path);
         }
     }
     

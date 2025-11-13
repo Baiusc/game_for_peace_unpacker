@@ -180,7 +180,7 @@ int read_file_data(int fd, Entry *entry, uint8_t **out_data, uint64_t *out_size)
     uint8_t *ptr = compressed_buffer;
     for (uint32_t i = 0; i < entry->NumOfBlocks; i++) {
         // 计算当前压缩块在 PAK 文件中的起始偏移
-        uint64_t block_start = entry->blocks[i].start + entry->FileOffset;
+        uint64_t block_start = entry->blocks[i].start ;
         // 计算当前压缩块的实际大小
         uint64_t block_size = entry->blocks[i].end - entry->blocks[i].start;
         // 读取当前压缩块数据到缓存
@@ -200,6 +200,7 @@ int read_file_data(int fd, Entry *entry, uint8_t **out_data, uint64_t *out_size)
     *out_size = total_compressed;
     return 0;
 }
+
 // ----------------------------------------------------------------------
 // 核心辅助函数：PAK 索引解析
 // ----------------------------------------------------------------------
@@ -658,21 +659,42 @@ int main() {
     printf("3.2 Writing new instance data blocks...\n");
     uint64_t offset_add = 0; // 记录新的数据体大小与旧数据体大小的增量偏移
     uint64_t new_data_block_start = current_new_offset; // 记录新块的起始偏移
-    
+
     // 写入第一个新实例
     NewInstance *ni0 = &my_instances[0];
-    if (write(NewPakFile, ni0->Data, ni0->DataSize) != ni0->DataSize) {
-        fprintf(stderr, "Failed to write new data block 1.\n"); result = 1; goto cleanup_buffer;
+    if (write(NewPakFile, ni0->Data, ni0->DataSize) != ni0->DataSize)
+    {
+        fprintf(stderr, "Failed to write new data block 1.\n");
+        result = 1;
+        goto cleanup_buffer;
+    }
+    // 压缩块的 start/end 偏移不是相对于 FileOffset 的，而是相对于整个文件开头的偏移，因此需要调整
+    if (ni0->entry.CompressionMethod != 0 && ni0->entry.NumOfBlocks > 0)
+    {
+        for (uint32_t b = 0; b < ni0->entry.NumOfBlocks; b++)
+        {
+            ni0->entry.blocks[b].start =  ni0->entry.blocks[b].start- ni0->entry.FileOffset + new_data_block_start ;
+            ni0->entry.blocks[b].end = ni0->entry.blocks[b].end - ni0->entry.FileOffset + new_data_block_start ;
+        }
     }
     ni0->entry.FileOffset = new_data_block_start; // 更新 Entry 结构体中的 FileOffset
     current_new_offset += ni0->DataSize;
-    
+
     // 写入第二个新实例
     NewInstance *ni1 = &my_instances[1];
     if (write(NewPakFile, ni1->Data, ni1->DataSize) != ni1->DataSize) {
         fprintf(stderr, "Failed to write new data block 2.\n"); result = 1; goto cleanup_buffer;
     }
-    ni1->entry.FileOffset = current_new_offset - ni1->DataSize; // 更新 Entry 结构体中的 FileOffset
+    // 压缩块的 start/end 偏移不是相对于 FileOffset 的，而是相对于整个文件开头的偏移，因此需要调整
+    if (ni1->entry.CompressionMethod != 0 && ni1->entry.NumOfBlocks > 0)
+    {
+        for (uint32_t b = 0; b < ni1->entry.NumOfBlocks; b++)
+        {
+            ni1->entry.blocks[b].start =  ni1->entry.blocks[b].start- ni1->entry.FileOffset + new_data_block_start ;
+            ni1->entry.blocks[b].end = ni1->entry.blocks[b].end - ni1->entry.FileOffset + new_data_block_start ;
+        }
+    }
+    ni1->entry.FileOffset = current_new_offset; // 更新 Entry 结构体中的 FileOffset
     current_new_offset += ni1->DataSize;
     
     // 计算增量偏移
@@ -746,9 +768,11 @@ int main() {
         } else if (i > old_entry_indices[1]) {
             // 在被替换块之后，FileOffset 需要加上增量
             adjusted_offset = e->FileOffset + offset_add;
+            // TODO 压缩块的 start/end 偏移不是相对于 FileOffset 的，而是相对于整个文件开头的偏移，因此需要调整
         } else {
             // 被替换的块，使用新块的绝对 FileOffset (已在 ni0/ni1->entry 中更新)
             adjusted_offset = e->FileOffset;
+            // 压缩块的 start/end 偏移不是相对于 FileOffset 的，而是相对于整个文件开头的偏移，因此需要调整，已在 3.2 处理
         }
         
         // 写入 Entry 结构体
@@ -767,7 +791,7 @@ int main() {
         if (e->CompressionMethod != 0) {
              write_data(NewIndexData, &NewIndexDataSize, &e->NumOfBlocks, 4);
              if (e->NumOfBlocks > 0) {
-                 // 压缩块的 start/end 偏移是相对于 FileOffset 的，因此不需要调整
+                 // 压缩块的 start/end 偏移不是相对于 FileOffset 的，而是相对于整个文件开头的偏移，因此最后2个新实体的压缩块的起止偏移需要调整，已在 3.2 处理
                  write_data(NewIndexData, &NewIndexDataSize, e->blocks, e->NumOfBlocks * sizeof(CompressionBlock));
              }
         }
