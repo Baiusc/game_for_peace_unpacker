@@ -155,52 +155,108 @@ void write_data(uint8_t *buffer, uint64_t *offset, const void *src, size_t len) 
 // 读取文件数据（含解密 + 拼接压缩块）
 // ----------------------------------------------------------------------
 
+// 调试函数：打印内存中的数据
+void print_hex_dump(const uint8_t *data, size_t size) {
+    size_t len = (size > 64) ? 64 : size; // 只打印前64字节
+    for (size_t i = 0; i < len; i++) {
+        printf("%02x ", data[i]);
+        if ((i + 1) % 16 == 0) {
+            printf("\n");
+        } else if ((i + 1) % 8 == 0) {
+            printf("  "); // 在8字节处添加额外空格
+        }
+    }
+    if (len > 0) printf("\n");
+}
+
 int read_file_data(int fd, Entry *entry, uint8_t **out_data, uint64_t *out_size) {
+    if (entry->CompressedLength == 0) {
+        *out_data = NULL;
+        *out_size = 0;
+        printf("DEBUG: 文件大小为 0，跳过读取。\n");
+        return 0;
+    }
+
     // 处理未压缩或单块压缩的情况
     if (entry->NumOfBlocks == 0) {
         *out_size = entry->CompressedLength;
         *out_data = malloc(*out_size);
         if (!*out_data) return 1;
+        
         // 直接从文件偏移处读取数据
         if (pread(fd, *out_data, *out_size, entry->FileOffset) != *out_size) {
+            fprintf(stderr, "Error: read_file_data failed to read %llu bytes from offset 0x%llx (Non-chunked).\n", 
+                    (unsigned long long)*out_size, (unsigned long long)entry->FileOffset);
             free(*out_data);
             return 1;
         }
+
+        // 解密（如果有）
         if (entry->Encrypted) {
             DecryptData(*out_data, *out_size);
+            // 注意：通常解密操作会原地进行，但我们现在打印的是解密后的数据
         }
+
+        // --- 调试打印 START ---
+        printf("DEBUG: 读取未分块文件数据完成。\n");
+        printf("DEBUG: 文件大小: %llu bytes (0x%llx)\n", (unsigned long long)*out_size, (unsigned long long)*out_size);
+        printf("DEBUG: 数据（前64字节）:\n");
+        print_hex_dump(*out_data, *out_size);
+        // --- 调试打印 END ---
+        
         return 0;
     }
 
     // 处理多块压缩的情况
     uint64_t total_compressed = 0;
-    uint8_t *compressed_buffer = malloc(entry->CompressedLength); // 分配总压缩长度的空间
+    // 假设 entry->CompressedLength 记录了所有块的总和大小
+    uint8_t *compressed_buffer = malloc(entry->CompressedLength); 
     if (!compressed_buffer) return 1;
 
     uint8_t *ptr = compressed_buffer;
     for (uint32_t i = 0; i < entry->NumOfBlocks; i++) {
         // 计算当前压缩块在 PAK 文件中的起始偏移
-        uint64_t block_start = entry->blocks[i].start ;
+        uint64_t block_start = entry->blocks[i].start;
         // 计算当前压缩块的实际大小
         uint64_t block_size = entry->blocks[i].end - entry->blocks[i].start;
+        
+        if (block_size == 0) continue;
+
         // 读取当前压缩块数据到缓存
         if (pread(fd, ptr, block_size, block_start) != block_size) {
+            fprintf(stderr, "Error: read_file_data failed to read block %u/%u from offset 0x%llx.\n", 
+                    i, entry->NumOfBlocks, (unsigned long long)block_start);
             free(compressed_buffer);
             return 1;
         }
         ptr += block_size;
         total_compressed += block_size;
     }
+    
+    // 检查总大小是否匹配（可选但推荐）
+    if (total_compressed != entry->CompressedLength) {
+         fprintf(stderr, "Warning: Total data read (%llu) does not match Entry->CompressedLength (%llu).\n",
+                 (unsigned long long)total_compressed, (unsigned long long)entry->CompressedLength);
+    }
 
+
+    // 解密所有拼接好的数据
     if (entry->Encrypted) {
         DecryptData(compressed_buffer, total_compressed);
     }
+    
+    // --- 调试打印 START ---
+    printf("DEBUG: 读取分块文件数据完成。\n");
+    printf("DEBUG: 文件大小: %llu bytes (0x%llx)\n", (unsigned long long)total_compressed, (unsigned long long)total_compressed);
+    printf("DEBUG: 数据（前64字节）:\n");
+    print_hex_dump(compressed_buffer, total_compressed);
+    // --- 调试打印 END ---
+
 
     *out_data = compressed_buffer;
     *out_size = total_compressed;
     return 0;
 }
-
 // ----------------------------------------------------------------------
 // 核心辅助函数：PAK 索引解析
 // ----------------------------------------------------------------------
