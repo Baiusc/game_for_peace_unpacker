@@ -2,8 +2,8 @@
  * @Author       : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
  * @Date         : 2025-11-04 11:55:58
  * @LastEditors  : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
- * @LastEditTime : 2025-11-04 11:59:19
- * @FilePath     : /game_for_peace_unpacker/src/game_for_peace_unpack.c删除补丁末尾实例替换
+ * @LastEditTime : 2025-11-13 15:42:35
+ * @FilePath     : /game_for_peace_unpacker/src/game_for_peace_unpack.c
  * @Description  : 找到补丁pak实例列表中的最后一个实例，将其替换为我的新实例（压缩数据、索引、路径）
  * 
  * Copyright (c) 2025 by vitalchem, All Rights Reserved. 
@@ -277,6 +277,9 @@ int main(int argc, const char *argv[]) {
     
     // 遍历并读取所有文件条目的元数据  （解包onread关羽赵云宇宙等包时，从这里开始会遇到加密问题）
     for (uint32_t Files = 0; Files < NumOfEntry; Files++) {
+        if(Files == 264) {
+            printf("Debug: Reached file entry index 264\n");
+        }
         read_data(entry[Files].FileHash, IndexData, 20);
         read_data(&entry[Files].FileOffset, IndexData, 8);
         read_data(&entry[Files].FileSize, IndexData, 8);
@@ -298,7 +301,6 @@ int main(int argc, const char *argv[]) {
         printf("FileSize: %llu\n", entry[Files].FileSize);
         printf("CompressionMethod: %u\n", entry[Files].CompressionMethod);
         printf("CompressedLength: %llu\n", entry[Files].CompressedLength);
-        printf("------------------------\n");
 
         if (entry[Files].CompressionMethod != 0 && entry[Files].CompressionMethod != 1) {
             // 数据可能被加密，需要解密
@@ -330,6 +332,9 @@ int main(int argc, const char *argv[]) {
 
         read_data(&entry[Files].CompressedBlockSize, IndexData, 4);
         read_data(&entry[Files].Encrypted, IndexData, 1);
+        printf("CompressedBlockSize: %llu\n", entry[Files].CompressedBlockSize);
+        printf("Encrypted: %u\n", entry[Files].Encrypted);
+        printf("------------------------\n");
     }
     
     // 读取目录和文件映射表

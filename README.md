@@ -2,7 +2,7 @@
  * @Author       : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
  * @Date         : 2025-09-02 16:42:02
  * @LastEditors  : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
- * @LastEditTime : 2025-11-04 10:44:17
+ * @LastEditTime : 2025-11-13 15:37:22
  * @FilePath     : /game_for_peace_unpacker/README.md
  * @Description  : 
  * 
@@ -450,3 +450,231 @@ Default__BP_PlayerRifleBullet_C
 20251029 准备明天来检查 285.dat 是不是从14362补丁pak解压出来的，版本是否对得上
 
 20251104 天线改为修改 283.dat 双向替换后，打包大小正常。也就是 BP_STRUCT_AvatarBPTable_type
+
+
+
+
+
+
+
+  // 读取目录和文件映射表
+
+    uint64_t ENTRIES = 0; // 未知用途
+
+    uint64_t DIR_COUNT = 0; // 目录数量
+
+    
+
+    read_data(&ENTRIES, IndexData, 8);
+
+    read_data(&DIR_COUNT, IndexData, 8);
+
+    
+
+    int32_t DIR_LEN = 0;
+
+    char DIR_NAME[1024];
+
+    uint64_t DIR_FILES = 0;
+
+    int32_t ENTRY; // 索引，指向之前读取的Entry数组
+
+    
+
+    char path[1024];
+
+    
+
+    // 遍历所有目录
+
+    for (int files = 0; files < DIR_COUNT; files++) {
+
+        read_data(&DIR_LEN, IndexData, 4);
+
+        read_data(DIR_NAME, IndexData, DIR_LEN);
+
+        read_data(&DIR_FILES, IndexData, 8);
+
+        
+
+        // 遍历当前目录下的所有文件
+
+        for (int x = 0; x < DIR_FILES; x++) {
+
+            read_data(&FilenameSize, IndexData, 4);
+
+            
+
+            if (FilenameSize > 0) {
+
+                read_data(Filename, IndexData, FilenameSize); // 如果文件名是 ASCII 编码 
+
+            } else {
+
+                // 如果文件名是 unicode 编码
+
+                read_data(Filename, IndexData, -FilenameSize * 2);
+
+                if (unicode_to_utf8(Filename, -FilenameSize * 2, Filename, sizeof(Filename)) == -1) {
+
+                    printf("failed to convert UTF-16LE filename into UTF-8!\n");
+
+                    exit(1);
+
+                }
+
+            }
+
+            
+
+            read_data(&ENTRY, IndexData, 4);
+
+            
+
+            // 构建完整的文件路径 
+
+            memset(path, 0, 1024);
+
+            snprintf(path, 1024, "%s%s%s", MountPoint, DIR_NAME, Filename);
+
+            
+
+            // 若目标特征符合，则保存目标为本地txt文件
+
+            if ( strcmp(Filename, "BP_UGC_ShotGun_S12K.uasset") == 0 || strcmp(Filename, "BP_UGC_ShotGun_S12K.uexp") == 0 || strcmp(Filename, "BP_PlayerRifleBullet.uasset") == 0)
+
+            {
+
+                // 构建输出文件名：[Filename].txt
+
+                char outputFilename[1024];
+
+                snprintf(outputFilename, 1024, "%s_info.txt", Filename);
+
+                FILE *logFile = fopen(outputFilename, "w");
+
+                if (logFile == NULL) {
+
+                    fprintf(stderr, "Error opening log file: %s\n", outputFilename);
+
+                } else {
+
+                    fprintf(logFile, "找到目标: %s\n", path);
+
+
+
+                    // 打印 DIR_LEN DIR_NAME DIR_FILES FilenameSize Filename ENTRY 等原始索引键值对
+
+                    fprintf(logFile, "\n--- 原始索引键值对 ---\n");
+
+                    fprintf(logFile, "ENTRY Index: %d\n", ENTRY); // ENTRY 是索引
+
+                    fprintf(logFile, "DIR_LEN: %d\n", DIR_LEN);
+
+                    fprintf(logFile, "DIR_NAME: %s\n", DIR_NAME);
+
+                    fprintf(logFile, "DIR_FILES (Files in Dir): %llu\n", DIR_FILES);
+
+                    fprintf(logFile, "FilenameSize (Raw): %d\n", FilenameSize); // 负值表示UTF-16
+
+                    fprintf(logFile, "Filename (UTF-8): %s\n", Filename);
+
+
+
+                    // 打印 FileHash FileOffset FileSize CompressionMethod CompressedLength Dummy CompressedBlockSize Encrypted 等原始数据键值对
+
+                    fprintf(logFile, "\n--- 原始数据键值对 ---\n");
+
+                    
+
+                    // 打印 FileHash (20字节数组)
+
+                    fprintf(logFile, "FileHash: ");
+
+                    for (int i = 0; i < 20; i++)
+
+                    {
+
+                        fprintf(logFile, "%02x", entry[ENTRY].FileHash[i]);
+
+                    }
+
+                    fprintf(logFile, "\n");
+
+                    
+
+                    fprintf(logFile, "FileOffset: 0x%llx (%llu)\n", entry[ENTRY].FileOffset, entry[ENTRY].FileOffset);
+
+                    fprintf(logFile, "FileSize (Original): %llu\n", entry[ENTRY].FileSize);
+
+                    fprintf(logFile, "CompressionMethod: %u\n", entry[ENTRY].CompressionMethod);
+
+                    fprintf(logFile, "CompressedLength: %llu\n", entry[ENTRY].CompressedLength);
+
+                    
+
+                    // 打印 Dummy (21字节数组)
+
+                    fprintf(logFile, "Dummy: ");
+
+                    for (int i = 0; i < 21; i++)
+
+                    {
+
+                        fprintf(logFile, "%02x", entry[ENTRY].Dummy[i]);
+
+                    }
+
+                    fprintf(logFile, "\n");
+
+
+
+                    fprintf(logFile, "NumOfBlocks: %u\n", entry[ENTRY].NumOfBlocks);
+
+                    for (uint32_t i = 0; i < entry[ENTRY].NumOfBlocks; i++)
+
+                    {
+
+                        // 打印每个压缩块的起始和结束偏移
+
+                        fprintf(logFile, "Block %u: Start = 0x%llx, End = 0x%llx\n", i, entry[ENTRY].blocks[i].start, entry[ENTRY].blocks[i].end);  
+
+                    }
+
+                    fprintf(logFile, "CompressedBlockSize: %u\n", entry[ENTRY].CompressedBlockSize);
+
+                    fprintf(logFile, "Encrypted: %u\n", entry[ENTRY].Encrypted);
+
+
+
+                    fclose(logFile);
+
+                }
+
+
+
+                printf("Found target file: %s, ENTRY: %d. Information saved to target_file_info.txt.\n", path, ENTRY);
+
+            }
+
+
+
+            // 调用提取函数，传入文件元数据和路径
+
+            // extract(PakFile, entry[ENTRY], path);
+
+        }
+
+    }
+
+
+
+根据以上读取《Directory Map》的代码，修改以下《 写入 Directory Map》的代码，改为在原版《Directory Map》的基础上进行寻找指定修改，再进行写入缓存。先根据ENTRY Index == src_data.NumOfEntry -1 和ENTRY Index == src_data.NumOfEntry - 2来找到需要更改的这两个《Directory Map》，然后更改其DIR_LEN DIR_NAME DIR_FILES  FilenameSize Filename，最后再进行写入缓存。
+
+
+
+// 4.3. 写入 Directory Map
+
+    uint64_t dir_map_size = src_data.OriginalIndexSize - src_data.EntryListEndOffset;
+
+    write_data(NewIndexData, &NewIndexDataSize, src_data.OriginalIndexData + src_data.EntryListEndOffset, dir_map_size);

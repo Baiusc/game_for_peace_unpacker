@@ -1,5 +1,5 @@
 /*
- * @Description  : 找到并替换src_pak中最后两个实例为my_pak中两个新实例，并生成一个新的pak文件
+ * @Description  : 找到并替换src_pak中两个旧实例为my_pak中两个新实例
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -11,6 +11,9 @@
 #include <string.h>
 #include <zlib.h>
 #include <errno.h>
+#include <openssl/aes.h>
+#include <openssl/evp.h>
+#include <openssl/err.h>
 
 // ----------------------------------------------------------------------
 // 结构体和宏定义
@@ -20,7 +23,7 @@
 #define CHUNK_SIZE 65536
 #define AES_KEY_SIZE 16
 
-// 占位符密钥
+// 假设的 AES 密钥（实际应从游戏中提取）
 static const uint8_t PAK_AES_KEY[AES_KEY_SIZE] = {
     0x5F, 0x1A, 0xE2, 0x3D, 0x4F, 0x6B, 0x8C, 0x9D,
     0xA1, 0xB2, 0xC3, 0xD4, 0xE5, 0xF6, 0x07, 0x18
@@ -54,7 +57,7 @@ typedef struct {
     CompressionBlock *blocks;
     uint32_t CompressedBlockSize;
     uint8_t Encrypted;
-    // 索引辅助字段
+    // 新增字段
     uint64_t EntryIndexStart; 
     uint64_t EntryIndexEnd;
 } __attribute__((packed)) Entry;
@@ -80,8 +83,8 @@ typedef struct {
     Entry entry;
     char Filename[1024];
     char DirPath[1024];
-    uint8_t *Data;      // 压缩后的文件数据
-    uint64_t DataSize;  // 压缩后的数据大小
+    uint8_t *Data; // 压缩后的文件数据
+    uint64_t DataSize;
     CompressionBlock *blocks;
 } NewInstance;
 
@@ -101,7 +104,7 @@ typedef struct {
 } PakIndexData;
 
 // ----------------------------------------------------------------------
-// 辅助函数 (保持不变)
+// 辅助函数
 // ----------------------------------------------------------------------
 // 🌟 占位符函数：此函数不再执行实际的 AES 解密操作
 void DecryptData(uint8_t *data, uint32_t size)
@@ -113,6 +116,20 @@ void DecryptData(uint8_t *data, uint32_t size)
     // 避免未使用的变量警告
     (void)data;
     (void)size;
+}
+unsigned int ZLIB_decompress(unsigned char *InData, unsigned int InSize,
+                             unsigned char *OutData, unsigned int OutSize) {
+    z_stream strm = {0};
+    strm.next_in = InData;
+    strm.avail_in = InSize;
+    strm.next_out = OutData;
+    strm.avail_out = OutSize;
+
+    if (inflateInit(&strm) != Z_OK) return 0;
+    int ret = inflate(&strm, Z_FINISH);
+    unsigned int have = strm.total_out;
+    inflateEnd(&strm);
+    return (ret == Z_STREAM_END) ? have : 0;
 }
 
 int unicode_to_utf8(const char *input, size_t input_len, char *out, size_t output_len) {
@@ -135,8 +152,9 @@ int unicode_to_utf8(const char *input, size_t input_len, char *out, size_t outpu
     out[j] = '\0';
     return j;
 }
+
 // ----------------------------------------------------------------------
-// 读取/写入工具函数 (保持不变)
+// 读取/写入工具函数
 // ----------------------------------------------------------------------
 
 uint64_t current_index_offset = 0;
@@ -200,6 +218,7 @@ int read_file_data(int fd, Entry *entry, uint8_t **out_data, uint64_t *out_size)
     *out_size = total_compressed;
     return 0;
 }
+
 // ----------------------------------------------------------------------
 // 核心辅助函数：PAK 索引解析
 // ----------------------------------------------------------------------
@@ -391,120 +410,6 @@ void CleanupPakData(PakIndexData *data) {
 }
 
 // ----------------------------------------------------------------------
-// 核心逻辑：数据块复制和替换
-// ----------------------------------------------------------------------
-
-// 查找最后一个文件实例的实际偏移
-uint64_t find_last_file_offset(PakIndexData *data, uint64_t *out_size) {
-    if (data->NumOfEntry == 0) return 0;
-    uint64_t max_offset = 0;
-    uint64_t max_offset_end = 0;
-
-    for (uint32_t i = 0; i < data->NumOfEntry; i++) {
-        Entry *e = &data->FileEntries[i];
-        uint64_t end_offset = e->FileOffset + e->CompressedLength;
-        
-        // 忽略 FileOffset 为 0 的条目
-        if (e->FileOffset > 0 && end_offset > max_offset_end) {
-            max_offset_end = end_offset;
-            max_offset = e->FileOffset;
-        }
-    }
-
-    // 假设索引中 FileOffset 最大的那个就是数据体中的最后一个文件
-    // ⚠️ 警告: 实际的 PAK 文件可能不是按 FileOffset 顺序排列的。
-    // 但是，为了简单起见，我们假设最大的 FileOffset+CompressedLength 对应了最后一个数据块的末尾。
-    *out_size = max_offset_end;
-    return max_offset;
-}
-
-// ----------------------------------------------------------------------
-// 调试辅助函数：验证内存中的新索引数据
-// ----------------------------------------------------------------------
-void VerifyNewIndexData(const uint8_t *NewIndexData, uint64_t NewIndexDataSize, 
-                        uint32_t NumOfEntry, uint64_t offset_add) {
-    printf("\n\n--- 🌟 调试验证：解析内存中的新索引数据 🌟 ---\n");
-    
-    // 假设索引头（MountPoint + NumOfEntry）是正确的，直接跳过
-    uint64_t verify_offset = 0;
-    
-    // 1. 跳过 MountPoint (从 NewIndexData 头部开始读取)
-    uint32_t MountPointLength;
-    memcpy(&MountPointLength, NewIndexData + verify_offset, 4);
-    verify_offset += 4 + MountPointLength; // 跳过 MountPointLength + MountPoint
-    
-    // 2. 跳过 NumOfEntry
-    uint32_t read_NumOfEntry;
-    memcpy(&read_NumOfEntry, NewIndexData + verify_offset, 4);
-    verify_offset += 4; // 跳过 NumOfEntry
-    
-    if (read_NumOfEntry != NumOfEntry) {
-        printf("🚨 致命错误：验证时发现 Entry 数量不匹配！\n");
-        return;
-    }
-
-    printf("Entry 数量: %u\n", read_NumOfEntry);
-    
-    // 3. 遍历并验证 Entry 列表
-    for (uint32_t i = 0; i < read_NumOfEntry; i++) {
-        // Entry 结构体字段（只关注 FileHash 和 FileOffset）
-        uint8_t FileHash[20];
-        uint64_t FileOffset;
-        uint64_t FileSize;
-        uint32_t CompressionMethod;
-
-        // 验证 FileHash (20 字节)
-        if (verify_offset + 20 > NewIndexDataSize) break;
-        memcpy(FileHash, NewIndexData + verify_offset, 20);
-        verify_offset += 20;
-
-        // 验证 FileOffset (8 字节)
-        if (verify_offset + 8 > NewIndexDataSize) break;
-        memcpy(&FileOffset, NewIndexData + verify_offset, 8);
-        verify_offset += 8;
-        
-        // 验证 FileSize (8 字节)
-        if (verify_offset + 8 > NewIndexDataSize) break;
-        memcpy(&FileSize, NewIndexData + verify_offset, 8);
-        verify_offset += 8;
-
-        // 验证 CompressionMethod (4 字节)
-        if (verify_offset + 4 > NewIndexDataSize) break;
-        memcpy(&CompressionMethod, NewIndexData + verify_offset, 4);
-        verify_offset += 4;
-        
-        printf("--- Entry #%u ---\n", i);
-        printf("  FileHash (DEBUG): %02x%02x... (期望 0xDE)\n", FileHash[0], FileHash[1]);
-        printf("  FileOffset: 0x%llx\n", FileOffset);
-        
-        // 跳过剩余的固定字段 (CompressedLength: 8B, Dummy: 21B)
-        verify_offset += 8 + 21; 
-
-        // 处理 NumOfBlocks 和 Blocks Data
-        if (CompressionMethod != 0) {
-            uint32_t NumOfBlocks;
-            if (verify_offset + 4 > NewIndexDataSize) break;
-            memcpy(&NumOfBlocks, NewIndexData + verify_offset, 4);
-            verify_offset += 4;
-            
-            // 跳过所有 CompressionBlock (NumOfBlocks * 16 字节)
-            verify_offset += NumOfBlocks * 16;
-        }
-
-        // 跳过 CompressedBlockSize (4B) 和 Encrypted (1B)
-        verify_offset += 4 + 1;
-        
-        // 打印验证结果（检查偏移量是否被正确修正）
-        if (i >= NumOfEntry - 2) {
-             printf("  **类型:** 被替换/尾部\n");
-        } else if (i > NumOfEntry - 3 && NumOfEntry >= 3) {
-             // 倒数第三个，应该被修正
-             printf("  **类型:** 修正检查 (应包含 +0x%llx)\n", offset_add);
-        }
-    }
-    printf("--- 调试验证完成 ---\n");
-}
-// ----------------------------------------------------------------------
 // main 函数
 // ----------------------------------------------------------------------
 
@@ -512,11 +417,9 @@ int main() {
     // 定义源 PAK 文件和包含新数据的 PAK 文件路径
     const char *SRC_PAK_PATH = "../paks/game_patch_1.33.12.14383原厂（复件）.pak";
     const char *MY_PAK_PATH = "../paks/game_patch_1.33.12.14371原厂（复件）.pak";
-    const char *NEW_PAK_PATH = "../paks/game_patch_1.33.12.14383魔改.pak"; // 🌟 新增：生成的新文件路径
 
-    // 定义要替换的旧文件实例的索引（我们假设要替换最后两个 Entry Index）
-    int old_entry_indices[2] = {-1, -1};
-    
+    // 定义要替换的旧文件实例名（在 src_pak 中寻找）
+    const char *key_str_old[] = { "BP_UGC_ShotGun_S12K.uasset", "BP_UGC_ShotGun_S12K.uexp" };
     // 定义要提取的新文件实例名（在 my_pak 中寻找）
     const char *key_str_my[] = { "BP_ShootWeaponBase.uasset", "BP_ShootWeaponBase.uexp" };
 
@@ -530,86 +433,55 @@ int main() {
     PakIndexData my_data = {0};
     PakIndexData src_data = {0};
     NewInstance my_instances[2] = {0};
+    FileInstance *old_instances_ptr[2] = {NULL}; // 指向 src_data 中的旧实例
+    int found_my_count = 0;
+    int found_old_count = 0;
     int MyPakFile = -1;
     int SrcPakFile = -1;
-    int NewPakFile = -1; // 🌟 新增：新文件描述符
     int result = 0;
     uint8_t *NewIndexData = NULL;
-    uint64_t found_my_count = 0;
-    uint64_t total_new_data_size = 0;
 
     // ------------------------------------------------------------------
-    // 1. 读取 src_pak，解析索引并确定替换范围
+    // 1. 读取 my_pak，提取新实例
     // ------------------------------------------------------------------
-    printf("--- Phase 1: Reading SRC_PAK and determining replacement range ---\n");
-    SrcPakFile = open(SRC_PAK_PATH, O_RDONLY);
-    if (SrcPakFile == -1) { fprintf(stderr, "Failed to open src.pak\n"); return 1; }
-
-    if (ParsePakIndex(SrcPakFile, &src_data) != 0) {
-        fprintf(stderr, "Failed to parse src.pak index.\n");
-        result = 1; goto cleanup;
-    }
-
-    // 确定要替换的最后两个文件实例的 Entry Index
-    if (src_data.NumOfEntry >= 2) {
-        old_entry_indices[0] = src_data.NumOfEntry - 2;
-        old_entry_indices[1] = src_data.NumOfEntry - 1;
-        printf("Targeting last two entries: #%d and #%d for replacement.\n", old_entry_indices[0], old_entry_indices[1]);
-    } else {
-        fprintf(stderr, "Error: SRC_PAK has fewer than 2 file entries.\n");
-        result = 1; goto cleanup;
-    }
-
-    // 找到最后一个文件数据块的末尾偏移 (即旧数据体的大小)
-    uint64_t old_data_body_end = 0;
-    uint64_t last_file_offset = find_last_file_offset(&src_data, &old_data_body_end);
-    
-    // 我们只需要知道最后一个文件数据块的起始位置
-    Entry *last_entry = &src_data.FileEntries[old_entry_indices[0]];
-    uint64_t old_data_start_offset = last_entry->FileOffset;
-    printf("Old data body start offset for replacement: 0x%llx\n", old_data_start_offset);
-
-
-    // ------------------------------------------------------------------
-    // 2. 读取 my_pak，提取新实例数据
-    // ------------------------------------------------------------------
-    printf("--- Phase 2: Reading MY_PAK and extracting new data ---\n");
+    printf("--- Phase 1: Reading MY_PAK and extracting new instances ---\n");
+    // 以只读方式打开 my_pak
     MyPakFile = open(MY_PAK_PATH, O_RDONLY);
-    if (MyPakFile == -1) { fprintf(stderr, "Failed to open my.pak\n"); result = 1; goto cleanup; }
+    if (MyPakFile == -1) { fprintf(stderr, "Failed to open my.pak\n"); return 1; }
 
+    // 解析 my_pak 索引
     if (ParsePakIndex(MyPakFile, &my_data) != 0) {
         fprintf(stderr, "Failed to parse my.pak index.\n");
         result = 1; goto cleanup;
     }
 
-    // 遍历 my_pak 提取目标新实例
+    // 遍历 my_pak 中的所有文件实例，找到需要替换的两个新文件
     for (uint32_t i = 0; i < my_data.NumOfInstances && found_my_count < 2; i++) {
         FileInstance *inst = &my_data.AllFileInstances[i];
         for (int k = 0; k < 2; k++) {
             if (strcmp(inst->Filename, key_str_my[k]) == 0) {
                 NewInstance *ni = &my_instances[found_my_count];
                 
-                // 拷贝 Entry 元数据（除了 FileOffset，因为它是旧的）
+                // 拷贝 Entry 元数据
                 memcpy(&ni->entry, inst->entry_ptr, sizeof(Entry));
-                
+                strncpy(ni->Filename, inst->Filename, 1024);
+                strncpy(ni->DirPath, inst->DirPath, 1024);
+
                 // 拷贝 CompressionBlock 数组
                 uint32_t blocks_size = ni->entry.NumOfBlocks * sizeof(CompressionBlock);
                 ni->blocks = (CompressionBlock*)malloc(blocks_size);
                 if (ni->blocks) {
                     memcpy(ni->blocks, inst->entry_ptr->blocks, blocks_size);
-                } else {
-                    fprintf(stderr, "Failed to allocate memory for blocks.\n");
-                    result = 1; goto cleanup;
                 }
 
                 // 读取新实例的实际压缩文件数据
                 if (read_file_data(MyPakFile, &ni->entry, &ni->Data, &ni->DataSize) != 0) {
-                    fprintf(stderr, "Failed to read data for %s\n", key_str_my[k]);
+                    fprintf(stderr, "Failed to read data for %s\n", ni->Filename);
                     result = 1; goto cleanup;
                 }
 
-                total_new_data_size += ni->DataSize;
                 found_my_count++;
+                printf("Extracted new instance: %s\n", ni->Filename);
                 break;
             }
         }
@@ -622,142 +494,84 @@ int main() {
     close(MyPakFile); MyPakFile = -1;
 
     // ------------------------------------------------------------------
-    // 3. 生成 new_pak 文件
+    // 2. 读取 src_pak，定位旧实例
     // ------------------------------------------------------------------
-    printf("--- Phase 3: Creating NEW_PAK and updating content ---\n");
-    NewPakFile = open(NEW_PAK_PATH, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-    if (NewPakFile == -1) { fprintf(stderr, "Failed to create new.pak\n"); result = 1; goto cleanup; }
+    printf("--- Phase 2: Reading SRC_PAK and locating old instances ---\n");
+    // 以读写方式打开源 PAK 文件
+    SrcPakFile = open(SRC_PAK_PATH, O_RDWR);
+    if (SrcPakFile == -1) { fprintf(stderr, "Failed to open src.pak\n"); result = 1; goto cleanup; }
 
-    uint64_t current_new_offset = 0; // 追踪 new_pak 的当前写入偏移
-    uint64_t buffer_size = CHUNK_SIZE;
-    uint8_t *buffer = (uint8_t*)malloc(buffer_size);
-    if (!buffer) { fprintf(stderr, "Buffer allocation failed.\n"); result = 1; goto cleanup; }
-    
-    // 3.1 写入 src_pak 中旧数据块起始偏移之前的内容 (Data Body 前半部分)
-    printf("3.1 Writing data body before offset 0x%llx...\n", old_data_start_offset);
-    uint64_t bytes_to_copy = old_data_start_offset;
-    uint64_t bytes_copied = 0;
-    
-    // 从 src_pak 的 0 偏移开始复制
-    while (bytes_copied < bytes_to_copy) {
-        size_t to_read = (size_t)(bytes_to_copy - bytes_copied < buffer_size ? bytes_to_copy - bytes_copied : buffer_size);
-        ssize_t bytesRead = pread(SrcPakFile, buffer, to_read, bytes_copied);
-        if (bytesRead <= 0) {
-            fprintf(stderr, "Failed to read data body from src.pak.\n");
-            result = 1; goto cleanup_buffer;
+    // 解析 src_pak 索引
+    if (ParsePakIndex(SrcPakFile, &src_data) != 0) {
+        fprintf(stderr, "Failed to parse src.pak index.\n");
+        result = 1; goto cleanup;
+    }
+
+    // 遍历 src_pak 中的所有文件实例，找到需要被替换的两个旧文件
+    for (uint32_t i = 0; i < src_data.NumOfInstances && found_old_count < 2; i++) {
+        FileInstance *inst = &src_data.AllFileInstances[i];
+        for (int k = 0; k < 2; k++) {
+            if (strcmp(inst->Filename, key_str_old[k]) == 0) {
+                old_instances_ptr[found_old_count] = inst; // 存储指向旧实例的指针
+                found_old_count++;
+                printf("Found old instance: %s at Entry Index %d\n", inst->Filename, inst->EntryIndex);
+                break;
+            }
         }
-        if (write(NewPakFile, buffer, bytesRead) != bytesRead) {
-            fprintf(stderr, "Failed to write data body to new.pak.\n");
-            result = 1; goto cleanup_buffer;
+    }
+
+    if (found_old_count != 2) {
+        fprintf(stderr, "Error: Failed to find 2 old instances in SRC_PAK.\n");
+        result = 1; goto cleanup;
+    }
+
+    // ------------------------------------------------------------------
+    // 3. 替换逻辑：写入新数据并重建索引
+    // ------------------------------------------------------------------
+    printf("--- Phase 3: Writing new data and reconstructing index ---\n");
+
+    // 找到源 PAK 文件当前的末尾，作为新数据的写入起始偏移
+    off_t total_size = lseek(SrcPakFile, 0, SEEK_END);
+    uint64_t current_write_offset = total_size;
+
+    for (int i = 0; i < 2; i++) {
+        NewInstance *ni = &my_instances[i];
+        FileInstance *oi = old_instances_ptr[i];
+
+        // 1. 更新新 Entry 的 FileOffset 
+        ni->entry.FileOffset = oi->entry_ptr->FileOffset; // 只需要更新偏移量
+      
+        // 2. 用新 Entry 替换旧 Entry
+        if (oi->entry_ptr->blocks) free(oi->entry_ptr->blocks); // 释放旧的 blocks 内存
+        memcpy(oi->entry_ptr, &ni->entry, sizeof(Entry));       // 拷贝新的元数据
+        oi->entry_ptr->blocks = ni->blocks;                     // 转移新的 blocks 数组指针
+        ni->blocks = NULL;                                      // 清空所有权，防止二次释放
+
+        // 3. 写入新的文件数据到 PAK 文件末尾
+        if (pwrite(SrcPakFile, ni->Data, ni->DataSize, current_write_offset) != ni->DataSize) {
+            fprintf(stderr, "Failed to write new file data %s.\n", ni->Filename);
+            result = 1; goto cleanup;
         }
-        bytes_copied += bytesRead;
-        current_new_offset += bytesRead;
+        current_write_offset += ni->DataSize; // 更新写入偏移
     }
 
-    // 3.2 写入两个新实例的数据块 (Data Body 后半部分，替换旧内容)
-    printf("3.2 Writing new instance data blocks...\n");
-    uint64_t offset_add = 0; // 记录新的数据体大小与旧数据体大小的增量偏移
-    uint64_t new_data_block_start = current_new_offset; // 记录新块的起始偏移
-    
-    // 写入第一个新实例
-    NewInstance *ni0 = &my_instances[0];
-    if (write(NewPakFile, ni0->Data, ni0->DataSize) != ni0->DataSize) {
-        fprintf(stderr, "Failed to write new data block 1.\n"); result = 1; goto cleanup_buffer;
-    }
-    ni0->entry.FileOffset = new_data_block_start; // 更新 Entry 结构体中的 FileOffset
-    current_new_offset += ni0->DataSize;
-    
-    // 写入第二个新实例
-    NewInstance *ni1 = &my_instances[1];
-    if (write(NewPakFile, ni1->Data, ni1->DataSize) != ni1->DataSize) {
-        fprintf(stderr, "Failed to write new data block 2.\n"); result = 1; goto cleanup_buffer;
-    }
-    ni1->entry.FileOffset = current_new_offset - ni1->DataSize; // 更新 Entry 结构体中的 FileOffset
-    current_new_offset += ni1->DataSize;
-    
-    // 计算增量偏移
-    uint64_t old_data_end = last_entry->FileOffset + last_entry->CompressedLength;
-    uint64_t old_replaced_size = old_data_body_end - old_data_start_offset;
-    uint64_t new_replaced_size = current_new_offset - new_data_block_start;
-    offset_add = new_replaced_size - old_replaced_size;
-    printf("Data body size change: %llu bytes (Offset Add).\n", offset_add);
-
-    // 3.3 写入 SRC_PAK 中最后两个实例之后的剩余数据 (如果存在)
-    // printf("3.3 Writing remaining data body...\n");
-    // 复制旧索引之前的数据体剩余部分，从旧数据块末尾开始
-    // bytes_to_copy = src_data.info.offset;
-    // bytes_copied = old_data_body_end;
-    
-    // while (bytes_copied < bytes_to_copy) {
-    //     size_t to_read = (size_t)(bytes_to_copy - bytes_copied < buffer_size ? bytes_to_copy - bytes_copied : buffer_size);
-    //     ssize_t bytesRead = pread(SrcPakFile, buffer, to_read, bytes_copied);
-    //     if (bytesRead <= 0) break; // 如果读取失败或结束，就退出
-        
-    //     if (write(NewPakFile, buffer, bytesRead) != bytesRead) {
-    //         fprintf(stderr, "Failed to write remaining data body to new.pak.\n");
-    //         result = 1; goto cleanup_buffer;
-    //     }
-    //     bytes_copied += bytesRead;
-    //     current_new_offset += bytesRead;
-    // }
-    // free(buffer);
-    // buffer = NULL;
-
-    // ------------------------------------------------------------------
-    // 4. 重建并写入索引数据
-    // ------------------------------------------------------------------
-    printf("--- Phase 4: Reconstructing and writing new Index Data ---\n");
-    uint64_t new_index_offset = current_new_offset; // 新索引的起始偏移
+    // 4. 重建索引数据
+    uint64_t new_index_offset = current_write_offset; // 新索引的起始偏移
     uint64_t NewIndexDataSize = 0;
-    // 分配内存用于存储新的索引数据 (预留空间)
-    NewIndexData = (uint8_t*)malloc(src_data.OriginalIndexSize + 1024);
+    // 分配内存用于存储新的索引数据
+    NewIndexData = (uint8_t*)malloc(src_data.OriginalIndexSize * 3);
     if (!NewIndexData) { result = 1; goto cleanup; }
 
-    // 4.1. MountPointLength + MountPoint + NumOfEntry (索引数据的前半部分) 保持原版不变
-    uint64_t pre_entry_size = 4+29+4;
+    // a. MountPoint + NumOfEntry (索引数据的前半部分)
+    // 16B = 4B(MountPointLength) + 4B(NumOfEntry)
+    uint64_t pre_entry_size = src_data.DirMapStartOffset - 16;
     write_data(NewIndexData, &NewIndexDataSize, src_data.OriginalIndexData, pre_entry_size);
 
-    // 4.2. 写入更新后的 Entry 列表
-    for (uint32_t i = 0; i < src_data.NumOfEntry; i++)
-    {
-        Entry *e = &src_data.FileEntries[i];
-
-        // 如果是最后两个被替换的实例，用新实例的元数据覆盖
-        if (i == old_entry_indices[0] - 1)
-        {
-            int k = 0;
-        }
-        if (i == old_entry_indices[0])
-        {
-            e = &ni0->entry;
-        }
-        else if (i == old_entry_indices[1])
-        {
-            e = &ni1->entry;
-        }
-
-        // 🌟 核心更新：调整 FileOffset
-        // 只有被替换的实例 FileOffset 是绝对值（已在 3.2 更新）。
-        // 其他实例的 FileOffset 需要加上增量偏移 offset_add。
-        uint64_t adjusted_offset = e->FileOffset;
-        if (i < old_entry_indices[0]) {
-            // 在被替换块之前，FileOffset 不变
-            adjusted_offset = e->FileOffset;
-        } else if (i > old_entry_indices[1]) {
-            // 在被替换块之后，FileOffset 需要加上增量
-            adjusted_offset = e->FileOffset + offset_add;
-        } else {
-            // 被替换的块，使用新块的绝对 FileOffset (已在 ni0/ni1->entry 中更新)
-            adjusted_offset = e->FileOffset;
-        }
-        
-        // 写入 Entry 结构体
-        // 【DEBUG TEST】: 替换 FileHash 字段为调试测试用的特殊字符 (20x 0xDE)
-        // uint8_t debug_hash[20];
-        // memset(debug_hash, 0xDE, 20); // 用 0xDE 填充 20 字节
-        // write_data(NewIndexData, &NewIndexDataSize, debug_hash, 20); // 写入调试哈希
+    // b. 写入更新后的 Entry 列表
+    for (uint32_t i = 0; i < src_data.NumOfEntry; i++) {
+        Entry *e = &src_data.FileEntries[i]; // 使用已在内存中更新过的 Entry 结构
         write_data(NewIndexData, &NewIndexDataSize, e->FileHash, 20);
-        write_data(NewIndexData, &NewIndexDataSize, &adjusted_offset, 8); // 写入调整后的偏移
+        write_data(NewIndexData, &NewIndexDataSize, &e->FileOffset, 8);
         write_data(NewIndexData, &NewIndexDataSize, &e->FileSize, 8);
         write_data(NewIndexData, &NewIndexDataSize, &e->CompressionMethod, 4);
         write_data(NewIndexData, &NewIndexDataSize, &e->CompressedLength, 8);
@@ -767,7 +581,6 @@ int main() {
         if (e->CompressionMethod != 0) {
              write_data(NewIndexData, &NewIndexDataSize, &e->NumOfBlocks, 4);
              if (e->NumOfBlocks > 0) {
-                 // 压缩块的 start/end 偏移是相对于 FileOffset 的，因此不需要调整
                  write_data(NewIndexData, &NewIndexDataSize, e->blocks, e->NumOfBlocks * sizeof(CompressionBlock));
              }
         }
@@ -776,44 +589,93 @@ int main() {
         write_data(NewIndexData, &NewIndexDataSize, &e->Encrypted, 1);
     }
 
-    // 4.3. 写入 Directory Map
-    uint64_t dir_map_size = src_data.OriginalIndexSize - src_data.EntryListEndOffset;
-    write_data(NewIndexData, &NewIndexDataSize, src_data.OriginalIndexData + src_data.EntryListEndOffset, dir_map_size);
+    // c. Directory Map Header (ENTRIES + DIR_COUNT)
+    write_data(NewIndexData, &NewIndexDataSize, src_data.OriginalIndexData + src_data.DirMapStartOffset, 16);
 
-    // 在写入文件之前，先验证我们内存中构造的新索引数据
-    VerifyNewIndexData(NewIndexData, NewIndexDataSize, src_data.NumOfEntry, offset_add);
+    // d. 重建 Directory Map (替换文件名)
+    current_index_offset = src_data.DirMapStartOffset + 16;
+    // 遍历原始 DirMap，同时读取并写入到 NewIndexData
+    for (uint64_t dir_idx = 0; dir_idx < src_data.DirMapEndOffset - src_data.DirMapStartOffset - 16;) {
+        uint64_t dir_start = current_index_offset;
+        int32_t DIR_LEN;
+        read_data(&DIR_LEN, src_data.OriginalIndexData, 4); // 读取目录名长度
+        current_index_offset += 4 + DIR_LEN + 8; // 跳过目录名和文件数量，定位到第一个文件实例
 
-    // 4.4. 将新索引数据写入 NEW_PAK 文件
-    if (write(NewPakFile, NewIndexData, NewIndexDataSize) != NewIndexDataSize) {
+        uint64_t DIR_FILES;
+        // 注意：这里需要重新定位读取 DIR_FILES，因为 read_data 会推进 current_index_offset
+        read_data(&DIR_FILES, src_data.OriginalIndexData + dir_start + 4 + DIR_LEN, 8);
+
+        // 复制目录头 (长度 + 路径 + 文件数量)
+        write_data(NewIndexData, &NewIndexDataSize, src_data.OriginalIndexData + dir_start, 4 + DIR_LEN + 8);
+
+        // 遍历目录下的文件实例
+        for (uint64_t f = 0; f < DIR_FILES; f++) {
+            uint64_t path_start = current_index_offset;
+            int32_t FilenameSize;
+            read_data(&FilenameSize, src_data.OriginalIndexData, 4); // 读取文件名大小
+            int name_len = FilenameSize > 0 ? FilenameSize : -FilenameSize * 2;
+            current_index_offset += name_len + 4; // 跳过文件名和 EntryIndex
+
+            int32_t EntryIndex;
+            // 重新定位读取 EntryIndex
+            read_data(&EntryIndex, src_data.OriginalIndexData + path_start + 4 + name_len, 4);
+
+            int is_old = 0;
+            NewInstance *ni = NULL;
+            // 检查当前实例是否是要被替换的旧实例
+            for (int k = 0; k < 2; k++) {
+                // 使用 EntryIndex 匹配，因为 EntryIndex 是唯一的 ID
+                if (old_instances_ptr[k]->EntryIndex == EntryIndex) { 
+                    is_old = 1;
+                    ni = &my_instances[k];
+                    break;
+                }
+            }
+
+            if (is_old && ni) {
+                // 替换：使用新文件名及其长度写入
+                int32_t new_size = strlen(ni->Filename);
+                write_data(NewIndexData, &NewIndexDataSize, &new_size, 4);
+                write_data(NewIndexData, &NewIndexDataSize, ni->Filename, new_size);
+                write_data(NewIndexData, &NewIndexDataSize, &EntryIndex, 4); // EntryIndex 保持不变
+            } else {
+                // 不替换：复制原始的文件实例数据
+                size_t path_len = current_index_offset - path_start;
+                write_data(NewIndexData, &NewIndexDataSize, src_data.OriginalIndexData + path_start, path_len);
+            }
+        }
+        dir_idx = current_index_offset - (src_data.DirMapStartOffset + 16); // 更新外层循环进度
+    }
+
+    // 5. 将新索引数据写入源 PAK 文件
+    if (pwrite(SrcPakFile, NewIndexData, NewIndexDataSize, new_index_offset) != NewIndexDataSize) {
         fprintf(stderr, "Failed to write new index data.\n");
         result = 1; goto cleanup;
     }
-    current_new_offset += NewIndexDataSize;
 
-    // ------------------------------------------------------------------
-    // 5. 更新并写入 PakInfo (文件尾部)
-    // ------------------------------------------------------------------
-    printf("--- Phase 5: Writing updated PakInfo ---\n");
-    // 新的 PakInfo 偏移：新索引起始位置相对于文件开头的偏移
-    src_data.info.offset = new_index_offset ^ OFFSET_KEY;    // 🌟 更新核心字段：异或后的索引偏移
-    // src_data.info.size = NewIndexDataSize;               // 更新索引大小(存疑TODO)
-    
-    // 将更新后的 PakInfo 写入文件末尾
-    if (write(NewPakFile, &src_data.info, 45) != 45) {
+    // 6. 更新 PakInfo (尾部信息)
+    src_data.info.offset = new_index_offset ^ OFFSET_KEY; // 更新索引偏移
+    src_data.info.size = NewIndexDataSize;               // 更新索引大小
+
+    // 将更新后的 PakInfo 写入文件末尾 (新索引之后)
+    if (pwrite(SrcPakFile, &src_data.info, 45, new_index_offset + NewIndexDataSize) != 45) {
         fprintf(stderr, "Failed to write updated PakInfo.\n");
         result = 1; goto cleanup;
     }
-    current_new_offset += 45;
 
-    printf("Successfully created and updated %s (New Size: %llu bytes).\n", NEW_PAK_PATH, current_new_offset);
-    
-cleanup_buffer:
-    if (buffer) free(buffer);
+    // 7. 截断文件，移除旧的索引数据和被替换的文件数据
+    if (ftruncate(SrcPakFile, new_index_offset + NewIndexDataSize + 45) != 0) {
+        fprintf(stderr, "Failed to truncate file.\n");
+        result = 1; goto cleanup;
+    }
+
+    printf("Successfully replaced 2 old instances with 2 new instances in %s.\n", SRC_PAK_PATH);
+
 cleanup:
     // 清理新实例数据
     for (int i = 0; i < 2; i++) {
         if (my_instances[i].Data) free(my_instances[i].Data);
-        // blocks 数组已经移交给 src_data.FileEntries，但 src_data 会在 CleanupPakData 中释放
+        if (my_instances[i].blocks) free(my_instances[i].blocks);
     }
     // 清理 PAK 索引解析时分配的内存
     CleanupPakData(&my_data);
@@ -823,10 +685,6 @@ cleanup:
     // 关闭文件描述符
     if (MyPakFile != -1) close(MyPakFile);
     if (SrcPakFile != -1) close(SrcPakFile);
-    if (NewPakFile != -1) close(NewPakFile);
 
     return result;
 }
-
-// ⚠️ 注意：ParsePakIndex 的实现细节被省略，你需要确保它被完整地包含在你的最终代码中。
-// 否则，你可以将我的 ParsePakIndex 的实现放在主函数之前。
