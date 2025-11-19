@@ -62,6 +62,17 @@
     "aes.h": "c",
     "*.c初版": "c",
     "*.c删除原版备份": "c",
-    "*.c魔改pak初版": "c"
+    "*.c魔改pak初版": "c",
+    "array": "c",
+    "deque": "c",
+    "forward_list": "c",
+    "list": "c",
+    "string": "c",
+    "unordered_map": "c",
+    "unordered_set": "c",
+    "vector": "c",
+    "string_view": "c",
+    "initializer_list": "c",
+    "ranges": "c"
   }
 }

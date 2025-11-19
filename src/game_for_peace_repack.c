@@ -26,14 +26,14 @@ static const uint8_t PAK_AES_KEY[AES_KEY_SIZE] = {
     0xA1, 0xB2, 0xC3, 0xD4, 0xE5, 0xF6, 0x07, 0x18
 };
 
-// Pak文件头结构体
+// Pak文件头结构体，位于文件末尾
 typedef struct {
-    uint8_t encrypted;
-    uint32_t magic;
-    uint32_t version;
-    uint8_t hash[20];
-    uint64_t size;
-    uint64_t offset;
+    uint8_t encrypted;  // 索引是否加密，0x6C 异或后得到 0 或 1
+    uint32_t magic;     // 魔数，用于文件格式标识
+    uint32_t version;   // 文件版本号
+    uint8_t hash[20];   // 索引数据的 SHA1 哈希值
+    uint64_t size;      // 索引数据的大小 (本代码未使用)
+    uint64_t offset;    // 索引数据在文件中的偏移量
 } __attribute__((packed)) PakInfo;
 
 // 压缩块结构体
@@ -55,8 +55,8 @@ typedef struct {
     uint32_t CompressedBlockSize;
     uint8_t Encrypted;
     // 索引辅助字段
-    uint64_t EntryIndexStart; 
-    uint64_t EntryIndexEnd;
+    uint64_t EntryIndexStart;  // 索引的起始偏移，以索引区开始处（挂载点）为零点
+    uint64_t EntryIndexEnd; // 索引的结束偏移，以索引区开始处（挂载点）为零点
 } __attribute__((packed)) Entry;
 
 // 文件路径和索引信息结构
@@ -95,11 +95,11 @@ typedef struct {
     Entry *FileEntries;
     FileInstance *AllFileInstances;
     uint32_t NumOfInstances;
-    uint8_t *OriginalIndexData;
-    int64_t OriginalIndexSize;
-    uint64_t EntryListEndOffset;
-    uint64_t DirMapStartOffset;
-    uint64_t DirMapEndOffset;
+    uint8_t *OriginalIndexData; // 索引区的起始位置，以文件开头为零点
+    int64_t OriginalIndexSize; // 索引数据的字节大小
+    uint64_t EntryListEndOffset; // 索引区的实体列表的结束位置，以索引区开始处（挂载点）为零点
+    uint64_t DirMapStartOffset; // 索引区的路径列表的开始位置，以索引区开始处（挂载点）为零点
+    uint64_t DirMapEndOffset; // 索引区的路径列表的结束位置，以索引区开始处（挂载点）为零点
 } PakIndexData;
 
 // ----------------------------------------------------------------------
@@ -314,7 +314,7 @@ int ParsePakIndex(int PakFileDescriptor, PakIndexData *Result) {
         DecryptData(Result->OriginalIndexData, Result->OriginalIndexSize);
     }
 
-    current_index_offset = 0;
+    current_index_offset = 0; // 以索引数据开头为零点
 
     // 读取 MountPoint (挂载点)
     uint32_t MountPointLength;
@@ -823,7 +823,7 @@ int main() {
     // ------------------------------------------------------------------
     printf("--- Phase 4: Reconstructing and writing new Index Data ---\n");
     uint64_t new_index_offset = current_new_offset; // 新索引的起始偏移
-    uint64_t NewIndexDataSize = 0;
+    uint64_t NewIndexDataSize = 0; // 新索引区的字节大小（包含挂载点+索引列表+路径列表）
     // 分配内存用于存储新的索引数据 (预留空间)
     NewIndexData = (uint8_t*)malloc(src_data.OriginalIndexSize + 1024);
     if (!NewIndexData) { result = 1; goto cleanup; }
@@ -879,23 +879,28 @@ int main() {
         write_data(NewIndexData, &NewIndexDataSize, &e->CompressionMethod, 4);
         write_data(NewIndexData, &NewIndexDataSize, &e->CompressedLength, 8);
         write_data(NewIndexData, &NewIndexDataSize, e->Dummy, 21);
-        
+
         // NumOfBlocks + Blocks Data
-        if (e->CompressionMethod != 0) {
-             write_data(NewIndexData, &NewIndexDataSize, &e->NumOfBlocks, 4);
-             if (e->NumOfBlocks > 0) {
-                 // 压缩块的 start/end 偏移不是相对于 FileOffset 的，而是相对于整个文件开头的偏移，因此最后2个新实体的压缩块的起止偏移需要调整，已在 3.2 处理
-                 write_data(NewIndexData, &NewIndexDataSize, e->blocks, e->NumOfBlocks * sizeof(CompressionBlock));
-             }
+        if (e->CompressionMethod != 0)
+        {
+            write_data(NewIndexData, &NewIndexDataSize, &e->NumOfBlocks, 4);
+            for (uint32_t i = 0; i < e->NumOfBlocks; i++)
+            {
+                if(i>1)
+                {
+                    int debug = i;
+                }
+                write_data(NewIndexData, &NewIndexDataSize, &e->blocks[i].start, 8);
+                write_data(NewIndexData, &NewIndexDataSize, &e->blocks[i].end, 8);
+            }
         }
-       
         write_data(NewIndexData, &NewIndexDataSize, &e->CompressedBlockSize, 4);
         write_data(NewIndexData, &NewIndexDataSize, &e->Encrypted, 1);
     }
 
     // 4.3. 写入 Directory Map
-    uint64_t dir_map_size = src_data.OriginalIndexSize - src_data.EntryListEndOffset;
-    write_data(NewIndexData, &NewIndexDataSize, src_data.OriginalIndexData + src_data.EntryListEndOffset, dir_map_size);
+    uint64_t dir_map_size = src_data.DirMapEndOffset - src_data.DirMapStartOffset;
+    write_data(NewIndexData, &NewIndexDataSize, src_data.OriginalIndexData + src_data.DirMapStartOffset, dir_map_size);
 
     // 在写入文件之前，先验证我们内存中构造的新索引数据
     VerifyNewIndexData(NewIndexData, NewIndexDataSize, src_data.NumOfEntry, offset_add);
