@@ -77,12 +77,14 @@ typedef struct {
 
 // 新实例数据结构
 typedef struct {
-    Entry entry;
+    Entry entry; // 从索引区解析的索引信息
     char Filename[1024];
     char DirPath[1024];
-    uint8_t *Data;      // 压缩后的文件数据
-    uint64_t DataSize;  // 压缩后的数据大小
-    CompressionBlock *blocks;
+    uint8_t *Head;      // 头 （内含的信息与entry等效）（大小为 94 字节）
+    size_t HeadSize;   // 头大小为 94 字节
+    uint8_t *Data;      // 压缩块
+    uint64_t DataSize;  // 压缩块大小
+    CompressionBlock *blocks; // 压缩块起止偏移量
 } NewInstance;
 
 // 完整的解析结果结构
@@ -169,94 +171,107 @@ void print_hex_dump(const uint8_t *data, size_t size) {
     if (len > 0) printf("\n");
 }
 
-int read_file_data(int fd, Entry *entry, uint8_t **out_data, uint64_t *out_size) {
-    if (entry->CompressedLength == 0) {
+// 新增：用于将 Entry 结构体的关键字段序列化为 94 字节的头部
+void SerializeHeadData(Entry *entry, uint8_t **out_head, size_t *out_size) {
+    // 确保分配了 94 字节的内存
+    *out_head = (uint8_t*)malloc(94);
+    if (!*out_head) {
+        fprintf(stderr, "Error: Failed to allocate memory for 94-byte head.\n");
+        return;
+    }
+
+    uint8_t *ptr = *out_head;
+    
+    // 1. 写入 FileHash (20B)
+    memcpy(ptr, entry->FileHash, 20); ptr += 20;
+    
+    // 2. 写入 FileOffset (8B)
+    memcpy(ptr, &entry->FileOffset, 8); ptr += 8;
+    
+    // 3. 写入 FileSize (8B)
+    memcpy(ptr, &entry->FileSize, 8); ptr += 8;
+    
+    // 4. 写入 CompressionMethod (4B)
+    memcpy(ptr, &entry->CompressionMethod, 4); ptr += 4;
+    
+    // 5. 写入 CompressedLength (8B)
+    memcpy(ptr, &entry->CompressedLength, 8); ptr += 8; 
+    
+    // 6. 写入 Dummy (21B)
+    memcpy(ptr, entry->Dummy, 21); ptr += 21;
+    
+    // 7. 写入 NumOfBlocks (4B)
+    memcpy(ptr, &entry->NumOfBlocks, 4); ptr += 4;
+
+    // 8. 写入 第一个 CompressionStart 和 End (8+8=16B)
+    for (uint32_t i = 0; i < entry->NumOfBlocks; i++) {
+        memcpy(ptr, &entry->blocks[i].start, 8); ptr += 8;
+        memcpy(ptr, &entry->blocks[i].end, 8); ptr += 8;
+    }
+
+    // 9. 写入 CompressedBlockSize (4B)
+    memcpy(ptr, &entry->CompressedBlockSize, 4); ptr += 4;
+    
+    // 10. 写入 Encrypted (1B)
+    memcpy(ptr, &entry->Encrypted, 1); ptr += 1;
+    
+    // 验证总大小
+    *out_size = ptr - *out_head;
+    if (*out_size != 94) {
+        fprintf(stderr, "Fatal Error: Head serialization size mismatch. Expected 94, got %zu.\n", *out_size);
+    }
+}
+
+// ----------------------------------------------------------------------
+// 读取文件数据（仅处理 NumOfBlocks == 1 的特定结构）
+// ----------------------------------------------------------------------
+int get_data_CompressedLength(int fd, Entry *entry, uint8_t **out_data, uint64_t *out_size) {
+    
+    // 定义头部大小
+    const uint64_t HEAD_SIZE = 94;
+    // 1. 检查条件：必须是 NumOfBlocks == 1 且 CompressedLength > 0
+    if (entry->NumOfBlocks != 1 || entry->CompressedLength <= 0)
+    {
+        // 暂不处理的情况
         *out_data = NULL;
         *out_size = 0;
-        printf("DEBUG: 文件大小为 0，跳过读取。\n");
-        return 0;
+        printf("错误: 不支持的block。\n");
+        return -1;
     }
-
-    // 处理未压缩或单块压缩的情况
-    if (entry->NumOfBlocks == 0) {
-        *out_size = entry->CompressedLength;
-        *out_data = malloc(*out_size);
-        if (!*out_data) return 1;
-        
-        // 直接从文件偏移处读取数据
-        if (pread(fd, *out_data, *out_size, entry->FileOffset) != *out_size) {
-            fprintf(stderr, "Error: read_file_data failed to read %llu bytes from offset 0x%llx (Non-chunked).\n", 
-                    (unsigned long long)*out_size, (unsigned long long)entry->FileOffset);
-            free(*out_data);
-            return 1;
-        }
-
-        // 解密（如果有）
-        if (entry->Encrypted) {
-            DecryptData(*out_data, *out_size);
-            // 注意：通常解密操作会原地进行，但我们现在打印的是解密后的数据
-        }
-
-        // --- 调试打印 START ---
-        printf("DEBUG: 读取未分块文件数据完成。\n");
-        printf("DEBUG: 文件大小: %llu bytes (0x%llx)\n", (unsigned long long)*out_size, (unsigned long long)*out_size);
-        printf("DEBUG: 数据（前64字节）:\n");
-        print_hex_dump(*out_data, *out_size);
-        // --- 调试打印 END ---
-        
-        return 0;
+    // 压缩数据流的绝对起始偏移
+    uint64_t block_start = entry->FileOffset + HEAD_SIZE;
+    // 压缩数据流的实际大小
+    uint64_t block_size = entry->CompressedLength;
+    // 读取数据
+    *out_size = block_size;
+    *out_data = malloc(*out_size);
+    if (!*out_data) {
+        fprintf(stderr, "Error: Failed to allocate memory for block size %llu.\n", (unsigned long long)block_size);
+        return -1;
     }
-
-    // 处理多块压缩的情况
-    uint64_t total_compressed = 0;
-    // 假设 entry->CompressedLength 记录了所有块的总和大小
-    uint8_t *compressed_buffer = malloc(entry->CompressedLength); 
-    if (!compressed_buffer) return 1;
-
-    uint8_t *ptr = compressed_buffer;
-    for (uint32_t i = 0; i < entry->NumOfBlocks; i++) {
-        // 计算当前压缩块在 PAK 文件中的起始偏移
-        uint64_t block_start = entry->blocks[i].start;
-        // 计算当前压缩块的实际大小
-        uint64_t block_size = entry->blocks[i].end - entry->blocks[i].start;
-        
-        if (block_size == 0) continue;
-
-        // 读取当前压缩块数据到缓存
-        if (pread(fd, ptr, block_size, block_start) != block_size) {
-            fprintf(stderr, "Error: read_file_data failed to read block %u/%u from offset 0x%llx.\n", 
-                    i, entry->NumOfBlocks, (unsigned long long)block_start);
-            free(compressed_buffer);
-            return 1;
-        }
-        ptr += block_size;
-        total_compressed += block_size;
+    // 读取数据
+    if (pread(fd, *out_data, *out_size, block_start) != *out_size) {
+        fprintf(stderr, "Error: get_data_CompressedLength failed to read %llu bytes from offset 0x%llx (FileOffset + 94).\n", 
+                (unsigned long long)*out_size, (unsigned long long)block_start);
+        free(*out_data);
+        return -1;
     }
-    
-    // 检查总大小是否匹配（可选但推荐）
-    if (total_compressed != entry->CompressedLength) {
-         fprintf(stderr, "Warning: Total data read (%llu) does not match Entry->CompressedLength (%llu).\n",
-                 (unsigned long long)total_compressed, (unsigned long long)entry->CompressedLength);
-    }
-
-
-    // 解密所有拼接好的数据
     if (entry->Encrypted) {
-        DecryptData(compressed_buffer, total_compressed);
+        DecryptData(*out_data, *out_size);
+        printf("警告: 进入DecryptData。\n");
     }
     
     // --- 调试打印 START ---
-    printf("DEBUG: 读取分块文件数据完成。\n");
-    printf("DEBUG: 文件大小: %llu bytes (0x%llx)\n", (unsigned long long)total_compressed, (unsigned long long)total_compressed);
+    printf("DEBUG: 读取单块压缩文件（跳过 94 字节头部）完成。\n");
+    printf("DEBUG: 压缩块大小 CompressedLength: %llu\n", (unsigned long long)entry->CompressedLength);
+    printf("DEBUG: 实际数据流大小: %llu bytes (0x%llx)\n", (unsigned long long)*out_size, (unsigned long long)*out_size);
     printf("DEBUG: 数据（前64字节）:\n");
-    print_hex_dump(compressed_buffer, total_compressed);
+    print_hex_dump(*out_data, *out_size);
     // --- 调试打印 END ---
 
-
-    *out_data = compressed_buffer;
-    *out_size = total_compressed;
     return 0;
 }
+
 // ----------------------------------------------------------------------
 // 核心辅助函数：PAK 索引解析
 // ----------------------------------------------------------------------
@@ -593,7 +608,6 @@ int main() {
     int result = 0;
     uint8_t *NewIndexData = NULL;
     uint64_t found_my_count = 0;
-    uint64_t total_new_data_size = 0;
 
     // ------------------------------------------------------------------
     // 1. 读取 src_pak，解析索引并确定替换范围
@@ -622,9 +636,10 @@ int main() {
     uint64_t last_file_offset = find_last_file_offset(&src_data, &old_data_body_end);
     
     // 我们只需要知道最后一个文件数据块的起始位置
-    Entry *last_entry = &src_data.FileEntries[old_entry_indices[0]];
-    uint64_t old_data_start_offset = last_entry->FileOffset;
-    printf("Old data body start offset for replacement: 0x%llx\n", old_data_start_offset);
+    Entry *old_entry_0 = &src_data.FileEntries[old_entry_indices[0]];
+    Entry *old_entry_1 = &src_data.FileEntries[old_entry_indices[1]];
+    uint64_t old_entry_0_FileOffset = old_entry_0->FileOffset;
+    printf("Old data body start offset for replacement: 0x%llx\n", old_entry_0_FileOffset);
 
 
     // ------------------------------------------------------------------
@@ -660,12 +675,10 @@ int main() {
                 }
 
                 // 读取新实例的实际压缩文件数据
-                if (read_file_data(MyPakFile, &ni->entry, &ni->Data, &ni->DataSize) != 0) {
+                if (get_data_CompressedLength(MyPakFile, &ni->entry, &ni->Data, &ni->DataSize) != 0) {
                     fprintf(stderr, "Failed to read data for %s\n", key_str_my[k]);
                     result = 1; goto cleanup;
                 }
-
-                total_new_data_size += ni->DataSize;
                 found_my_count++;
                 break;
             }
@@ -691,8 +704,8 @@ int main() {
     if (!buffer) { fprintf(stderr, "Buffer allocation failed.\n"); result = 1; goto cleanup; }
     
     // 3.1 写入 src_pak 中旧数据块起始偏移之前的内容 (Data Body 前半部分)
-    printf("3.1 Writing data body before offset 0x%llx...\n", old_data_start_offset);
-    uint64_t bytes_to_copy = old_data_start_offset;
+    printf("3.1 Writing data body before offset 0x%llx...\n", old_entry_0_FileOffset);
+    uint64_t bytes_to_copy = old_entry_0_FileOffset;
     uint64_t bytes_copied = 0;
     
     // 从 src_pak 的 0 偏移开始复制
@@ -711,53 +724,77 @@ int main() {
         current_new_offset += bytesRead;
     }
 
-    // 3.2 写入两个新实例的数据块 (Data Body 后半部分，替换旧内容)
+    // 3.2 写入两个新实例的 databody ，包含 head + data
     printf("3.2 Writing new instance data blocks...\n");
     uint64_t offset_add = 0; // 记录新的数据体大小与旧数据体大小的增量偏移
-    uint64_t new_data_block_start = current_new_offset; // 记录新块的起始偏移
 
-    // 写入第一个新实例
+    // 写入第一个新实例（先写入size=94的head，再写入size=CompressionLength的data）
+    
     NewInstance *ni0 = &my_instances[0];
-    if (write(NewPakFile, ni0->Data, ni0->DataSize) != ni0->DataSize)
+
+    // 压缩块的 start/end 偏移不是相对于 FileOffset 的，而是相对于整个文件开头的偏移，因此需要先调整
+    if (ni0->entry.CompressionMethod != 0 && ni0->entry.NumOfBlocks > 0)
+    {
+        for (uint32_t b = 0; b < ni0->entry.NumOfBlocks; b++)
+        {
+            ni0->entry.blocks[b].start =  ni0->entry.blocks[b].start- ni0->entry.FileOffset + current_new_offset ;
+            ni0->entry.blocks[b].end = ni0->entry.blocks[b].end - ni0->entry.FileOffset + current_new_offset ;
+        }
+    }
+    ni0->entry.FileOffset = current_new_offset;
+    // 根据新的 entry ，构造新的  ni0->Head （size = 94）字段
+    SerializeHeadData(&ni0->entry, &ni0->Head, &ni0->HeadSize); 
+    // 写入size=94的  ni0->Head
+    if (write(NewPakFile, &ni0->Head, ni0->HeadSize) != ni0->HeadSize)
+    {
+        fprintf(stderr, "Failed to write new data block 1 head.\n");
+        result = 1;
+        goto cleanup_buffer;
+    }
+    // 再写入size=CompressionLength的data
+        if (write(NewPakFile, ni0->Data, ni0->DataSize) != ni0->DataSize)
     {
         fprintf(stderr, "Failed to write new data block 1.\n");
         result = 1;
         goto cleanup_buffer;
     }
-    // 压缩块的 start/end 偏移不是相对于 FileOffset 的，而是相对于整个文件开头的偏移，因此需要调整
-    if (ni0->entry.CompressionMethod != 0 && ni0->entry.NumOfBlocks > 0)
-    {
-        for (uint32_t b = 0; b < ni0->entry.NumOfBlocks; b++)
-        {
-            ni0->entry.blocks[b].start =  ni0->entry.blocks[b].start- ni0->entry.FileOffset + new_data_block_start ;
-            ni0->entry.blocks[b].end = ni0->entry.blocks[b].end - ni0->entry.FileOffset + new_data_block_start ;
-        }
-    }
-    ni0->entry.FileOffset = new_data_block_start; // 更新 Entry 结构体中的 FileOffset
-    current_new_offset += ni0->DataSize;
+    // 更新当前偏移
+    current_new_offset += ni0->HeadSize + ni0->DataSize;
 
     // 写入第二个新实例
     NewInstance *ni1 = &my_instances[1];
-    if (write(NewPakFile, ni1->Data, ni1->DataSize) != ni1->DataSize) {
-        fprintf(stderr, "Failed to write new data block 2.\n"); result = 1; goto cleanup_buffer;
-    }
     // 压缩块的 start/end 偏移不是相对于 FileOffset 的，而是相对于整个文件开头的偏移，因此需要调整
     if (ni1->entry.CompressionMethod != 0 && ni1->entry.NumOfBlocks > 0)
     {
         for (uint32_t b = 0; b < ni1->entry.NumOfBlocks; b++)
         {
-            ni1->entry.blocks[b].start =  ni1->entry.blocks[b].start- ni1->entry.FileOffset + new_data_block_start ;
-            ni1->entry.blocks[b].end = ni1->entry.blocks[b].end - ni1->entry.FileOffset + new_data_block_start ;
+            ni1->entry.blocks[b].start =  ni1->entry.blocks[b].start- ni1->entry.FileOffset + current_new_offset ;
+            ni1->entry.blocks[b].end = ni1->entry.blocks[b].end - ni1->entry.FileOffset + current_new_offset ;
         }
     }
     ni1->entry.FileOffset = current_new_offset; // 更新 Entry 结构体中的 FileOffset
-    current_new_offset += ni1->DataSize;
-    
+    // 根据新的 entry ，构造新的  ni1->Head （size = 94）字段
+    SerializeHeadData(&ni1->entry, &ni1->Head, &ni1->HeadSize);
+    // 写入size=94的  ni1->Head
+    if (write(NewPakFile, &ni1->Head, ni1->HeadSize) != ni1->HeadSize)
+    {
+        fprintf(stderr, "Failed to write new data block 1 head.\n");
+        result = 1;
+        goto cleanup_buffer;
+    }
+    // 再写入size=CompressionLength的data
+        if (write(NewPakFile, ni1->Data, ni1->DataSize) != ni1->DataSize)
+    {
+        fprintf(stderr, "Failed to write new data block 1.\n");
+        result = 1;
+        goto cleanup_buffer;
+    }
+    // 更新当前偏移
+    current_new_offset += ni1->HeadSize + ni1->DataSize;
+
     // 计算增量偏移
-    uint64_t old_data_end = last_entry->FileOffset + last_entry->CompressedLength;
-    uint64_t old_replaced_size = old_data_body_end - old_data_start_offset;
-    uint64_t new_replaced_size = current_new_offset - new_data_block_start;
-    offset_add = new_replaced_size - old_replaced_size;
+    offset_add = ni0->entry.CompressedLength -  old_entry_0->CompressedLength +
+                 ni1->entry.CompressedLength -  old_entry_1->CompressedLength;
     printf("Data body size change: %llu bytes (Offset Add).\n", offset_add);
 
     // 3.3 写入 SRC_PAK 中最后两个实例之后的剩余数据 (如果存在)

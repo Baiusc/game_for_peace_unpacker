@@ -2,7 +2,7 @@
  * @Author       : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
  * @Date         : 2025-09-02 16:42:02
  * @LastEditors  : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
- * @LastEditTime : 2025-11-13 15:37:22
+ * @LastEditTime : 2025-11-13 17:31:56
  * @FilePath     : /game_for_peace_unpacker/README.md
  * @Description  : 
  * 
@@ -678,3 +678,6 @@ Default__BP_PlayerRifleBullet_C
     uint64_t dir_map_size = src_data.OriginalIndexSize - src_data.EntryListEndOffset;
 
     write_data(NewIndexData, &NewIndexDataSize, src_data.OriginalIndexData + src_data.EntryListEndOffset, dir_map_size);
+
+
+剩余工作：1、Directory Map的修改  2、元数据103字节差异的探索
