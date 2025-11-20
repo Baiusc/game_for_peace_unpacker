@@ -926,14 +926,14 @@ dir_map_error:
 int main() {
     // 定义源 PAK 文件和包含新数据的 PAK 文件路径
     const char *SRC_PAK_PATH = "../paks/game_patch_1.33.12.14383原厂（复件）.pak";
-    const char *MY_PAK_PATH = "../paks/game_patch_1.33.12.14371原厂（复件）.pak";
+    const char *MY_PAK_PATH = "../paks/map_lobby_1.33.12.14210原厂（复件）.pak";
     const char *NEW_PAK_PATH = "../paks/game_patch_1.33.12.14383魔改.pak"; // 🌟 新增：生成的新文件路径
 
     // 定义要替换的旧文件实例的索引（我们假设要替换最后两个 Entry Index）
     int old_entry_indices[2] = {-1, -1};
     
     // 定义要提取的新文件实例名（在 my_pak 中寻找）
-    const char *key_str_my[] = { "BP_ShootWeaponBase.uasset", "BP_ShootWeaponBase.uexp" };
+    const char *key_str_my[] = { "CH_Base_SK_PhysicsAsset.uasset", "CH_Base_SK_PhysicsAsset.uexp" };
 
     // 检查文件是否存在
     if (access(SRC_PAK_PATH, F_OK) == -1 || access(MY_PAK_PATH, F_OK) == -1) {
