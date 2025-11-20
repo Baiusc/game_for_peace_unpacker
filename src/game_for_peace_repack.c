@@ -803,28 +803,42 @@ void VerifyNewIndexData(const uint8_t *NewIndexData, uint64_t NewIndexDataSize,
     for (uint64_t d = 0; d < DIR_COUNT; d++) {
         uint32_t DIR_LEN = 0;
         uint64_t DIR_FILES = 0;
-        
+
         // 读取 DIR_LEN (4B)
-        if (verify_offset + 4 > NewIndexDataSize) { goto dir_map_error; }
+        if (verify_offset + 4 > NewIndexDataSize)
+        {
+            printf("🚨 错误：DirMap 中 DIR_LEN 读取异常。\n");
+            goto dir_map_error;
+        }
         memcpy(&DIR_LEN, NewIndexData + verify_offset, 4);
         verify_offset += 4;
 
         // 读取 DIR_NAME (DIR_LEN B) 并打印
-        if (verify_offset + DIR_LEN > NewIndexDataSize) { goto dir_map_error; }
-        if (DIR_LEN > 0) {
+        if (verify_offset + DIR_LEN > NewIndexDataSize)
+        {
+            printf("🚨 错误：DirMap 中 DIR_NAME 读取异常。\n");
+            goto dir_map_error;
+        }
+        if (DIR_LEN > 0)
+        {
             // 将目录名复制到临时缓冲区并确保以 null 终止
             size_t copy_len = (DIR_LEN < sizeof(temp_buffer) - 1) ? DIR_LEN : sizeof(temp_buffer) - 1;
             memcpy(temp_buffer, NewIndexData + verify_offset, copy_len);
-            temp_buffer[copy_len] = '\0'; 
-        } else {
+            temp_buffer[copy_len] = '\0';
+        }
+        else
+        {
             temp_buffer[0] = '\0';
         }
         verify_offset += DIR_LEN; 
         const char *DIR_NAME = temp_buffer;
 
-
         // 读取 DIR_FILES (8B)
-        if (verify_offset + 8 > NewIndexDataSize) { goto dir_map_error; }
+        if (verify_offset + 8 > NewIndexDataSize)
+        {
+            printf("🚨 错误：DirMap 中 DIR_FILES 读取异常。\n");
+            goto dir_map_error;
+        }
         memcpy(&DIR_FILES, NewIndexData + verify_offset, 8);
         verify_offset += 8;
         
@@ -1237,6 +1251,8 @@ int main() {
     uint64_t dir_map_src_size = src_0.DirStartOffset - src_data.DirMapStartOffset;
     write_data(NewIndexData, &NewIndexDataSize, src_data.OriginalIndexData + src_data.DirMapStartOffset, dir_map_src_size);
     // 然后写入 新实例 的文件夹 Directory Map 
+    ni0->dir_map.dir_files=2; // 手动更新文件数量 DEBUG
+    SerializeDirMap(&ni0->dir_map);
     write_data(NewIndexData, &NewIndexDataSize, ni0->dir_map.dir_bin_head, ni0->dir_map.dir_bin_head_size);
     // 最后写入 两个新实例 计算生成的 文件 Directory Map 
     write_data(NewIndexData, &NewIndexDataSize, ni0->dir_map.dir_bin_body, ni0->dir_map.dir_bin_body_size);
