@@ -693,32 +693,21 @@ void VerifyNewIndexData(const uint8_t *NewIndexData, uint64_t NewIndexDataSize,
     // 临时缓冲区用于存储和打印目录名和文件名
     char temp_buffer[1024] = {0};
 
-    // 假设索引头（MountPoint + NumOfEntry）是正确的，直接跳过
+    // 索引头（MountPoint + NumOfEntry）是正确的，直接跳过
     uint64_t verify_offset = 0;
     
     // 1. 跳过 MountPoint (从 NewIndexData 头部开始读取)
     uint32_t MountPointLength;
-    if (verify_offset + 4 > NewIndexDataSize) {
-        printf("🚨 致命错误：数据大小不足以读取 MountPointLength\n");
-        return;
-    }
+
     memcpy(&MountPointLength, NewIndexData + verify_offset, 4);
     verify_offset += 4;
     
-    if (verify_offset + MountPointLength > NewIndexDataSize) {
-        printf("🚨 致命错误：数据大小不足以跳过 MountPoint (Length: %u)\n", MountPointLength);
-        return;
-    }
     // 打印 MountPoint Length
     printf("MountPoint Length: %u\n", MountPointLength);
     verify_offset += MountPointLength; // 跳过 MountPoint
     
-    // 2. 跳过 NumOfEntry
+    // 2. 打印 NumOfEntry
     uint32_t read_NumOfEntry = 0;
-    if (verify_offset + 4 > NewIndexDataSize) {
-        printf("🚨 致命错误：数据大小不足以读取 NumOfEntry\n");
-        return;
-    }
     memcpy(&read_NumOfEntry, NewIndexData + verify_offset, 4);
     verify_offset += 4; // 跳过 NumOfEntry
     
@@ -849,7 +838,11 @@ void VerifyNewIndexData(const uint8_t *NewIndexData, uint64_t NewIndexDataSize,
             uint32_t ENTRY_Index = 0;
             
             // 读取 FilenameSize (4B)
-            if (verify_offset + 4 > NewIndexDataSize) { goto dir_map_error; }
+            if (verify_offset + 4 > NewIndexDataSize) 
+            { 
+                printf("🚨 错误：DirMap 中 FilenameSize 读取异常。\n");
+                goto dir_map_error; 
+            }
             memcpy(&FilenameSize, NewIndexData + verify_offset, 4);
             verify_offset += 4;
             
@@ -858,12 +851,16 @@ void VerifyNewIndexData(const uint8_t *NewIndexData, uint64_t NewIndexDataSize,
             int raw_name_len = (raw_name_len_int > 0) ? raw_name_len_int : -raw_name_len_int * 2;
             
             if (raw_name_len < 0) {
-                 printf("🚨 错误：DirMap 中文件名长度计算异常。\n");
+                 printf("🚨 错误：DirMap 中 raw_name_len 计算异常。\n");
                  goto dir_map_error;
             }
 
             // 读取 FilenameRaw (variable B)
-            if (verify_offset + raw_name_len > NewIndexDataSize) { goto dir_map_error; }
+            if (verify_offset + raw_name_len > NewIndexDataSize)   
+            { 
+                printf("🚨 错误：DirMap 中 FilenameRaw 读取异常。\n");
+                goto dir_map_error; 
+            }
             
             char filename_utf8[1024] = {0};
             
@@ -878,10 +875,15 @@ void VerifyNewIndexData(const uint8_t *NewIndexData, uint64_t NewIndexDataSize,
                     snprintf(filename_utf8, sizeof(filename_utf8), "<UTF-16LE Conversion Failed>");
                 }
             }
-            verify_offset += raw_name_len; 
-            
+            verify_offset += raw_name_len;
+
             // 读取 ENTRY_Index (4B)
-            if (verify_offset + 4 > NewIndexDataSize) { goto dir_map_error; }
+            if (verify_offset + 4 > NewIndexDataSize)
+            {
+                printf("🚨 错误：DirMap 中 ENTRY_Index 读取异常。\n");
+                goto dir_map_error;
+            }
+
             memcpy(&ENTRY_Index, NewIndexData + verify_offset, 4);
             verify_offset += 4;
             
