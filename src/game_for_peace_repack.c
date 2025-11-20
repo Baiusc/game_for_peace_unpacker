@@ -61,39 +61,52 @@ typedef struct {
 
 // 文件路径和索引信息结构
 typedef struct {
-    int32_t FilenameSize;
-    char Filename[1024];
-    int32_t EntryIndex;
-    Entry *entry_ptr;
-    char *DirPath;
-    int32_t DirLen; // 路径长度
-    uint64_t PathIndexStart;
-    uint64_t PathIndexEnd;
-    uint64_t DirFilesPtrOffset;
-    uint64_t EntryIndexStart;
-    uint64_t EntryIndexEnd;
-    uint64_t DirStartOffset;
+    uint32_t FilenameSize; // 文件名大小（正值表示UTF-8，负值表示UTF-16）
+    char Filename[1024]; // 文件名，支持UTF-8和UTF-16
+    uint32_t EntryIndex; // 当前路径条目关联的 Entry 索引
+    Entry *entry_ptr; // 指向对应的 Entry 结构体
+    char *DirPath; // 路径
+    uint32_t DirLen; // 路径长度
+    uint64_t DirFiles; // 当前目录下的文件数量
+    uint64_t PathIndexStart; // 当前 文件 的起始偏移，以索引区开始处（挂载点）为零点
+    uint64_t PathIndexEnd; // 当前 文件 的结束偏移，以索引区开始处（挂载点）为零点
+    uint64_t DirFilesPtrOffset; // DirFiles 字段在索引区中的偏移位置，以索引区开始处（挂载点）为零点
+    uint64_t EntryIndexStart; // 当前 Entry 在索引区中的起始偏移位置，以索引区开始处（挂载点）为零点
+    uint64_t EntryIndexEnd; // 当前 Entry 在索引区中的结束偏移位置，以索引区开始处（挂载点）为零点
+    uint64_t DirStartOffset; // 当前 文件夹 的起始偏移，以索引区开始处（挂载点）为零点
 } FileInstance;
 
 // 新增：单个文件在 Directory Map 中的路径映射信息结构体
 typedef struct {
-    // 1. DirMap 全局头部信息 (ENTRIES, DIR_COUNT)
-    uint64_t global_entries;
-    uint64_t global_dir_count;
-    
-    // 2. 目录信息
-    int32_t dir_len;              // 原始目录名长度 (4B)
+
+    // 1. 目录信息(head部分，size=4+dir_len+8)
+    uint32_t dir_len;              // 原始目录名长度 (4B)
     char dir_path_raw[1024];       // 原始目录名数据 (用于精确序列化)
     uint64_t dir_files;           // 当前目录包含的文件数量 (8B)
 
-    // 3. 文件名和索引信息
-    int32_t filename_size;        // 原始文件名长度/编码标识 (4B)
+    // 2. 文件名和索引信息(body部分，size=4+filename_size+4)
+    uint32_t filename_size;        // 原始文件名长度/编码标识 (4B)
     char filename_raw[1024 * 2];  // 原始文件名数据 (用于序列化，最大支持 Unicode/UTF-16LE)
-    int32_t entry_index;          // 关联的 Entry 索引 (4B)
+    uint32_t entry_index;          // 关联的 Entry 索引 (4B)
     
-    // 序列化辅助字段
+    // 序列化辅助字段 (完整块)
     uint8_t *dir_bin;               // 序列化后的完整 DirMap Entry 数据块
     size_t dir_bin_size;             // 序列化后的数据块大小
+
+    // 序列化辅助字段 (Head/Body 分割)
+    uint8_t *dir_bin_head;          // 序列化后的 DirMap 目录信息部分
+    size_t dir_bin_head_size;        // DirMap 目录信息部分大小
+    uint8_t *dir_bin_body;          // 序列化后的 DirMap 文件条目部分
+    size_t dir_bin_body_size;        // DirMap 文件条目部分大小
+
+    // 索引偏移字段
+    uint64_t dir_start_offset;     // 当前 文件夹 的起始偏移，以索引区开始处（挂载点）为零点
+    uint64_t path_index_start;     // 当前 文件 的起始偏移，以索引区开始处（挂载点）为零点
+    uint64_t path_index_end;       // 当前 文件 的结束偏移，以索引区开始处（挂载点）为零点
+
+    // DirMap 全局头部信息 (ENTRIES, DIR_COUNT)
+    uint64_t global_entries;
+    uint64_t global_dir_count;
 } DirMapEntry;
 
 // 新实例数据结构
@@ -193,15 +206,13 @@ void print_hex_dump(const uint8_t *data, size_t size) {
     if (len > 0) printf("\n");
 }
 
-// ----------------------------------------------------------------------
 // 辅助函数：将 DirMap Entry 路径条目序列化成字节流
-// ----------------------------------------------------------------------
-// Path Entry 结构：[DirLen: 4B] + [DirPathRaw: DirLen] + [DirFiles: 8B] + 
-//                  [FilenameSize: 4B] + [FilenameRaw: variable] + [EntryIndex: 4B]
 int SerializeDirMap(DirMapEntry *dir_map) {
-    int raw_name_len = (dir_map->filename_size > 0) ? 
-                       dir_map->filename_size : 
-                       -dir_map->filename_size * 2;
+    // raw_name_len 用于处理文件名长度的负数逻辑（表示 UTF-16LE 编码）
+    int raw_name_len_int = (int32_t)dir_map->filename_size;
+    int raw_name_len = (raw_name_len_int > 0) ? 
+                       raw_name_len_int : 
+                       -raw_name_len_int * 2;
     
     // 检查是否有文件名数据需要序列化
     if (raw_name_len < 0) {
@@ -209,47 +220,101 @@ int SerializeDirMap(DirMapEntry *dir_map) {
         return -1;
     }
     
-    // 整体数据块大小计算：
-    // (4B: dir_len) + (dir_len: dir_path_raw) + (8B: dir_files) +
-    // (4B: filename_size) + (raw_name_len: filename_raw) + (4B: entry_index)
-    dir_map->dir_bin_size = sizeof(int32_t) + dir_map->dir_len + sizeof(uint64_t) + 
-                            sizeof(int32_t) + raw_name_len + sizeof(int32_t);
+    // --- 1. 计算 Head 和 Body 的大小并赋值 ---
     
+    // Head Size: [DirLen: 4B] + [DirPathRaw: DirLen] + [DirFiles: 8B]
+    dir_map->dir_bin_head_size = sizeof(uint32_t) + dir_map->dir_len + sizeof(uint64_t);
+
+    // Body Size: [FilenameSize: 4B] + [FilenameRaw: variable] + [EntryIndex: 4B]
+    dir_map->dir_bin_body_size = sizeof(uint32_t) + raw_name_len + sizeof(uint32_t);
+
+    // 整体数据块大小
+    dir_map->dir_bin_size = dir_map->dir_bin_head_size + dir_map->dir_bin_body_size;
+    
+    // --- 2. 内存分配 ---
+    // 为三个数据块分配内存
     dir_map->dir_bin = (uint8_t*)malloc(dir_map->dir_bin_size);
-    if (!dir_map->dir_bin) {
-        fprintf(stderr, "Failed to allocate memory for DirMap serialization.\n");
+    dir_map->dir_bin_head = (uint8_t*)malloc(dir_map->dir_bin_head_size);
+    dir_map->dir_bin_body = (uint8_t*)malloc(dir_map->dir_bin_body_size);
+
+    if (!dir_map->dir_bin || !dir_map->dir_bin_head || !dir_map->dir_bin_body) {
+        fprintf(stderr, "Failed to allocate memory for DirMap serialization parts.\n");
+        // 清理已分配的内存
+        if (dir_map->dir_bin) free(dir_map->dir_bin);
+        if (dir_map->dir_bin_head) free(dir_map->dir_bin_head);
+        if (dir_map->dir_bin_body) free(dir_map->dir_bin_body);
+        dir_map->dir_bin = NULL;
+        dir_map->dir_bin_head = NULL;
+        dir_map->dir_bin_body = NULL;
+        // 重置大小字段
+        dir_map->dir_bin_size = dir_map->dir_bin_head_size = dir_map->dir_bin_body_size = 0;
         return -1;
     }
     
-    uint64_t current_offset = 0;
+    uint64_t current_offset_total = 0;
+    uint64_t current_offset_head = 0;
+    uint64_t current_offset_body = 0;
     
-    // --- 写入目录信息 (Directory Node 部分) ---
+    // --- 3. 写入 Head 部分 (目录信息) 到 dir_bin_head ---
     
     // 1. 写入 dir_len (4B)
-    write_data(dir_map->dir_bin, &current_offset, &dir_map->dir_len, sizeof(int32_t));
+    write_data(dir_map->dir_bin_head, &current_offset_head, &dir_map->dir_len, sizeof(uint32_t));
     
     // 2. 写入 dir_path_raw (variable)
-    write_data(dir_map->dir_bin, &current_offset, dir_map->dir_path_raw, dir_map->dir_len);
+    write_data(dir_map->dir_bin_head, &current_offset_head, dir_map->dir_path_raw, dir_map->dir_len);
     
     // 3. 写入 dir_files (8B)
-    write_data(dir_map->dir_bin, &current_offset, &dir_map->dir_files, sizeof(uint64_t));
+    write_data(dir_map->dir_bin_head, &current_offset_head, &dir_map->dir_files, sizeof(uint64_t));
 
-    // --- 写入文件条目信息 (File Path Entry 部分) ---
+    // 检查 Head 大小是否匹配
+    if (current_offset_head != dir_map->dir_bin_head_size) {
+        fprintf(stderr, "Serialization size mismatch for DirMap Head. Expected %zu, got %llu.\n",
+                dir_map->dir_bin_head_size, (unsigned long long)current_offset_head);
+        // 清理所有分配的内存
+        if (dir_map->dir_bin) free(dir_map->dir_bin);
+        if (dir_map->dir_bin_head) free(dir_map->dir_bin_head);
+        if (dir_map->dir_bin_body) free(dir_map->dir_bin_body);
+        return -1;
+    }
+
+    // --- 4. 写入 Body 部分 (文件条目信息) 到 dir_bin_body ---
 
     // 4. 写入 filename_size (4B)
-    write_data(dir_map->dir_bin, &current_offset, &dir_map->filename_size, sizeof(int32_t));
+    write_data(dir_map->dir_bin_body, &current_offset_body, &dir_map->filename_size, sizeof(uint32_t));
     
     // 5. 写入 filename_raw (variable)
-    write_data(dir_map->dir_bin, &current_offset, dir_map->filename_raw, raw_name_len);
+    write_data(dir_map->dir_bin_body, &current_offset_body, dir_map->filename_raw, raw_name_len);
     
     // 6. 写入 entry_index (4B)
-    write_data(dir_map->dir_bin, &current_offset, &dir_map->entry_index, sizeof(int32_t));
+    write_data(dir_map->dir_bin_body, &current_offset_body, &dir_map->entry_index, sizeof(uint32_t));
     
-    if (current_offset != dir_map->dir_bin_size) {
-        fprintf(stderr, "Serialization size mismatch for DirMap Entry. Expected %zu, got %llu.\n",
-                dir_map->dir_bin_size, (unsigned long long)current_offset);
-        free(dir_map->dir_bin);
-        dir_map->dir_bin = NULL;
+    // 检查 Body 大小是否匹配
+    if (current_offset_body != dir_map->dir_bin_body_size) {
+        fprintf(stderr, "Serialization size mismatch for DirMap Body. Expected %zu, got %llu.\n",
+                dir_map->dir_bin_body_size, (unsigned long long)current_offset_body);
+        // 清理所有分配的内存
+        if (dir_map->dir_bin) free(dir_map->dir_bin);
+        if (dir_map->dir_bin_head) free(dir_map->dir_bin_head);
+        if (dir_map->dir_bin_body) free(dir_map->dir_bin_body);
+        return -1;
+    }
+    
+    // --- 5. 拼接完整数据块 dir_bin ---
+    
+    // 写入 Head
+    write_data(dir_map->dir_bin, &current_offset_total, dir_map->dir_bin_head, dir_map->dir_bin_head_size);
+    
+    // 写入 Body
+    write_data(dir_map->dir_bin, &current_offset_total, dir_map->dir_bin_body, dir_map->dir_bin_body_size);
+    
+    // 检查 Total 大小是否匹配
+    if (current_offset_total != dir_map->dir_bin_size) {
+        fprintf(stderr, "Serialization size mismatch for DirMap Total. Expected %zu, got %llu.\n",
+                dir_map->dir_bin_size, (unsigned long long)current_offset_total);
+        // 清理所有分配的内存
+        if (dir_map->dir_bin) free(dir_map->dir_bin);
+        if (dir_map->dir_bin_head) free(dir_map->dir_bin_head);
+        if (dir_map->dir_bin_body) free(dir_map->dir_bin_body);
         return -1;
     }
     
@@ -272,18 +337,15 @@ int computeDirMap(const PakIndexData *pak_data, const FileInstance *inst, NewIns
     strncpy(dm->dir_path_raw, inst->DirPath, inst->DirLen);
     dm->dir_path_raw[inst->DirLen] = '\0'; 
     
-    // 3. 读取当前目录下的文件数量 (DirFiles)
-    uint8_t *dir_files_ptr = pak_data->OriginalIndexData + inst->DirFilesPtrOffset;
-    if (inst->DirFilesPtrOffset + 8 <= pak_data->OriginalIndexSize) {
-        memcpy(&dm->dir_files, dir_files_ptr, 8);
-    } else {
-        fprintf(stderr, "Error: DirFiles data read out of bounds.\n");
-        return -1;
-    }
+    // 3.填充当前目录下的文件数量 (DirFiles)
+    dm->dir_files = inst->DirFiles;
 
     // 4. 填充文件名和关联索引信息
     dm->filename_size = inst->FilenameSize;
     dm->entry_index = inst->EntryIndex;
+    dm->dir_start_offset = inst->DirStartOffset;
+    dm->path_index_start = inst->PathIndexStart;
+    dm->path_index_end = inst->PathIndexEnd;
 
     // 5. 提取 FilenameRaw 字段
     uint8_t *raw_path_ptr = pak_data->OriginalIndexData + inst->PathIndexStart;
@@ -552,6 +614,7 @@ int ParsePakIndex(int PakFileDescriptor, PakIndexData *Result) {
             strncpy(inst->Filename, FilenameBuffer, 1024);
             inst->DirLen = DIR_LEN;
             inst->DirPath = strdup(DIR_NAME);
+            inst->DirFiles = DIR_FILES;
             inst->DirFilesPtrOffset = dir_files_offset;
             inst->PathIndexStart = path_start_offset;
             inst->PathIndexEnd = path_end_offset;
@@ -621,33 +684,56 @@ uint64_t find_last_file_offset(PakIndexData *data, uint64_t *out_size) {
 
 // ----------------------------------------------------------------------
 // 调试辅助函数：验证内存中的新索引数据
+// 注意: 此函数需要访问全局的 unicode_to_utf8 函数定义
 // ----------------------------------------------------------------------
 void VerifyNewIndexData(const uint8_t *NewIndexData, uint64_t NewIndexDataSize, 
                         uint32_t NumOfEntry, uint64_t offset_add) {
     printf("\n\n--- 🌟 调试验证：解析内存中的新索引数据 🌟 ---\n");
     
+    // 临时缓冲区用于存储和打印目录名和文件名
+    char temp_buffer[1024] = {0};
+
     // 假设索引头（MountPoint + NumOfEntry）是正确的，直接跳过
     uint64_t verify_offset = 0;
     
     // 1. 跳过 MountPoint (从 NewIndexData 头部开始读取)
     uint32_t MountPointLength;
+    if (verify_offset + 4 > NewIndexDataSize) {
+        printf("🚨 致命错误：数据大小不足以读取 MountPointLength\n");
+        return;
+    }
     memcpy(&MountPointLength, NewIndexData + verify_offset, 4);
-    verify_offset += 4 + MountPointLength; // 跳过 MountPointLength + MountPoint
+    verify_offset += 4;
+    
+    if (verify_offset + MountPointLength > NewIndexDataSize) {
+        printf("🚨 致命错误：数据大小不足以跳过 MountPoint (Length: %u)\n", MountPointLength);
+        return;
+    }
+    // 打印 MountPoint Length
+    printf("MountPoint Length: %u\n", MountPointLength);
+    verify_offset += MountPointLength; // 跳过 MountPoint
     
     // 2. 跳过 NumOfEntry
-    uint32_t read_NumOfEntry;
+    uint32_t read_NumOfEntry = 0;
+    if (verify_offset + 4 > NewIndexDataSize) {
+        printf("🚨 致命错误：数据大小不足以读取 NumOfEntry\n");
+        return;
+    }
     memcpy(&read_NumOfEntry, NewIndexData + verify_offset, 4);
     verify_offset += 4; // 跳过 NumOfEntry
     
     if (read_NumOfEntry != NumOfEntry) {
-        printf("🚨 致命错误：验证时发现 Entry 数量不匹配！\n");
-        return;
+        printf("🚨 致命错误：验证时发现 Entry 数量不匹配！ (预期: %u, 读取: %u)\n", NumOfEntry, read_NumOfEntry);
+    } else {
+        printf("Entry 数量: %u (匹配)\n", read_NumOfEntry);
     }
 
-    printf("Entry 数量: %u\n", read_NumOfEntry);
-    
-    // 3. 遍历并验证 Entry 列表
+    // 3. 遍历并验证 Entry 列表的字节流 (保持不变，用于定位 DirMap 起始位置)
     for (uint32_t i = 0; i < read_NumOfEntry; i++) {
+        if(i>=158)
+        {
+            int debug_break=1;
+        }
         // Entry 结构体字段（只关注 FileHash 和 FileOffset）
         uint8_t FileHash[20];
         uint64_t FileOffset;
@@ -674,41 +760,149 @@ void VerifyNewIndexData(const uint8_t *NewIndexData, uint64_t NewIndexDataSize,
         memcpy(&CompressionMethod, NewIndexData + verify_offset, 4);
         verify_offset += 4;
         
-        printf("--- Entry #%u ---\n", i);
-        printf("  FileHash (DEBUG): %02x%02x... (期望 0xDE)\n", FileHash[0], FileHash[1]);
-        printf("  FileOffset: 0x%llx\n", FileOffset);
+        // --- 精简打印，仅在关键位置打印，避免日志过长 ---
+        if (i < 3 || i >= read_NumOfEntry - 3) {
+            printf("--- Entry #%u ---\n", i);
+            printf("  FileHash: %02x%02x...%02x\n", FileHash[0], FileHash[1], FileHash[19]);
+            printf("  FileOffset: 0x%llx\n", (unsigned long long)FileOffset);
+        }
         
         // 跳过剩余的固定字段 (CompressedLength: 8B, Dummy: 21B)
+        if (verify_offset + 8 + 21 > NewIndexDataSize) break;
         verify_offset += 8 + 21; 
 
         // 处理 NumOfBlocks 和 Blocks Data
         if (CompressionMethod != 0) {
-            uint32_t NumOfBlocks;
+            uint32_t NumOfBlocks = 0;
             if (verify_offset + 4 > NewIndexDataSize) break;
             memcpy(&NumOfBlocks, NewIndexData + verify_offset, 4);
             verify_offset += 4;
             
             // 跳过所有 CompressionBlock (NumOfBlocks * 16 字节)
-            verify_offset += NumOfBlocks * 16;
+            uint64_t blocks_size = (uint64_t)NumOfBlocks * 16;
+            if (verify_offset + blocks_size > NewIndexDataSize) break;
+            verify_offset += blocks_size;
         }
 
         // 跳过 CompressedBlockSize (4B) 和 Encrypted (1B)
+        if (verify_offset + 4 + 1 > NewIndexDataSize) break;
         verify_offset += 4 + 1;
+    }
+    
+    printf("--- Entry 列表验证完成。当前偏移 (DirMapStart): 0x%llx ---\n", (unsigned long long)verify_offset);
+
+    // 4. 验证 Directory Map
+    printf("\n--- 🌐 验证 Directory Map 结构 (打印目录和文件名) ---\n");
+    
+    // 4.1. 读取全局头部 (ENTRIES, DIR_COUNT)
+    uint64_t ENTRIES = 0;
+    uint64_t DIR_COUNT = 0;
+    
+    if (verify_offset + 8 > NewIndexDataSize) { goto dir_map_error; }
+    memcpy(&ENTRIES, NewIndexData + verify_offset, 8);
+    verify_offset += 8;
+
+    if (verify_offset + 8 > NewIndexDataSize) { goto dir_map_error; }
+    memcpy(&DIR_COUNT, NewIndexData + verify_offset, 8);
+    verify_offset += 8;
+    
+    printf("  全局 ENTRIES: %llu, DIR_COUNT: %llu\n", (unsigned long long)ENTRIES, (unsigned long long)DIR_COUNT);
+
+    uint64_t total_files_verified = 0;
+    
+    // 4.2. 遍历并验证目录和文件条目
+    for (uint64_t d = 0; d < DIR_COUNT; d++) {
+        uint32_t DIR_LEN = 0;
+        uint64_t DIR_FILES = 0;
         
-        // 打印验证结果（检查偏移量是否被正确修正）
-        if (i >= NumOfEntry - 2) {
-             printf("  **类型:** 被替换/尾部\n");
-        } else if (i > NumOfEntry - 3 && NumOfEntry >= 3) {
-             // 倒数第三个，应该被修正
-             printf("  **类型:** 修正检查 (应包含 +0x%llx)\n", offset_add);
+        // 读取 DIR_LEN (4B)
+        if (verify_offset + 4 > NewIndexDataSize) { goto dir_map_error; }
+        memcpy(&DIR_LEN, NewIndexData + verify_offset, 4);
+        verify_offset += 4;
+
+        // 读取 DIR_NAME (DIR_LEN B) 并打印
+        if (verify_offset + DIR_LEN > NewIndexDataSize) { goto dir_map_error; }
+        if (DIR_LEN > 0) {
+            // 将目录名复制到临时缓冲区并确保以 null 终止
+            size_t copy_len = (DIR_LEN < sizeof(temp_buffer) - 1) ? DIR_LEN : sizeof(temp_buffer) - 1;
+            memcpy(temp_buffer, NewIndexData + verify_offset, copy_len);
+            temp_buffer[copy_len] = '\0'; 
+        } else {
+            temp_buffer[0] = '\0';
+        }
+        verify_offset += DIR_LEN; 
+        const char *DIR_NAME = temp_buffer;
+
+
+        // 读取 DIR_FILES (8B)
+        if (verify_offset + 8 > NewIndexDataSize) { goto dir_map_error; }
+        memcpy(&DIR_FILES, NewIndexData + verify_offset, 8);
+        verify_offset += 8;
+        
+        printf("  - 目录 #%llu: LEN=%u, FILES=%llu, NAME='%s'\n", 
+               (unsigned long long)d, DIR_LEN, (unsigned long long)DIR_FILES, DIR_NAME);
+
+
+        // 遍历当前目录下的所有文件 (File Path Entry Body 部分)
+        for (uint64_t f = 0; f < DIR_FILES; f++) {
+            uint32_t FilenameSize = 0;
+            uint32_t ENTRY_Index = 0;
+            
+            // 读取 FilenameSize (4B)
+            if (verify_offset + 4 > NewIndexDataSize) { goto dir_map_error; }
+            memcpy(&FilenameSize, NewIndexData + verify_offset, 4);
+            verify_offset += 4;
+            
+            // 计算 FilenameRaw 的长度
+            int raw_name_len_int = (int32_t)FilenameSize;
+            int raw_name_len = (raw_name_len_int > 0) ? raw_name_len_int : -raw_name_len_int * 2;
+            
+            if (raw_name_len < 0) {
+                 printf("🚨 错误：DirMap 中文件名长度计算异常。\n");
+                 goto dir_map_error;
+            }
+
+            // 读取 FilenameRaw (variable B)
+            if (verify_offset + raw_name_len > NewIndexDataSize) { goto dir_map_error; }
+            
+            char filename_utf8[1024] = {0};
+            
+            if (FilenameSize > 0) {
+                // ASCII 或 UTF-8
+                size_t copy_len = (raw_name_len < sizeof(filename_utf8) - 1) ? raw_name_len : sizeof(filename_utf8) - 1;
+                memcpy(filename_utf8, NewIndexData + verify_offset, copy_len);
+                filename_utf8[copy_len] = '\0';
+            } else if (FilenameSize < 0) {
+                // UTF-16LE, 假设 unicode_to_utf8 可用
+                if (unicode_to_utf8(NewIndexData + verify_offset, raw_name_len, filename_utf8, sizeof(filename_utf8)) == -1) {
+                    snprintf(filename_utf8, sizeof(filename_utf8), "<UTF-16LE Conversion Failed>");
+                }
+            }
+            verify_offset += raw_name_len; 
+            
+            // 读取 ENTRY_Index (4B)
+            if (verify_offset + 4 > NewIndexDataSize) { goto dir_map_error; }
+            memcpy(&ENTRY_Index, NewIndexData + verify_offset, 4);
+            verify_offset += 4;
+            
+            total_files_verified++;
+            
+            // 打印文件条目信息 (只打印前几个和后几个)
+            if (total_files_verified < 5 || total_files_verified > (total_files_verified - 5)) { // 粗略打印前几个和后几个
+                 printf("    -> 文件 #%llu: RawSize=%d, ENTRY=%u, NAME='%s'\n", 
+                        (unsigned long long)f, FilenameSize, ENTRY_Index, filename_utf8);
+            }
         }
     }
+    
+    printf("  DirMap 结构验证成功。总共验证文件条目: %llu\n", (unsigned long long)total_files_verified);
+    printf("--- 调试验证完成 ---\n");
+    return;
+
+dir_map_error:
+    printf("🚨 致命错误：DirMap 结构验证失败，在偏移 0x%llx 处数据大小不足或结构异常。\n", (unsigned long long)verify_offset);
     printf("--- 调试验证完成 ---\n");
 }
-// ----------------------------------------------------------------------
-// main 函数
-// ----------------------------------------------------------------------
-
 int main() {
     // 定义源 PAK 文件和包含新数据的 PAK 文件路径
     const char *SRC_PAK_PATH = "../paks/game_patch_1.33.12.14383原厂（复件）.pak";
@@ -1033,11 +1227,19 @@ int main() {
         write_data(NewIndexData, &NewIndexDataSize, &e->Encrypted, 1);
     }
 
-    // 4.3. 写入 Directory Map
-    uint64_t dir_map_size = src_data.DirMapEndOffset - src_data.DirMapStartOffset;
-    write_data(NewIndexData, &NewIndexDataSize, src_data.OriginalIndexData + src_data.DirMapStartOffset, dir_map_size);
+    // 4.3. 更新并写入 Directory Map
 
-    // 在写入文件之前，先验证我们内存中构造的新索引数据
+    // 先写入 原始 的 Directory Map 数据
+    FileInstance src_0 =  src_data.AllFileInstances[src_data.NumOfEntry-2];
+    FileInstance src_1 =  src_data.AllFileInstances[src_data.NumOfEntry-1];
+    uint64_t dir_map_src_size = src_0.DirStartOffset - src_data.DirMapStartOffset;
+    write_data(NewIndexData, &NewIndexDataSize, src_data.OriginalIndexData + src_data.DirMapStartOffset, dir_map_src_size);
+    // 然后写入 新实例 的文件夹 Directory Map 
+    write_data(NewIndexData, &NewIndexDataSize, ni0->dir_map.dir_bin_head, ni0->dir_map.dir_bin_head_size);
+    // 最后写入 两个新实例 计算生成的 文件 Directory Map 
+    write_data(NewIndexData, &NewIndexDataSize, ni0->dir_map.dir_bin_body, ni0->dir_map.dir_bin_body_size);
+    write_data(NewIndexData, &NewIndexDataSize, ni1->dir_map.dir_bin_body, ni1->dir_map.dir_bin_body_size);
+    // 在写入文件之前，先打印验证我们在内存中构造的新索引数据
     VerifyNewIndexData(NewIndexData, NewIndexDataSize, src_data.NumOfEntry, offset_add);
 
     // 4.4. 将新索引数据写入 NEW_PAK 文件
