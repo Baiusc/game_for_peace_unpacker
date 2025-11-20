@@ -577,6 +577,10 @@ int ParsePakIndex(int PakFileDescriptor, PakIndexData *Result) {
 
     // 遍历所有目录
     for (uint64_t dir_idx = 0; dir_idx < DIR_COUNT; dir_idx++) {
+        if(dir_idx == 158)
+        {
+            int debug = 1; // DEBUG
+        }
         uint64_t dir_start_offset = current_index_offset;
         int32_t DIR_LEN; char DIR_NAME[1024]; uint64_t DIR_FILES;
 
@@ -1248,15 +1252,22 @@ int main() {
     // 先写入 原始 的 Directory Map 数据
     FileInstance src_0 =  src_data.AllFileInstances[src_data.NumOfEntry-2];
     FileInstance src_1 =  src_data.AllFileInstances[src_data.NumOfEntry-1];
-    uint64_t dir_map_src_size = src_0.DirStartOffset - src_data.DirMapStartOffset;
-    write_data(NewIndexData, &NewIndexDataSize, src_data.OriginalIndexData + src_data.DirMapStartOffset, dir_map_src_size);
+    uint64_t src_front_size = src_0.DirStartOffset - src_data.DirMapStartOffset; // 上文长度
+    uint64_t src_0_head_size = src_0.PathIndexStart - src_0.DirStartOffset; // 本文的头长度
+    uint64_t src_0_body_size = src_0.PathIndexEnd - src_0.PathIndexStart;// 本文0的身长度
+    uint64_t src_1_body_size = src_1.PathIndexEnd - src_1.PathIndexStart;// 本文1的身长度
+    uint64_t src_back_size = src_data.DirMapEndOffset -src_1.PathIndexEnd ; // 下文长度
+
+    write_data(NewIndexData, &NewIndexDataSize, src_data.OriginalIndexData + src_data.DirMapStartOffset, src_front_size);
     // 然后写入 新实例 的文件夹 Directory Map 
     ni0->dir_map.dir_files=2; // 手动更新文件数量 DEBUG
     SerializeDirMap(&ni0->dir_map);
     write_data(NewIndexData, &NewIndexDataSize, ni0->dir_map.dir_bin_head, ni0->dir_map.dir_bin_head_size);
-    // 最后写入 两个新实例 计算生成的 文件 Directory Map 
+    // 写入 两个新实例 计算生成的 文件 Directory Map 
     write_data(NewIndexData, &NewIndexDataSize, ni0->dir_map.dir_bin_body, ni0->dir_map.dir_bin_body_size);
     write_data(NewIndexData, &NewIndexDataSize, ni1->dir_map.dir_bin_body, ni1->dir_map.dir_bin_body_size);
+    // 最后写入剩下的原始内容（最后一个空路径）
+    write_data(NewIndexData, &NewIndexDataSize, src_data.OriginalIndexData + src_1.PathIndexEnd , src_back_size);
     // 在写入文件之前，先打印验证我们在内存中构造的新索引数据
     VerifyNewIndexData(NewIndexData, NewIndexDataSize, src_data.NumOfEntry, offset_add);
 
