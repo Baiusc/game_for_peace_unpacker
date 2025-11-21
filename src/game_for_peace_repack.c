@@ -723,7 +723,7 @@ void VerifyNewIndexData(const uint8_t *NewIndexData, uint64_t NewIndexDataSize,
 
     // 3. 遍历并验证 Entry 列表的字节流 (保持不变，用于定位 DirMap 起始位置)
     for (uint32_t i = 0; i < read_NumOfEntry; i++) {
-        if(i>=158)
+        if(i>=429)
         {
             int debug_break=1;
         }
@@ -754,10 +754,14 @@ void VerifyNewIndexData(const uint8_t *NewIndexData, uint64_t NewIndexDataSize,
         verify_offset += 4;
         
         // --- 精简打印，仅在关键位置打印，避免日志过长 ---
-        if (i < 3 || i >= read_NumOfEntry - 3) {
+        if (i < 5 || i >= read_NumOfEntry - 5) {
             printf("--- Entry #%u ---\n", i);
             printf("  FileHash: %02x%02x...%02x\n", FileHash[0], FileHash[1], FileHash[19]);
             printf("  FileOffset: 0x%llx\n", (unsigned long long)FileOffset);
+            // >>> 新增：打印 FileSize
+            printf("  FileSize: %llu bytes (0x%llx)\n", 
+                   (unsigned long long)FileSize, 
+                   (unsigned long long)FileSize);
         }
         
         // 跳过剩余的固定字段 (CompressedLength: 8B, Dummy: 21B)
@@ -927,7 +931,7 @@ int main() {
     // 定义源 PAK 文件和包含新数据的 PAK 文件路径
     const char *SRC_PAK_PATH = "../paks/game_patch_1.33.12.14383原厂（复件）.pak";
     const char *MY_PAK_PATH = "../paks/map_lobby_1.33.12.14210原厂（复件）.pak";
-    const char *NEW_PAK_PATH = "../paks/game_patch_1.33.12.14383魔改.pak"; // 🌟 新增：生成的新文件路径
+    const char *NEW_PAK_PATH = "../paks/game_patch_1.33.12.14383万能范围原厂.pak"; // 🌟 新增：生成的新文件路径
 
     // 定义要替换的旧文件实例的索引（我们假设要替换最后两个 Entry Index）
     int old_entry_indices[2] = {-1, -1};
@@ -1261,7 +1265,10 @@ int main() {
     write_data(NewIndexData, &NewIndexDataSize, src_data.OriginalIndexData + src_data.DirMapStartOffset, src_front_size);
     // 然后写入 新实例 的文件夹 Directory Map 
     ni0->dir_map.dir_files=2; // 手动更新文件数量 DEBUG
+    ni0->dir_map.entry_index = src_0.EntryIndex; // 更新实体索引
+    ni1->dir_map.entry_index = src_1.EntryIndex; //  更新实体索引
     SerializeDirMap(&ni0->dir_map);
+    SerializeDirMap(&ni1->dir_map);
     write_data(NewIndexData, &NewIndexDataSize, ni0->dir_map.dir_bin_head, ni0->dir_map.dir_bin_head_size);
     // 写入 两个新实例 计算生成的 文件 Directory Map 
     write_data(NewIndexData, &NewIndexDataSize, ni0->dir_map.dir_bin_body, ni0->dir_map.dir_bin_body_size);

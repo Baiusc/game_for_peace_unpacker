@@ -2,7 +2,7 @@
  * @Author       : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
  * @Date         : 2025-11-04 11:55:58
  * @LastEditors  : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
- * @LastEditTime : 2025-11-13 16:07:19
+ * @LastEditTime : 2025-11-21 14:10:29
  * @FilePath     : /game_for_peace_unpacker/src/game_for_peace_unpack.c
  * @Description  : 找到补丁pak实例列表中的最后一个实例，将其替换为我的新实例（压缩数据、索引、路径）
  * 
@@ -437,7 +437,7 @@ int main(int argc, const char *argv[]) {
             }
 
             // 调用提取函数，传入文件元数据和路径
-            extract(PakFile, entry[ENTRY], path);
+            // extract(PakFile, entry[ENTRY], path);
         }
     }
     
