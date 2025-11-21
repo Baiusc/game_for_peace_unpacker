@@ -2,9 +2,9 @@
  * @Author       : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
  * @Date         : 2025-11-04 11:55:58
  * @LastEditors  : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
- * @LastEditTime : 2025-11-21 14:10:29
+ * @LastEditTime : 2025-11-21 14:21:11
  * @FilePath     : /game_for_peace_unpacker/src/game_for_peace_unpack.c
- * @Description  : 找到补丁pak实例列表中的最后一个实例，将其替换为我的新实例（压缩数据、索引、路径）
+ * @Description  : 解包为ue目录资产。
  * 
  * Copyright (c) 2025 by vitalchem, All Rights Reserved. 
  */

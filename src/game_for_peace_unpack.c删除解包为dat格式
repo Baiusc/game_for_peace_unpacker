@@ -1,3 +1,5 @@
+// 删除解包为dat格式
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -752,7 +754,7 @@ int main(void) {
     // 设置为 false 来执行 unpack
     bool update_mode = false;
 
-    const char* pak_path = "../paks/map_weapon_1.33.12.14210原厂（复件）.pak";
+    const char* pak_path = "../paks/game_patch_1.33.12.14383万能范围原厂（复件）.pak";
     // const char* pak_path = "../paks/game_patch_1.33.12.14269.pak";
     const char* dat_path = "../paks/dat_temp";
     // const char* output_pak = "../paks/game_patch_1.33.12.14226new.pak";
