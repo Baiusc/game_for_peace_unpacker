@@ -361,6 +361,71 @@ int computeDirMap(const PakIndexData *pak_data, const FileInstance *inst, NewIns
     // 6. 序列化 DirMap Entry 路径条目部分
     return SerializeDirMap(dm);
 }
+void DebugPrintHexFromBuffer(const void *buf, size_t len, const char *label) {
+    printf("--- DEBUG: Hex dump of %s (size=%zu) ---\n", label, len);
+    const uint8_t *data = (const uint8_t *)buf;
+    for (size_t i = 0; i < len; i++) {
+        if (i % 16 == 0 && i != 0) printf("\n");
+        printf("%02x ", data[i]);
+    }
+    printf("\n--- END ---\n\n");
+}
+// 新增辅助函数：模拟反序列化并打印头部数据
+void DebugDeserializeAndPrintHead(uint8_t *head_data, size_t head_size, const char *instance_name) {
+    if (head_size != 94) {
+        printf("DEBUG: Head size is not 94 bytes. Skipping print.\n");
+        return;
+    }
+    
+    printf("\n--- DEBUG: Verifying Head Data for %s ---\n", instance_name);
+    
+    uint8_t *ptr = head_data;
+    
+    // 1. FileHash (20B)
+    uint8_t file_hash[20];
+    memcpy(file_hash, ptr, 20); ptr += 20;
+    printf("  FileHash: %02x%02x...%02x\n", file_hash[0], file_hash[1], file_hash[19]);
+    
+    // 2. FileOffset (8B)
+    uint64_t file_offset;
+    memcpy(&file_offset, ptr, 8); ptr += 8;
+    printf("  FileOffset: 0x%llx\n", (unsigned long long)file_offset);
+    
+    // 3. FileSize (8B)
+    uint64_t file_size;
+    memcpy(&file_size, ptr, 8); ptr += 8;
+    printf("  FileSize: %llu (0x%llx)\n", (unsigned long long)file_size, (unsigned long long)file_size);
+    
+    // 4. CompressionMethod (4B)
+    uint32_t comp_method;
+    memcpy(&comp_method, ptr, 4); ptr += 4;
+    printf("  CompressionMethod: %u\n", comp_method);
+    
+    // 5. CompressedLength (8B)
+    uint64_t comp_length;
+    memcpy(&comp_length, ptr, 8); ptr += 8;
+    printf("  CompressedLength: %llu (0x%llx)\n", (unsigned long long)comp_length, (unsigned long long)comp_length);
+    
+    // 6. Dummy (21B) - 跳过
+    ptr += 21;
+    
+    // 7. NumOfBlocks (4B)
+    uint32_t num_of_blocks;
+    memcpy(&num_of_blocks, ptr, 4); ptr += 4;
+    printf("  NumOfBlocks: %u\n", num_of_blocks);
+
+    // 8. Compression Block Info (8B * 2 * NumOfBlocks)
+    for (uint32_t i = 0; i < num_of_blocks; i++) {
+        uint64_t start, end;
+        memcpy(&start, ptr, 8); ptr += 8;
+        memcpy(&end, ptr, 8); ptr += 8;
+        printf("  Block #%u: Start=0x%llx, End=0x%llx\n", i, (unsigned long long)start, (unsigned long long)end);
+    }
+    
+    // ... 其他字段可以省略打印 ...
+    
+    printf("---------------------------------------\n");
+}
 
 // 新增：用于将 Entry 结构体的关键字段序列化为 94 字节的头部
 void SerializeHeadData(Entry *entry, uint8_t **out_head, size_t *out_size) {
@@ -927,17 +992,82 @@ dir_map_error:
     printf("🚨 致命错误：DirMap 结构验证失败，在偏移 0x%llx 处数据大小不足或结构异常。\n", (unsigned long long)verify_offset);
     printf("--- 调试验证完成 ---\n");
 }
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <fcntl.h>   // For open
+#include <unistd.h>  // For close, read
+#include <stdint.h>  // For uint8_t
+
+// 辅助函数：以只读模式打开文件，读取开头的 94 字节并打印 16 进制
+void DebugReadFirst94Bytes(const char *file_path) {
+    int fd = -1;
+    const size_t READ_SIZE = 94;
+    uint8_t buffer[READ_SIZE];
+    
+    printf("\n--- DEBUG: Verifying first 94 bytes of new file ---\n");
+    printf("Attempting to open file: %s\n", file_path);
+
+    // 1. 以只读模式打开文件
+    // O_RDONLY: 只读模式
+    fd = open(file_path, O_RDONLY);
+    if (fd == -1) {
+        perror("DEBUG ERROR: Failed to open NewPakFile in read-only mode");
+        return;
+    }
+    
+    // 2. 读取最开头的 94 字节
+    ssize_t bytes_read = read(fd, buffer, READ_SIZE);
+    
+    // 3. 关闭文件
+    close(fd);
+
+    if (bytes_read == -1) {
+        perror("DEBUG ERROR: Failed to read from NewPakFile");
+        return;
+    }
+    
+    if ((size_t)bytes_read != READ_SIZE) {
+        fprintf(stderr, "DEBUG WARNING: Read size mismatch. Expected %zu, got %zd bytes.\n", READ_SIZE, bytes_read);
+        // 继续打印已读取的部分
+    }
+    
+    // 4. 16 进制打印
+    printf("DEBUG: Hex dump of first %zd bytes:\n", bytes_read);
+    
+    // 按 16 字节为一行打印
+    for (size_t i = 0; i < (size_t)bytes_read; i++) {
+        printf("%02x ", buffer[i]);
+        
+        // 打印空格分隔符
+        if ((i + 1) % 16 == 0) {
+            printf("\n");
+        } else if ((i + 1) % 8 == 0) {
+            printf("  "); // 8 字节间隔
+        }
+    }
+    
+    // 确保以换行结束
+    if (bytes_read > 0 && bytes_read % 16 != 0) {
+        printf("\n");
+    }
+    printf("--------------------------------------------------\n");
+}
+
 int main() {
     // 定义源 PAK 文件和包含新数据的 PAK 文件路径
-    const char *SRC_PAK_PATH = "../paks/game_patch_1.33.12.14383原厂（复件）.pak";
-    const char *MY_PAK_PATH = "../paks/map_lobby_1.33.12.14210原厂（复件）.pak";
-    const char *NEW_PAK_PATH = "../paks/game_patch_1.33.12.14383万能范围原厂.pak"; // 🌟 新增：生成的新文件路径
+    const char *SRC_PAK_PATH = "../paks/game_patch_1.33.12.14429原厂（复件）.pak";
+    const char *MY_PAK_PATH = "../paks/game_patch_1.33.12.14429原厂（复件）.pak";
+    const char *NEW_PAK_PATH = "../paks/game_patch_1.33.12.14429调试.pak"; // 🌟 新增：生成的新文件路径
 
     // 定义要替换的旧文件实例的索引（我们假设要替换最后两个 Entry Index）
     int old_entry_indices[2] = {-1, -1};
     
     // 定义要提取的新文件实例名（在 my_pak 中寻找）
-    const char *key_str_my[] = { "CH_Base_SK_PhysicsAsset.uasset", "CH_Base_SK_PhysicsAsset.uexp" };
+    // const char *key_str_my[] = { "CH_Base_SK_PhysicsAsset.uasset", "CH_Base_SK_PhysicsAsset.uexp" };
+    // const char *key_str_my[] = { "BP_Rifle_M416.uasset", "BP_Rifle_M416.uexp" };
+    const char *key_str_my[] = { "BP_UGC_ShotGun_S12K.uasset", "BP_UGC_ShotGun_S12K.uexp" };
 
     // 检查文件是否存在
     if (access(SRC_PAK_PATH, F_OK) == -1 || access(MY_PAK_PATH, F_OK) == -1) {
@@ -1097,6 +1227,8 @@ int main() {
     ni0->entry.FileOffset = current_new_offset;
     // 根据新的 entry ，构造新的  ni0->Head （size = 94）字段
     SerializeHeadData(&ni0->entry, &ni0->Head, &ni0->HeadSize); 
+    // >>> 新增：写入 ni0->Head 之前，模拟反序列化并打印 Head 数据
+    DebugDeserializeAndPrintHead(ni0->Head, ni0->HeadSize, "ni0");
     // 写入size=94的  ni0->Head
     if (write(NewPakFile, &ni0->Head, ni0->HeadSize) != ni0->HeadSize)
     {
@@ -1104,8 +1236,10 @@ int main() {
         result = 1;
         goto cleanup_buffer;
     }
+    // 改为直接打印内存中的 Head 数据：
+    DebugPrintHexFromBuffer(ni0->Head, ni0->HeadSize, "ni0");
     // 再写入size=CompressionLength的data
-        if (write(NewPakFile, ni0->Data, ni0->DataSize) != ni0->DataSize)
+    if (write(NewPakFile, ni0->Data, ni0->DataSize) != ni0->DataSize)
     {
         fprintf(stderr, "Failed to write new data block 1.\n");
         result = 1;
@@ -1128,6 +1262,8 @@ int main() {
     ni1->entry.FileOffset = current_new_offset; // 更新 Entry 结构体中的 FileOffset
     // 根据新的 entry ，构造新的  ni1->Head （size = 94）字段
     SerializeHeadData(&ni1->entry, &ni1->Head, &ni1->HeadSize);
+    // >>> 新增：写入 ni1->Head 之前，模拟反序列化并打印 Head 数据
+    DebugDeserializeAndPrintHead(ni1->Head, ni1->HeadSize, "ni1");
     // 写入size=94的  ni1->Head
     if (write(NewPakFile, &ni1->Head, ni1->HeadSize) != ni1->HeadSize)
     {
@@ -1316,9 +1452,16 @@ cleanup:
     // 清理新的索引缓存
     if (NewIndexData) free(NewIndexData);
     // 关闭文件描述符
-    if (MyPakFile != -1) close(MyPakFile);
-    if (SrcPakFile != -1) close(SrcPakFile);
-    if (NewPakFile != -1) close(NewPakFile);
-
+    if (MyPakFile != -1)
+        close(MyPakFile);
+    if (SrcPakFile != -1)
+        close(SrcPakFile);
+    if (NewPakFile != -1)
+        close(NewPakFile);
+    // =======================================================
+    // >>> 新增：调用调试函数，使用只读模式验证文件开头
+    // 假设 NEW_PAK_PATH 在此作用域内可见
+    // DebugReadFirst94Bytes(NEW_PAK_PATH);
+    // =======================================================
     return result;
 }

@@ -67,10 +67,26 @@ for I = 0 < FILES            # 循环遍历所有文件
     get ZSIZE longlong TOC_FILE  # 读取压缩后大小 8
 	getdstring DUMMY2 21 TOC_FILE # 读取21字节的填充/未知数据 21
 
-    # print "文件偏移量: 0x%OFFSET|llx%"
-    print "原始大小: %SIZE%"
-    print "压缩类型 (ZIP): %ZIP%"
-    print "压缩后大小: %ZSIZE%"
+# ========================== 替代打印逻辑 (使用 string 切片) ==========================
+    
+    # 打印哈希值 (前4字节和末4字节)
+    
+    # 1. 截取哈希值的前4个字节 (索引 0 到 3)
+    string HASH_START = HASH
+    string HASH_START = 0 3
+    
+    # 2. 截取哈希值的末4个字节 (哈希长度为 20，索引 16 到 19)
+    string HASH_END = HASH
+    string HASH_END = 16 19
+    
+    print "\n--- File Entry #%I% ---"
+    print "  Hash: %HASH_START%...%HASH_END%"
+    print "  Offset: 0x%OFFSET|X%"
+    print "  Original Size: %SIZE% bytes (0x%SIZE|X%)"
+    print "  ZIP Type: %ZIP%"
+    print "  Compressed Size: %ZSIZE% bytes (0x%ZSIZE|X%)"
+    
+    # =================================================================
 
     if OFFSET != 0               # 如果偏移量不为0，可能已到达文件列表末尾
 		print "Extraction complete!" # 打印完成信息并退出

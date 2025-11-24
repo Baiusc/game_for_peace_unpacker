@@ -2,7 +2,7 @@
 Author       : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
 Date         : 2025-08-21 10:10:50
 LastEditors  : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
-LastEditTime : 2025-11-21 13:56:34
+LastEditTime : 2025-11-24 09:48:25
 FilePath     : /game_for_peace_unpacker/python/bms_linux.py
 Description  : 
 
@@ -14,9 +14,10 @@ import time
 from glob import glob
 
 
-# pak_file = "./paks/game_patch_1.33.12.14343原厂（复件）.pak"
+# pak_file = "./paks/game_patch_1.33.12.14429原厂（复件）.pak"
+# pak_file = "./paks/game_patch_1.33.12.14426原厂（复件）.pak"
 # pak_file = "./paks/map_weapon_1.33.12.14210原厂（复件）.pak"
-pak_file = "./paks/game_patch_1.33.12.14383万能范围原厂（复件）.pak"
+pak_file = "./paks/game_patch_1.33.12.14429多枪午后M4魔改.pak"
 # pak_file = "./paks/game_patch_1.33.12.14383原厂（复件）.pak"
 # pak_file = "./paks/game_patch_1.33.12.14371午后v2稳定版.pak"
 
@@ -29,7 +30,7 @@ def jb():
     # 执行解包命令（去掉 qemu-i386 不需要安卓模拟PC环境）
     command = [
         "./python/quickbms_linux",  # 直接运行 quickbms
-        "./python/解包.bms",  # 确保路径正确
+        "./python/解包自制加注释.bms",  # 确保路径正确
         pak_file, 
         dat_dir
     ]

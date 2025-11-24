@@ -2,7 +2,7 @@
  * @Author       : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
  * @Date         : 2025-11-04 11:55:58
  * @LastEditors  : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
- * @LastEditTime : 2025-11-21 14:21:11
+ * @LastEditTime : 2025-11-22 08:56:00
  * @FilePath     : /game_for_peace_unpacker/src/game_for_peace_unpack.c
  * @Description  : 解包为ue目录资产。
  * 
@@ -437,7 +437,7 @@ int main(int argc, const char *argv[]) {
             }
 
             // 调用提取函数，传入文件元数据和路径
-            // extract(PakFile, entry[ENTRY], path);
+            extract(PakFile, entry[ENTRY], path);
         }
     }
     
