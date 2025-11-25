@@ -370,6 +370,17 @@ void DebugPrintHexFromBuffer(const void *buf, size_t len, const char *label) {
     }
     printf("\n--- END ---\n\n");
 }
+void DebugPrintHex(const uint8_t* buf, size_t len, const char* label) {
+    printf("\n%s (%zu bytes):\n", label, len);
+    for (size_t i = 0; i < len && i < 100; i++) {
+        printf("%02X ", buf[i]);
+        if ((i + 1) % 16 == 0) printf("\n");
+    }
+    printf("\n");
+    // 尝试打印为字符串
+    printf("As string: %.*s\n", (int)len, buf);
+}
+
 // 新增辅助函数：模拟反序列化并打印头部数据
 void DebugDeserializeAndPrintHead(uint8_t *head_data, size_t head_size, const char *instance_name) {
     if (head_size != 94) {
@@ -727,36 +738,12 @@ void CleanupPakData(PakIndexData *data) {
 // 核心逻辑：数据块复制和替换
 // ----------------------------------------------------------------------
 
-// 查找最后一个文件实例的实际偏移
-uint64_t find_last_file_offset(PakIndexData *data, uint64_t *out_size) {
-    if (data->NumOfEntry == 0) return 0;
-    uint64_t max_offset = 0;
-    uint64_t max_offset_end = 0;
-
-    for (uint32_t i = 0; i < data->NumOfEntry; i++) {
-        Entry *e = &data->FileEntries[i];
-        uint64_t end_offset = e->FileOffset + e->CompressedLength;
-        
-        // 忽略 FileOffset 为 0 的条目
-        if (e->FileOffset > 0 && end_offset > max_offset_end) {
-            max_offset_end = end_offset;
-            max_offset = e->FileOffset;
-        }
-    }
-
-    // 假设索引中 FileOffset 最大的那个就是数据体中的最后一个文件
-    // ⚠️ 警告: 实际的 PAK 文件可能不是按 FileOffset 顺序排列的。
-    // 但是，为了简单起见，我们假设最大的 FileOffset+CompressedLength 对应了最后一个数据块的末尾。
-    *out_size = max_offset_end;
-    return max_offset;
-}
-
 // ----------------------------------------------------------------------
 // 调试辅助函数：验证内存中的新索引数据
 // 注意: 此函数需要访问全局的 unicode_to_utf8 函数定义
 // ----------------------------------------------------------------------
 void VerifyNewIndexData(const uint8_t *NewIndexData, uint64_t NewIndexDataSize, 
-                        uint32_t NumOfEntry, uint64_t offset_add) {
+                        uint32_t NumOfEntry) {
     printf("\n\n--- 🌟 调试验证：解析内存中的新索引数据 🌟 ---\n");
     
     // 临时缓冲区用于存储和打印目录名和文件名
@@ -914,7 +901,10 @@ void VerifyNewIndexData(const uint8_t *NewIndexData, uint64_t NewIndexDataSize,
         }
         memcpy(&DIR_FILES, NewIndexData + verify_offset, 8);
         verify_offset += 8;
-        
+        if(d == 460)
+        {
+            int debug = 1;
+        }
         printf("  - 目录 #%llu: LEN=%u, FILES=%llu, NAME='%s'\n", 
                (unsigned long long)d, DIR_LEN, (unsigned long long)DIR_FILES, DIR_NAME);
 
@@ -1057,17 +1047,21 @@ void DebugReadFirst94Bytes(const char *file_path) {
 
 int main() {
     // 定义源 PAK 文件和包含新数据的 PAK 文件路径
-    const char *SRC_PAK_PATH = "../paks/game_patch_1.33.12.14429原厂（复件）.pak";
-    const char *MY_PAK_PATH = "../paks/game_patch_1.33.12.14429原厂（复件）.pak";
-    const char *NEW_PAK_PATH = "../paks/game_patch_1.33.12.14429调试.pak"; // 🌟 新增：生成的新文件路径
+    const char *SRC_PAK_PATH = "../paks/map_weapon_1.34.12.14500原厂.pak";
+    const char *MY_PAK_PATH  = "../paks/map_weapon_1.34.12.14500原厂.pak";
+    const char *NEW_PAK_PATH = "../paks/map_weapon_1.34.12.14500魔改M762.pak"; // 🌟 新增：生成的新文件路径
 
     // 定义要替换的旧文件实例的索引（我们假设要替换最后两个 Entry Index）
     int old_entry_indices[2] = {-1, -1};
+    const char *key_str_old[] = { "BP_Muzzle_M762.uasset", "BP_Muzzle_M762.uexp" };  // 旧文件实例的文件名
+
     
     // 定义要提取的新文件实例名（在 my_pak 中寻找）
     // const char *key_str_my[] = { "CH_Base_SK_PhysicsAsset.uasset", "CH_Base_SK_PhysicsAsset.uexp" };
-    // const char *key_str_my[] = { "BP_Rifle_M416.uasset", "BP_Rifle_M416.uexp" };
-    const char *key_str_my[] = { "BP_UGC_ShotGun_S12K.uasset", "BP_UGC_ShotGun_S12K.uexp" };
+    // const char *key_str_my[] = { "BP_Rifle_M762.uasset", "BP_Rifle_M762.uexp" }; 
+    const char *key_str_my[] = { "BP_Muzzle_M762.uasset", "BP_Muzzle_M762.uexp" }; 
+
+    // const char *key_str_my[] = { "BP_UGC_ShotGun_S12K.uasset", "BP_UGC_ShotGun_S12K.uexp" }; // 原版 debug
 
     // 检查文件是否存在
     if (access(SRC_PAK_PATH, F_OK) == -1 || access(MY_PAK_PATH, F_OK) == -1) {
@@ -1098,26 +1092,48 @@ int main() {
         result = 1; goto cleanup;
     }
 
-    // 确定要替换的最后两个文件实例的 Entry Index
-    if (src_data.NumOfEntry >= 2) {
-        old_entry_indices[0] = src_data.NumOfEntry - 2;
-        old_entry_indices[1] = src_data.NumOfEntry - 1;
-        printf("Targeting last two entries: #%d and #%d for replacement.\n", old_entry_indices[0], old_entry_indices[1]);
-    } else {
-        fprintf(stderr, "Error: SRC_PAK has fewer than 2 file entries.\n");
-        result = 1; goto cleanup;
-    }
+    // // 确定要替换的最后两个文件实例的 Entry Index
+    // if (src_data.NumOfEntry >= 2) {
+    //     old_entry_indices[0] = src_data.NumOfEntry - 2;
+    //     old_entry_indices[1] = src_data.NumOfEntry - 1;
+    //     printf("Targeting last two entries: #%d and #%d for replacement.\n", old_entry_indices[0], old_entry_indices[1]);
+    // } else {
+    //     fprintf(stderr, "Error: SRC_PAK has fewer than 2 file entries.\n");
+    //     result = 1; goto cleanup;
+    // }
 
-    // 找到最后一个文件数据块的末尾偏移 (即旧数据体的大小)
-    uint64_t old_data_body_end = 0;
-    uint64_t last_file_offset = find_last_file_offset(&src_data, &old_data_body_end);
+    // 遍历所有文件实例，匹配文件名（仅 basename，忽略路径）
+    for (uint32_t i = 0; i < src_data.NumOfInstances; i++)
+    {
+        FileInstance *inst = &src_data.AllFileInstances[i];
+
+        // 提取文件名部分（去掉目录路径）
+        const char *basename = strrchr(inst->Filename, '/');
+        if (!basename)
+            basename = inst->Filename;
+        else
+            basename++; // 跳过 '/'
+
+        // 检查是否匹配 key_str_old 中的任意一个
+        for (int k = 0; k < 2; k++)
+        {
+            if (old_entry_indices[k] == -1 && strcmp(basename, key_str_old[k]) == 0)
+            {
+                old_entry_indices[k] = inst->EntryIndex;
+                printf("Found old file '%s' -> EntryIndex #%d\n", key_str_old[k], inst->EntryIndex);
+                break;
+            }
+        }
+    }
     
     // 我们只需要知道最后一个文件数据块的起始位置
     Entry *old_entry_0 = &src_data.FileEntries[old_entry_indices[0]];
     Entry *old_entry_1 = &src_data.FileEntries[old_entry_indices[1]];
     uint64_t old_entry_0_FileOffset = old_entry_0->FileOffset;
     printf("Old data body start offset for replacement: 0x%llx\n", old_entry_0_FileOffset);
-
+    // 找到最后一个旧目标文件数据块的末尾偏移 （即旧目标的后邻居实例的FileOffset）
+    Entry *old_entry_1_after = &src_data.FileEntries[old_entry_indices[1] + 1];
+    uint64_t old_data_body_end =old_entry_1_after->FileOffset;
 
     // ------------------------------------------------------------------
     // 2. 读取 my_pak，提取新实例数据
@@ -1225,12 +1241,15 @@ int main() {
         }
     }
     ni0->entry.FileOffset = current_new_offset;
+    ni0->entry.FileOffset = 0; // 写为0，和原版一致，才能bms解包
     // 根据新的 entry ，构造新的  ni0->Head （size = 94）字段
-    SerializeHeadData(&ni0->entry, &ni0->Head, &ni0->HeadSize); 
+    SerializeHeadData(&ni0->entry, &ni0->Head, &ni0->HeadSize);
     // >>> 新增：写入 ni0->Head 之前，模拟反序列化并打印 Head 数据
     DebugDeserializeAndPrintHead(ni0->Head, ni0->HeadSize, "ni0");
+    // 在 write 之前调用：
+    DebugPrintHex(ni0->Head, ni0->HeadSize, "ni0->Head BEFORE writing to PAK");
     // 写入size=94的  ni0->Head
-    if (write(NewPakFile, &ni0->Head, ni0->HeadSize) != ni0->HeadSize)
+    if (write(NewPakFile, ni0->Head, ni0->HeadSize) != ni0->HeadSize)
     {
         fprintf(stderr, "Failed to write new data block 1 head.\n");
         result = 1;
@@ -1260,19 +1279,22 @@ int main() {
         }
     }
     ni1->entry.FileOffset = current_new_offset; // 更新 Entry 结构体中的 FileOffset
+    ni1->entry.FileOffset = 0; // 写为0，和原版一致，才能bms解包
     // 根据新的 entry ，构造新的  ni1->Head （size = 94）字段
     SerializeHeadData(&ni1->entry, &ni1->Head, &ni1->HeadSize);
     // >>> 新增：写入 ni1->Head 之前，模拟反序列化并打印 Head 数据
     DebugDeserializeAndPrintHead(ni1->Head, ni1->HeadSize, "ni1");
+    // 在 write 之前调用：
+    DebugPrintHex(ni1->Head, ni1->HeadSize, "ni1->Head BEFORE writing to PAK");
     // 写入size=94的  ni1->Head
-    if (write(NewPakFile, &ni1->Head, ni1->HeadSize) != ni1->HeadSize)
+    if (write(NewPakFile, ni1->Head, ni1->HeadSize) != ni1->HeadSize)
     {
         fprintf(stderr, "Failed to write new data block 1 head.\n");
         result = 1;
         goto cleanup_buffer;
     }
     // 再写入size=CompressionLength的data
-        if (write(NewPakFile, ni1->Data, ni1->DataSize) != ni1->DataSize)
+    if (write(NewPakFile, ni1->Data, ni1->DataSize) != ni1->DataSize)
     {
         fprintf(stderr, "Failed to write new data block 1.\n");
         result = 1;
@@ -1287,25 +1309,26 @@ int main() {
     printf("Data body size change: %llu bytes (Offset Add).\n", offset_add);
 
     // 3.3 写入 SRC_PAK 中最后两个实例之后的剩余数据 (如果存在)
-    // printf("3.3 Writing remaining data body...\n");
+    printf("3.3 Writing remaining data body...\n");
     // 复制旧索引之前的数据体剩余部分，从旧数据块末尾开始
-    // bytes_to_copy = src_data.info.offset;
-    // bytes_copied = old_data_body_end;
+    uint64_t oldIndexOffset = src_data.info.offset ^ OFFSET_KEY;
+    bytes_to_copy = oldIndexOffset; 
+    bytes_copied = old_data_body_end;
     
-    // while (bytes_copied < bytes_to_copy) {
-    //     size_t to_read = (size_t)(bytes_to_copy - bytes_copied < buffer_size ? bytes_to_copy - bytes_copied : buffer_size);
-    //     ssize_t bytesRead = pread(SrcPakFile, buffer, to_read, bytes_copied);
-    //     if (bytesRead <= 0) break; // 如果读取失败或结束，就退出
+    while (bytes_copied < bytes_to_copy) {
+        size_t to_read = (size_t)(bytes_to_copy - bytes_copied < buffer_size ? bytes_to_copy - bytes_copied : buffer_size);
+        ssize_t bytesRead = pread(SrcPakFile, buffer, to_read, bytes_copied);
+        if (bytesRead <= 0) break; // 如果读取失败或结束，就退出
         
-    //     if (write(NewPakFile, buffer, bytesRead) != bytesRead) {
-    //         fprintf(stderr, "Failed to write remaining data body to new.pak.\n");
-    //         result = 1; goto cleanup_buffer;
-    //     }
-    //     bytes_copied += bytesRead;
-    //     current_new_offset += bytesRead;
-    // }
-    // free(buffer);
-    // buffer = NULL;
+        if (write(NewPakFile, buffer, bytesRead) != bytesRead) {
+            fprintf(stderr, "Failed to write remaining data body to new.pak.\n");
+            result = 1; goto cleanup_buffer;
+        }
+        bytes_copied += bytesRead;
+        current_new_offset += bytesRead;
+    }
+    free(buffer);
+    buffer = NULL;
 
     // ------------------------------------------------------------------
     // 4. 重建并写入索引数据
@@ -1318,7 +1341,8 @@ int main() {
     if (!NewIndexData) { result = 1; goto cleanup; }
 
     // 4.1. MountPointLength + MountPoint + NumOfEntry (索引数据的前半部分) 保持原版不变
-    uint64_t pre_entry_size = 4+29+4;
+    // uint64_t pre_entry_size = 4+29+4; // ShadowTrackerExtra/
+    uint64_t pre_entry_size = 4+37+4; // ShadowTrackerExtra/Content
     write_data(NewIndexData, &NewIndexDataSize, src_data.OriginalIndexData, pre_entry_size);
 
     // 4.2. 写入更新后的 Entry 列表
@@ -1390,8 +1414,8 @@ int main() {
     // 4.3. 更新并写入 Directory Map
 
     // 先写入 原始 的 Directory Map 数据
-    FileInstance src_0 =  src_data.AllFileInstances[src_data.NumOfEntry-2];
-    FileInstance src_1 =  src_data.AllFileInstances[src_data.NumOfEntry-1];
+    FileInstance src_0 =  src_data.AllFileInstances[old_entry_indices[0]];
+    FileInstance src_1 =  src_data.AllFileInstances[old_entry_indices[1]];
     uint64_t src_front_size = src_0.DirStartOffset - src_data.DirMapStartOffset; // 上文长度
     uint64_t src_0_head_size = src_0.PathIndexStart - src_0.DirStartOffset; // 本文的头长度
     uint64_t src_0_body_size = src_0.PathIndexEnd - src_0.PathIndexStart;// 本文0的身长度
@@ -1400,7 +1424,8 @@ int main() {
 
     write_data(NewIndexData, &NewIndexDataSize, src_data.OriginalIndexData + src_data.DirMapStartOffset, src_front_size);
     // 然后写入 新实例 的文件夹 Directory Map 
-    ni0->dir_map.dir_files=2; // 手动更新文件数量 DEBUG
+    ni0->dir_map.dir_files = 2; // 手动更新文件数量 DEBUG
+    ni1->dir_map.dir_files = 2;
     ni0->dir_map.entry_index = src_0.EntryIndex; // 更新实体索引
     ni1->dir_map.entry_index = src_1.EntryIndex; //  更新实体索引
     SerializeDirMap(&ni0->dir_map);
@@ -1412,7 +1437,7 @@ int main() {
     // 最后写入剩下的原始内容（最后一个空路径）
     write_data(NewIndexData, &NewIndexDataSize, src_data.OriginalIndexData + src_1.PathIndexEnd , src_back_size);
     // 在写入文件之前，先打印验证我们在内存中构造的新索引数据
-    VerifyNewIndexData(NewIndexData, NewIndexDataSize, src_data.NumOfEntry, offset_add);
+    VerifyNewIndexData(NewIndexData, NewIndexDataSize, src_data.NumOfEntry);
 
     // 4.4. 将新索引数据写入 NEW_PAK 文件
     if (write(NewPakFile, NewIndexData, NewIndexDataSize) != NewIndexDataSize) {

@@ -2,7 +2,7 @@
 Author       : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
 Date         : 2025-09-23 09:33:20
 LastEditors  : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
-LastEditTime : 2025-11-04 08:46:42
+LastEditTime : 2025-11-25 10:52:30
 FilePath     : /game_for_peace_unpacker/py_script/从解包文件中筛选出枪uasset.py
 Description  : 从解包文件中筛选符合规则的枪械 uasset 文件，并可选择复制到目标目录
 
@@ -45,11 +45,11 @@ def find_matching_files(src_ue_dir: str) -> List[str]:
 
 
 if __name__ == "__main__":
-    src_ue_dir = "./paks/ShadowTrackerExtra_14383"
-    src_ue_dir = "./paks/ShadowTrackerExtra_map_weapon原厂/Content/Arts_PlayerBluePrints/Weapon/MainWeapon"
+    # src_ue_dir = "./paks/ShadowTrackerExtra_14510"
+    src_ue_dir = "./paks/ShadowTrackerExtra_lobby_14500/Content/Arts_PlayerBluePrints/Weapon/MainWeapon"
 
     is_print_uasset_only = True    # True=只打印 复制 移动 .uasset 
-    is_copy_and_move = True        # True=复制符合规则的文件到 src_ue_dir
+    is_copy_and_move = False        # True=复制符合规则的文件到 src_ue_dir
 
     results = find_matching_files(src_ue_dir)
 

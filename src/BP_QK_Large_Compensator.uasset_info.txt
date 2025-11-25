@@ -1,0 +1,22 @@
+找到目标: ShadowTrackerExtra/Content/Arts_PlayerBluePrints/Weapon/Attachments/QK/BP_QK_Large_Compensator.uasset
+
+--- 原始索引键值对 ---
+ENTRY Index: 10913
+路径 Index: 959
+DIR_LEN: 45
+DIR_NAME: Arts_PlayerBluePrints/Weapon/Attachments/QK/
+DIR_FILES (Files in Dir): 34
+FilenameSize (Raw): 31
+Filename (UTF-8): BP_QK_Large_Compensator.uasset
+
+--- 原始数据键值对 ---
+FileHash: d9cddcde7e1f01e54d90710364b9d261726fa1c3
+FileOffset: 0x1f139000 (521375744)
+FileSize (Original): 7546
+CompressionMethod: 1
+CompressedLength: 2704
+Dummy: 000000000000000000000000000000000000000000
+NumOfBlocks: 1
+Block 0: Start = 0x1f13905e, End = 0x1f139ae6
+CompressedBlockSize: 7546
+Encrypted: 0

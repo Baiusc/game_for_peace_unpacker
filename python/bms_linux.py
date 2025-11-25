@@ -2,7 +2,7 @@
 Author       : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
 Date         : 2025-08-21 10:10:50
 LastEditors  : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
-LastEditTime : 2025-11-24 09:48:25
+LastEditTime : 2025-11-25 11:27:50
 FilePath     : /game_for_peace_unpacker/python/bms_linux.py
 Description  : 
 
@@ -14,12 +14,8 @@ import time
 from glob import glob
 
 
-# pak_file = "./paks/game_patch_1.33.12.14429原厂（复件）.pak"
-# pak_file = "./paks/game_patch_1.33.12.14426原厂（复件）.pak"
-# pak_file = "./paks/map_weapon_1.33.12.14210原厂（复件）.pak"
-pak_file = "./paks/game_patch_1.33.12.14429多枪午后M4魔改.pak"
-# pak_file = "./paks/game_patch_1.33.12.14383原厂（复件）.pak"
-# pak_file = "./paks/game_patch_1.33.12.14371午后v2稳定版.pak"
+pak_file = "./paks/game_patch_1.34.12.14510原厂.pak"
+
 
 dat_dir = "./paks/dat_temp"
 

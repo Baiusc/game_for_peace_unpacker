@@ -2,7 +2,7 @@
  * @Author       : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
  * @Date         : 2025-11-04 11:55:58
  * @LastEditors  : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
- * @LastEditTime : 2025-11-22 08:56:00
+ * @LastEditTime : 2025-11-25 14:45:07
  * @FilePath     : /game_for_peace_unpacker/src/game_for_peace_unpack.c
  * @Description  : 解包为ue目录资产。
  * 
@@ -275,7 +275,7 @@ int main(int argc, const char *argv[]) {
     
     // 遍历并读取所有文件条目的元数据  （解包onread关羽赵云宇宙等包时，从这里开始会遇到加密问题）
     for (uint32_t Files = 0; Files < NumOfEntry; Files++) {
-        if(Files == 264) {
+        if(Files == 11781) {
             printf("Debug: Reached file entry index 264\n");
         }
         read_data(entry[Files].FileHash, IndexData, 20);
@@ -377,7 +377,7 @@ int main(int argc, const char *argv[]) {
             snprintf(path, 1024, "%s%s%s", MountPoint, DIR_NAME, Filename);
             
             // 若目标特征符合，则保存目标为本地txt文件
-            if ( strcmp(Filename, "BP_UGC_ShotGun_S12K.uasset") == 0 || strcmp(Filename, "BP_UGC_ShotGun_S12K.uexp") == 0 || strcmp(Filename, "BP_PlayerRifleBullet.uasset") == 0)
+            if ( strcmp(Filename, "BP_QK_Large_Compensator.uasset") == 0 || strcmp(Filename, "BP_QK_Large_Compensator.uexp") == 0 || strcmp(Filename, "BP_PlayerRifleBullet.uasset") == 0)
             {
                 // 构建输出文件名：[Filename].txt
                 char outputFilename[1024];
@@ -391,6 +391,7 @@ int main(int argc, const char *argv[]) {
                     // 打印 DIR_LEN DIR_NAME DIR_FILES FilenameSize Filename ENTRY 等原始索引键值对
                     fprintf(logFile, "\n--- 原始索引键值对 ---\n");
                     fprintf(logFile, "ENTRY Index: %d\n", ENTRY); // ENTRY 是索引
+                    fprintf(logFile, "路径 Index: %d\n", files);                    
                     fprintf(logFile, "DIR_LEN: %d\n", DIR_LEN);
                     fprintf(logFile, "DIR_NAME: %s\n", DIR_NAME);
                     fprintf(logFile, "DIR_FILES (Files in Dir): %llu\n", DIR_FILES);
@@ -437,7 +438,10 @@ int main(int argc, const char *argv[]) {
             }
 
             // 调用提取函数，传入文件元数据和路径
-            extract(PakFile, entry[ENTRY], path);
+            if(ENTRY>=0)
+            {
+                // extract(PakFile, entry[ENTRY], path);
+            }
         }
     }
     
