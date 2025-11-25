@@ -8,124 +8,84 @@ from pathlib import Path
 import hashlib
 import struct
 
-# === 配置 ===
-OFFSET_ni0 = 2321236          # ni0 对应的 FileOffset
-OFFSET_ni1 = 2327138          # ni1 对应的 FileOffset 原版
+# 配置参数
+start_byte = 523259658
+print_byte_size = 246+4
+print_byte_size_pre = 0
+print_byte_size_after = 0
 
-HEAD_SIZE = 94                # UE4 Pak Entry 头部固定长度（字节）
+src_pak = Path("./paks/map_weapon_1.34.12.14500原厂.pak")
+my_pak = Path("./paks/map_weapon_1.34.12.14500原厂.pak")
 
-# SRC_PAK = Path("./paks/game_patch_1.33.12.14429原厂（复件）.pak")
-SRC_PAK = Path("./paks/map_weapon_1.34.12.14500原厂.pak")
-NEW_PAK = Path("./paks/map_weapon_1.34.12.14500原厂.pak")
+def compute_file_hash(file_path: Path, algorithm='sha256') -> str:
+    """计算文件的哈希值"""
+    hash_func = hashlib.new(algorithm)
+    with open(file_path, 'rb') as f:
+        for chunk in iter(lambda: f.read(4096), b""):
+            hash_func.update(chunk)
+    return hash_func.hexdigest()
 
-# 定义要检查的偏移点：(标签, 偏移值)
-offsets_to_check = [
-    ("ni0", OFFSET_ni0),
-    ("ni1", OFFSET_ni1),
-]
+def get_file_size(file_path: Path) -> int:
+    """获取文件字节大小"""
+    return file_path.stat().st_size
 
+def print_hex_region(file_path: Path, offset: int, pre: int, size: int, post: int):
+    """打印 offset 前后指定字节数的十六进制内容"""
+    total_read = pre + size + post
+    read_offset = offset - pre
+    if read_offset < 0:
+        # 如果偏移太小，调整到文件开头
+        adjust = -read_offset
+        read_offset = 0
+        pre -= adjust
+        total_read -= adjust
+        print(f"⚠️  Warning: offset {offset} is too close to start; adjusted pre bytes to {pre}")
 
-def compute_file_hash(path: Path, algorithm='sha256') -> str:
-    """计算文件的 SHA256（或其他算法）哈希值"""
-    h = hashlib.new(algorithm)
-    with open(path, 'rb') as f:
-        while chunk := f.read(65536):
-            h.update(chunk)
-    return h.hexdigest()
+    try:
+        with open(file_path, 'rb') as f:
+            f.seek(read_offset)
+            data = f.read(total_read)
+    except OSError as e:
+        print(f"❌ Error reading {file_path.name}: {e}")
+        return
 
+    # 打印十六进制
+    print(f"\n--- Hex dump of {file_path.name} around offset 0x{offset:X} ({offset}) ---")
+    print(f"Range: [{read_offset} : {read_offset + len(data)}] (total {len(data)} bytes)")
+    print("Offset(h) | 00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F | ASCII")
+    print("-" * 70)
 
-def parse_pak_head(data: bytes):
-    """解析 94 字节的 UE4 Pak Entry 头部结构"""
-    if len(data) < HEAD_SIZE:
-        raise ValueError("数据长度不足 94 字节")
-    
-    off = 0
-    result = {}
-    # 1. FileHash (20 bytes)
-    result['FileHash'] = data[off:off+20].hex()
-    off += 20
-    # 2. FileOffset (8 bytes, little-endian)
-    result['FileOffset'] = struct.unpack('<Q', data[off:off+8])[0]
-    off += 8
-    # 3. FileSize (8 bytes)
-    result['FileSize'] = struct.unpack('<Q', data[off:off+8])[0]
-    off += 8
-    # 4. CompressionMethod (4 bytes)
-    result['CompressionMethod'] = struct.unpack('<I', data[off:off+4])[0]
-    off += 4
-    # 5. CompressedLength (8 bytes)
-    result['CompressedLength'] = struct.unpack('<Q', data[off:off+8])[0]
-    off += 8
-    # 6. Dummy padding (21 bytes)
-    off += 21
-    # 7. NumOfBlocks (4 bytes)
-    num_blocks = struct.unpack('<I', data[off:off+4])[0]
-    result['NumOfBlocks'] = num_blocks
-    off += 4
+    for i in range(0, len(data), 16):
+        chunk = data[i:i+16]
+        hex_part = ' '.join(f"{b:02X}" for b in chunk)
+        ascii_part = ''.join(chr(b) if 32 <= b <= 126 else '.' for b in chunk)
+        print(f"{read_offset + i:08X}  | {hex_part:<47} | {ascii_part}")
 
-    # 8. Blocks (each block: start Q, end Q)
-    blocks = []
-    for _ in range(num_blocks):
-        start = struct.unpack('<Q', data[off:off+8])[0]
-        off += 8
-        end = struct.unpack('<Q', data[off:off+8])[0]
-        off += 8
-        blocks.append((start, end))
-    result['Blocks'] = blocks
+# --- 主逻辑 ---
+if not src_pak.exists():
+    raise FileNotFoundError(f"Source PAK not found: {src_pak}")
+if not my_pak.exists():
+    raise FileNotFoundError(f"My PAK not found: {my_pak}")
 
-    # 9. CompressedBlockSize (4 bytes)
-    result['CompressedBlockSize'] = struct.unpack('<I', data[off:off+4])[0]
-    off += 4
-    # 10. Encrypted flag (1 byte)
-    result['Encrypted'] = data[off]
-    off += 1
+# 1. 比较文件大小
+size_src = get_file_size(src_pak)
+size_my = get_file_size(my_pak)
+print(f"📄 File Sizes:")
+print(f"  {src_pak.name}: {size_src:,} bytes")
+print(f"  {my_pak.name}:   {size_my:,} bytes")
+print(f"  ➤ Size Match: {'✅ Yes' if size_src == size_my else '❌ No'}")
 
-    assert off == HEAD_SIZE, f"解析长度错误：期望 {HEAD_SIZE}，实际 {off}"
-    return result
+# 2. 比较哈希值（SHA256）
+print("\n🔐 Hash Comparison (SHA256):")
+hash_src = compute_file_hash(src_pak)
+hash_my = compute_file_hash(my_pak)
+print(f"  {src_pak.name}: {hash_src}")
+print(f"  {my_pak.name}:   {hash_my}")
+print(f"  ➤ Hash Match: {'✅ Yes' if hash_src == hash_my else '❌ No'}")
 
+# 3. 打印两个文件在指定位置的十六进制内容
+target_offset = start_byte
+print(f"\n🔍 Comparing hex content around offset {target_offset} (0x{target_offset:X})")
 
-def read_bytes_at(path: Path, offset: int, size: int) -> bytes:
-    """从文件指定偏移读取指定字节数"""
-    with open(path, 'rb') as f:
-        f.seek(offset)
-        return f.read(size)
-
-
-# === 主流程 ===
-if not SRC_PAK.exists():
-    raise FileNotFoundError(f"源 PAK 文件不存在: {SRC_PAK}")
-if not NEW_PAK.exists():
-    raise FileNotFoundError(f"新 PAK 文件不存在: {NEW_PAK}")
-
-# 1. 比较文件大小与哈希
-size_src = SRC_PAK.stat().st_size
-size_new = NEW_PAK.stat().st_size
-hash_src = compute_file_hash(SRC_PAK)
-hash_new = compute_file_hash(NEW_PAK)
-
-print("📄 文件大小对比:")
-print(f"  原版: {size_src:,} 字节")
-print(f"  新版: {size_new:,} 字节")
-print(f"  是否一致: {'✅ 是' if size_src == size_new else '❌ 否'}")
-
-print("\n🔐 SHA256 哈希值:")
-print(f"  原版: {hash_src}")
-print(f"  新版: {hash_new}")
-print(f"  是否一致: {'✅ 是' if hash_src == hash_new else '❌ 否'}")
-
-# 2. 解析两个偏移处的头部
-for label, offset in offsets_to_check:
-    print(f"\n🔍 正在解析 {label}（偏移 {offset} / 0x{offset:X}）处的 94 字节头部...")
-
-    for name, path in [("原版", SRC_PAK), ("新版", NEW_PAK)]:
-        try:
-            data = read_bytes_at(path, offset, HEAD_SIZE)
-            if len(data) < HEAD_SIZE:
-                print(f"\n⚠️  {name} PAK 在偏移 {offset} 处仅读取到 {len(data)} 字节，不足 94 字节！")
-                continue
-            parsed = parse_pak_head(data)
-            print(f"\n--- {name} PAK - {label} 头部信息 ---")
-            for key, value in parsed.items():
-                print(f"{key}: {value}")
-        except Exception as e:
-            print(f"\n❌ 解析 {name} PAK 的 {label} 头部失败: {e}")
+print_hex_region(src_pak, target_offset, print_byte_size_pre, print_byte_size, print_byte_size_after)
+print_hex_region(my_pak, target_offset, print_byte_size_pre, print_byte_size, print_byte_size_after)
