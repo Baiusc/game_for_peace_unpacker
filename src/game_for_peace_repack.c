@@ -1047,19 +1047,19 @@ void DebugReadFirst94Bytes(const char *file_path) {
 
 int main() {
     // 定义源 PAK 文件和包含新数据的 PAK 文件路径
-    const char *SRC_PAK_PATH = "../paks/map_weapon_1.34.12.14500原厂.pak";
-    const char *MY_PAK_PATH  = "../paks/map_weapon_1.34.12.14500原厂.pak";
-    const char *NEW_PAK_PATH = "../paks/map_weapon_1.34.12.14500魔改M762.pak"; // 🌟 新增：生成的新文件路径
+    const char *SRC_PAK_PATH = "../paks/game_patch_1.34.12.14510原厂.pak";
+    const char *MY_PAK_PATH  = "../paks/game_patch_1.33.12.14429多枪减后m4午后.pak";
+    const char *NEW_PAK_PATH = "../paks/game_patch_1.34.12.14510调试.pak"; // 🌟 新增：生成的新文件路径
 
     // 定义要替换的旧文件实例的索引（我们假设要替换最后两个 Entry Index）
     int old_entry_indices[2] = {-1, -1};
-    const char *key_str_old[] = { "BP_Muzzle_M762.uasset", "BP_Muzzle_M762.uexp" };  // 旧文件实例的文件名
+    const char *key_str_old[] = { "BP_QK_Large_Compensator.uasset", "BP_QK_Large_Compensator.uexp" };  // 旧文件实例的文件名
 
     
     // 定义要提取的新文件实例名（在 my_pak 中寻找）
     // const char *key_str_my[] = { "CH_Base_SK_PhysicsAsset.uasset", "CH_Base_SK_PhysicsAsset.uexp" };
     // const char *key_str_my[] = { "BP_Rifle_M762.uasset", "BP_Rifle_M762.uexp" }; 
-    const char *key_str_my[] = { "BP_Muzzle_M762.uasset", "BP_Muzzle_M762.uexp" }; 
+    const char *key_str_my[] = { "BP_Other_PKM.uasset", "BP_Other_PKM.uexp" }; 
 
     // const char *key_str_my[] = { "BP_UGC_ShotGun_S12K.uasset", "BP_UGC_ShotGun_S12K.uexp" }; // 原版 debug
 
@@ -1341,8 +1341,8 @@ int main() {
     if (!NewIndexData) { result = 1; goto cleanup; }
 
     // 4.1. MountPointLength + MountPoint + NumOfEntry (索引数据的前半部分) 保持原版不变
-    // uint64_t pre_entry_size = 4+29+4; // ShadowTrackerExtra/
-    uint64_t pre_entry_size = 4+37+4; // ShadowTrackerExtra/Content
+    uint64_t pre_entry_size = 4+29+4; // ShadowTrackerExtra/ 
+    // uint64_t pre_entry_size = 4+37+4; // ShadowTrackerExtra/Content
     write_data(NewIndexData, &NewIndexDataSize, src_data.OriginalIndexData, pre_entry_size);
 
     // 4.2. 写入更新后的 Entry 列表
