@@ -563,7 +563,7 @@ void SerializeHeadData(Entry *entry, uint8_t **out_head, size_t *out_size)
 }
 
 // ----------------------------------------------------------------------
-// 读取文件数据（仅处理 NumOfBlocks == 1 的特定结构）
+// 读取文件数据（仅处理 NumOfBlocks == 1 的特定结构） TODO datasize应该包含padding的全0数据
 // ----------------------------------------------------------------------
 int get_data_CompressedLength(int fd, Entry *entry, uint8_t **out_data, uint64_t *out_size)
 {
@@ -1460,7 +1460,7 @@ int main()
     }
     // 改为直接打印内存中的 Head 数据：
     DebugPrintHexFromBuffer(ni0->Head, ni0->HeadSize, "ni0");
-    // 再写入size=CompressionLength的data
+    // 再写入size=CompressionLength的data ，此处错误，写入的size为next_offset - cur_offset
     if (write(NewPakFile, ni0->Data, ni0->DataSize) != ni0->DataSize)
     {
         fprintf(stderr, "Failed to write new data block 1.\n");
