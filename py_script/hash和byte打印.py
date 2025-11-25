@@ -11,13 +11,12 @@ import struct
 # === 配置 ===
 OFFSET_ni0 = 2321236          # ni0 对应的 FileOffset
 OFFSET_ni1 = 2327138          # ni1 对应的 FileOffset 原版
-OFFSET_ni1 = 2329554          # ni1 对应的 FileOffset m4
 
 HEAD_SIZE = 94                # UE4 Pak Entry 头部固定长度（字节）
 
 # SRC_PAK = Path("./paks/game_patch_1.33.12.14429原厂（复件）.pak")
-SRC_PAK = Path("./paks/game_patch_1.33.12.14429多枪午后（复件）.pak")
-NEW_PAK = Path("./paks/game_patch_1.33.12.14429多枪午后0.67范围.pak")
+SRC_PAK = Path("./paks/map_weapon_1.34.12.14500原厂.pak")
+NEW_PAK = Path("./paks/map_weapon_1.34.12.14500原厂.pak")
 
 # 定义要检查的偏移点：(标签, 偏移值)
 offsets_to_check = [

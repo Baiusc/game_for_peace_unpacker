@@ -2,7 +2,7 @@
  * @Author       : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
  * @Date         : 2025-11-04 11:55:58
  * @LastEditors  : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
- * @LastEditTime : 2025-11-25 14:45:07
+ * @LastEditTime : 2025-11-25 16:14:58
  * @FilePath     : /game_for_peace_unpacker/src/game_for_peace_unpack.c
  * @Description  : 解包为ue目录资产。
  * 
@@ -275,7 +275,7 @@ int main(int argc, const char *argv[]) {
     
     // 遍历并读取所有文件条目的元数据  （解包onread关羽赵云宇宙等包时，从这里开始会遇到加密问题）
     for (uint32_t Files = 0; Files < NumOfEntry; Files++) {
-        if(Files == 11781) {
+        if(Files == 104) {
             printf("Debug: Reached file entry index 264\n");
         }
         read_data(entry[Files].FileHash, IndexData, 20);
@@ -440,7 +440,7 @@ int main(int argc, const char *argv[]) {
             // 调用提取函数，传入文件元数据和路径
             if(ENTRY>=0)
             {
-                // extract(PakFile, entry[ENTRY], path);
+                extract(PakFile, entry[ENTRY], path);
             }
         }
     }
