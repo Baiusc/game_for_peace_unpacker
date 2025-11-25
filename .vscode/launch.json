@@ -5,8 +5,8 @@
       "name": "调试(不构建)",
       "type": "cppdbg",
       "request": "launch",
-      "program": "${workspaceFolder}/build/PEACE_UNPACK",
-      // "program": "${workspaceFolder}/build/PEACE_REPACK",
+      // "program": "${workspaceFolder}/build/PEACE_UNPACK",
+      "program": "${workspaceFolder}/build/PEACE_REPACK",
       "args": [
         // "${workspaceFolder}/paks/game_patch_1.34.12.14512原厂.pak"
         "${workspaceFolder}/paks/map_weapon_1.34.12.14500原厂.pak"

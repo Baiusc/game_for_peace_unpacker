@@ -562,60 +562,52 @@ void SerializeHeadData(Entry *entry, uint8_t **out_head, size_t *out_size)
     }
 }
 
-// ----------------------------------------------------------------------
-// 读取文件数据（仅处理 NumOfBlocks == 1 的特定结构） TODO datasize应该包含padding的全0数据
-// ----------------------------------------------------------------------
-int get_data_CompressedLength(int fd, Entry *entry, uint8_t **out_data, uint64_t *out_size)
+// 修改函数签名：增加 next_file_offset 参数
+int get_data_CompressedLength(int fd, Entry *entry, uint64_t next_file_offset, uint8_t **out_data, uint64_t *out_size)
 {
-
-    // 定义头部大小
     const uint64_t HEAD_SIZE = 94;
-    // 1. 检查条件：必须是 NumOfBlocks == 1 且 CompressedLength > 0
+
     if (entry->NumOfBlocks != 1 || entry->CompressedLength <= 0)
     {
-        // 暂不处理的情况
         *out_data = NULL;
         *out_size = 0;
         printf("错误: 不支持的block。\n");
         return -1;
     }
-    // 压缩数据流的绝对起始偏移
+
     uint64_t block_start = entry->FileOffset + HEAD_SIZE;
-    // 压缩数据流的实际大小
-    uint64_t block_size = entry->CompressedLength;
-    // 读取数据
-    *out_size = block_size;
+    // 使用 next_file_offset 计算实际数据区大小（含 padding）
+    uint64_t actual_data_size = next_file_offset - entry->FileOffset - HEAD_SIZE;
+
+    *out_size = actual_data_size;
     *out_data = malloc(*out_size);
     if (!*out_data)
     {
-        fprintf(stderr, "Error: Failed to allocate memory for block size %llu.\n", (unsigned long long)block_size);
+        fprintf(stderr, "Error: Failed to allocate memory for block size %llu.\n", (unsigned long long)*out_size);
         return -1;
     }
-    // 读取数据
+
     if (pread(fd, *out_data, *out_size, block_start) != *out_size)
     {
-        fprintf(stderr, "Error: get_data_CompressedLength failed to read %llu bytes from offset 0x%llx (FileOffset + 94).\n",
+        fprintf(stderr, "Error: get_data_CompressedLength failed to read %llu bytes from offset 0x%llx.\n",
                 (unsigned long long)*out_size, (unsigned long long)block_start);
         free(*out_data);
         return -1;
     }
+
     if (entry->Encrypted)
     {
         DecryptData(*out_data, *out_size);
         printf("警告: 进入DecryptData。\n");
     }
 
-    // --- 调试打印 START ---
     printf("DEBUG: 读取单块压缩文件（跳过 94 字节头部）完成。\n");
-    printf("DEBUG: 压缩块大小 CompressedLength: %llu\n", (unsigned long long)entry->CompressedLength);
-    printf("DEBUG: 实际数据流大小: %llu bytes (0x%llx)\n", (unsigned long long)*out_size, (unsigned long long)*out_size);
-    printf("DEBUG: 数据（前64字节）:\n");
-    print_hex_dump(*out_data, *out_size);
-    // --- 调试打印 END ---
+    printf("DEBUG: CompressedLength: %llu, 实际读取大小（含padding）: %llu\n",
+           (unsigned long long)entry->CompressedLength, (unsigned long long)*out_size);
+    print_hex_dump(*out_data, (*out_size > 64 ? 64 : *out_size));
 
     return 0;
 }
-
 // ----------------------------------------------------------------------
 // 核心辅助函数：PAK 索引解析
 // ----------------------------------------------------------------------
@@ -1209,7 +1201,7 @@ int main()
 {
     // 定义源 PAK 文件和包含新数据的 PAK 文件路径
     const char *SRC_PAK_PATH = "../paks/map_weapon_1.34.12.14500原厂.pak";
-    const char *MY_PAK_PATH = "../paks/map_lobby_1.34.12.14500原厂.pak";
+    const char *MY_PAK_PATH  = "../paks/map_weapon_1.34.12.14500原厂.pak";
     const char *NEW_PAK_PATH = "../paks/map_weapon_1.34.12.14500魔改.pak"; // 🌟 新增：生成的新文件路径
 
     // 定义要替换的旧文件实例的索引（我们假设要替换最后两个 Entry Index）
@@ -1218,7 +1210,9 @@ int main()
 
     // 定义要提取的新文件实例名（在 my_pak 中寻找）
     // const char *key_str_my[] = { "CH_Base_SK_PhysicsAsset.uasset", "CH_Base_SK_PhysicsAsset.uexp" };
-    const char *key_str_my[] = { "BP_Rifle_M762.uasset", "BP_Rifle_M762.uexp" };
+    // const char *key_str_my[] = { "BP_Rifle_M762.uasset", "BP_Rifle_M762.uexp" };
+    const char *key_str_my[] = { "BP_Muzzle_M762.uasset", "BP_Muzzle_M762.uexp" };
+
     // const char *key_str_my[] = {"BP_Other_PKM.uasset", "BP_Other_PKM.uexp"};
 
     // const char *key_str_my[] = { "BP_UGC_ShotGun_S12K.uasset", "BP_UGC_ShotGun_S12K.uexp" }; // 原版 debug
@@ -1325,12 +1319,12 @@ int main()
     for (uint32_t i = 0; i < my_data.NumOfInstances && found_my_count < 2; i++)
     {
         FileInstance *inst = &my_data.AllFileInstances[i];
+        uint64_t offset_next = my_data.FileEntries[i+1].FileOffset;
         for (int k = 0; k < 2; k++)
         {
             if (strcmp(inst->Filename, key_str_my[k]) == 0)
             {
                 NewInstance *ni = &my_instances[found_my_count];
-
                 // 拷贝 Entry 元数据（除了 FileOffset，因为它是旧的）
                 memcpy(&ni->entry, inst->entry_ptr, sizeof(Entry));
 
@@ -1349,7 +1343,7 @@ int main()
                 }
 
                 // 读取新实例的实际压缩文件数据
-                if (get_data_CompressedLength(MyPakFile, &ni->entry, &ni->Data, &ni->DataSize) != 0)
+                if (get_data_CompressedLength(MyPakFile, &ni->entry, offset_next, &ni->Data, &ni->DataSize) != 0)
                 {
                     fprintf(stderr, "Failed to read data for %s\n", key_str_my[k]);
                     result = 1;
@@ -1507,8 +1501,10 @@ int main()
     current_new_offset += ni1->HeadSize + ni1->DataSize;
 
     // 计算增量偏移
-    offset_add = ni0->entry.CompressedLength - old_entry_0->CompressedLength +
-                 ni1->entry.CompressedLength - old_entry_1->CompressedLength;
+    uint64_t old_size = old_entry_1_after->FileOffset - old_entry_0->FileOffset;
+    uint64_t new_size = ni0->HeadSize + ni0->DataSize +  ni1->HeadSize+  ni1->DataSize;
+
+    offset_add = new_size - old_size;
     printf("Data body size change: %llu bytes (Offset Add).\n", offset_add);
 
     // 3.3 写入 SRC_PAK 中最后两个实例之后的剩余数据 (如果存在)
