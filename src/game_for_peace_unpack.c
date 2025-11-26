@@ -2,7 +2,7 @@
  * @Author       : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
  * @Date         : 2025-11-04 11:55:58
  * @LastEditors  : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
- * @LastEditTime : 2025-11-25 16:49:51
+ * @LastEditTime : 2025-11-26 08:40:49
  * @FilePath     : /game_for_peace_unpacker/src/game_for_peace_unpack.c
  * @Description  : 解包为ue目录资产。
  * 
@@ -438,14 +438,14 @@ int main(int argc, const char *argv[]) {
             }
 
             // 调用提取函数，传入文件元数据和路径
-            if(ENTRY>=11781 && ENTRY<=11784)
+            if (ENTRY >= 11781 && ENTRY <= 11784)
             {
-                extract(PakFile, entry[ENTRY], path);
+                // extract(PakFile, entry[ENTRY], path);
             }
+            extract(PakFile, entry[ENTRY], path);
         }
     }
-    
-    
+
     // 释放动态分配的内存
     for (uint32_t Files = 0; Files < NumOfEntry; Files++) {
         free(entry[Files].blocks);

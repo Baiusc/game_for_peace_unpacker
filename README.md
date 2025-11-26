@@ -2,7 +2,7 @@
  * @Author       : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
  * @Date         : 2025-09-02 16:42:02
  * @LastEditors  : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
- * @LastEditTime : 2025-11-13 17:31:56
+ * @LastEditTime : 2025-11-26 08:44:27
  * @FilePath     : /game_for_peace_unpacker/README.md
  * @Description  : 
  * 
@@ -102,6 +102,8 @@ RadiusScaleCurve 半径缩放曲线引用。 这是最重要的配置之一。�
 find . -type f -name '*BP_Player*Bullet*'
 find . -type f -name '*BP_*_Bullet*'
 find . -type f -name '*Bullet*Template*'
+find . -type f -name 'AvatarBPTable.uasset'
+
 示例 (搜索 "Weapon" 或 "Damage" 或 "Mesh" 并在上下各打印 3 行):
 
 find . -type f -name "*.uasset" -exec grep -H -E 'BP_PlayerBoltBullet|BP_PlayerSPAS12ShotgunBullet' -C 3 {} +
