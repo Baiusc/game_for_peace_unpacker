@@ -1200,20 +1200,23 @@ void DebugReadFirst94Bytes(const char *file_path)
 int main()
 {
     // 定义源 PAK 文件和包含新数据的 PAK 文件路径
-    const char *SRC_PAK_PATH = "../paks/map_weapon_1.34.12.14500原厂.pak";
-    const char *MY_PAK_PATH  = "../paks/map_lobby_1.34.12.14500原厂.pak";
-    const char *NEW_PAK_PATH = "../paks/map_weapon_1.34.12.14500魔改.pak"; // 🌟 新增：生成的新文件路径
+    const char *SRC_PAK_PATH = "../paks/game_patch_1.34.12.14515原厂.pak";
+    const char *MY_PAK_PATH  = "../paks/旧版/map_weapon_1.33.12.14210稳定1104发布.pak";
+    const char *NEW_PAK_PATH = "../paks/game_patch_1.34.12.14515调试ace稳定枪补.pak"; // 🌟 新增：生成的新文件路径
 
     // 定义要替换的旧文件实例的索引（我们假设要替换最后两个 Entry Index）
     int old_entry_indices[2] = {-1, -1};
-    const char *key_str_old[] = {"BP_Muzzle_M762.uasset", "BP_Muzzle_M762.uexp"}; // 旧文件实例的文件名
+    // const char *key_str_old[] = {"BP_Muzzle_M762.uasset", "BP_Muzzle_M762.uexp"}; // 旧文件实例的文件名
+    // const char *key_str_old[] = {"BP_Sniper_SVD.uasset", "BP_Sniper_SVD.uexp"}; // 旧文件实例的文件名
+    const char *key_str_old[] = {"BP_Rifle_AKM.uasset", "BP_Rifle_AKM.uexp"}; // 旧文件实例的文件名
+
 
     // 定义要提取的新文件实例名（在 my_pak 中寻找）
     // const char *key_str_my[] = { "CH_Base_SK_PhysicsAsset.uasset", "CH_Base_SK_PhysicsAsset.uexp" };
-    const char *key_str_my[] = { "BP_Rifle_M762.uasset", "BP_Rifle_M762.uexp" };
+    // const char *key_str_my[] = { "BP_Rifle_M762.uasset", "BP_Rifle_M762.uexp" };
     // const char *key_str_my[] = { "BP_Muzzle_M762.uasset", "BP_Muzzle_M762.uexp" };
 
-    // const char *key_str_my[] = {"BP_Other_PKM.uasset", "BP_Other_PKM.uexp"};
+    const char *key_str_my[] = {"BP_Rifle_ACE32.uasset", "BP_Rifle_ACE32.uexp"};
 
     // const char *key_str_my[] = { "BP_UGC_ShotGun_S12K.uasset", "BP_UGC_ShotGun_S12K.uexp" }; // 原版 debug
 
@@ -1548,8 +1551,8 @@ int main()
     }
 
     // 4.1. MountPointLength + MountPoint + NumOfEntry (索引数据的前半部分) 保持原版不变
-    // uint64_t pre_entry_size = 4+29+4; // ShadowTrackerExtra/
-    uint64_t pre_entry_size = 4+37+4; // ShadowTrackerExtra/Content
+    uint64_t pre_entry_size = 4+29+4; // ShadowTrackerExtra/
+    // uint64_t pre_entry_size = 4+37+4; // ShadowTrackerExtra/Content
     write_data(NewIndexData, &NewIndexDataSize, src_data.OriginalIndexData, pre_entry_size);
 
     // 4.2. 写入更新后的 Entry 列表
@@ -1638,14 +1641,26 @@ int main()
     // 然后写入 新实例 的文件夹 Directory Map
     ni0->dir_map.dir_files = 2; // 手动更新文件数量 DEBUG
     ni1->dir_map.dir_files = 2;
+
+    // 手动在 dir_path_raw 开头添加前缀 "Content/"
+    // if (ni0->dir_map.dir_len + 8 < sizeof(ni0->dir_map.dir_path_raw))
+    // {
+    //     memmove(ni0->dir_map.dir_path_raw + 8,
+    //             ni0->dir_map.dir_path_raw,
+    //             ni0->dir_map.dir_len + 1); // +1 保留结尾 '\0'（如果存在）
+    //     memcpy(ni0->dir_map.dir_path_raw, "Content/", 8);
+    //     ni0->dir_map.dir_len += 8;
+    // }
+
     // 手动删除 dir_path_raw 的前8个字符 "Content/"
-    if (ni0->dir_map.dir_len >= 8 && strncmp(ni0->dir_map.dir_path_raw, "Content/", 8) == 0)
-    {
-        ni0->dir_map.dir_len -= 8;
-        memmove(ni0->dir_map.dir_path_raw,
-                ni0->dir_map.dir_path_raw + 8,
-                ni0->dir_map.dir_len + 1); // +1 确保可能的 '\0' 被保留
-    }
+    // if (ni0->dir_map.dir_len >= 8 && strncmp(ni0->dir_map.dir_path_raw, "Content/", 8) == 0)
+    // {
+    //     ni0->dir_map.dir_len -= 8;
+    //     memmove(ni0->dir_map.dir_path_raw,
+    //             ni0->dir_map.dir_path_raw + 8,
+    //             ni0->dir_map.dir_len + 1); // +1 确保可能的 '\0' 被保留
+    // }
+
     ni0->dir_map.entry_index = src_0.EntryIndex; // 更新实体索引
     ni1->dir_map.entry_index = src_1.EntryIndex; //  更新实体索引
     SerializeDirMap(&ni0->dir_map);

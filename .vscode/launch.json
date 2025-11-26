@@ -8,7 +8,7 @@
       // "program": "${workspaceFolder}/build/PEACE_UNPACK",
       "program": "${workspaceFolder}/build/PEACE_REPACK",
       "args": [
-        "${workspaceFolder}/paks/game_patch_1.34.12.14513原厂.pak"
+        "${workspaceFolder}/paks/game_patch_1.34.12.14515原厂.pak"
         // "${workspaceFolder}/paks/map_weapon_1.34.12.14500原厂.pak"
         // "${workspaceFolder}/paks/map_lobby_1.34.12.14500.pak"
         // "${workspaceFolder}/paks/game_patch_1.33.12.14429多枪减后m4午后.pak"

@@ -168,10 +168,11 @@ if __name__ == "__main__":
 
  
     # my_dir = "./release/RE武器发布/src_dat2ue"
-    my_dir = "./release/RE天线V4发布20250930"
+    # my_dir = "./release/RE天线V4发布20250930"
     # my_dir = "/media/baiusc/DATA1/Linux/ShareFolder_Linux_Win/1121万能补丁新思路"
-    # my_dir = "./release/RE枪补V5发布20250930/my_dat适配14383稳定"
-    src_dir = "./paks/dat_temp"
+    my_dir = "./release/RE枪补V5发布20250930/my_dat适配14383稳定"
+    # src_dir = "./paks/dat_temp"
+    src_dir = "./paks/ShadowTrackerExtra_14515"
     # src_dir = "./release/RE武器发布/my_dat"
     # src_dir = "./paks/dat_uexp_map_weapon_14210/only_weapon"
     # src_dir = "/run/user/1000/gvfs/mtp:host=Xiaomi_MI_8_UD_92daeda3/内部存储设备/Download/UEXP三合一/UEXP解包"
