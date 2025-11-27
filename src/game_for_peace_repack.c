@@ -1513,31 +1513,94 @@ int main()
     int64_t offset_delta = (int64_t)new_size - (int64_t)old_size;
     printf("Data body size change: %llu bytes (Offset Delta).\n", offset_delta);
 
-    // 3.3 写入 SRC_PAK 中最后两个实例之后的剩余数据 (如果存在)
+    // 3.3 写入 SRC_PAK 中最后两个实例之后的剩余数据 (需要更改其head94的压缩快start/end偏移 += offset_delta)
     printf("3.3 Writing remaining data body...\n");
-    // 复制旧索引之前的数据体剩余部分，从旧数据块末尾开始
-    uint64_t oldIndexOffset = src_data.info.offset ^ OFFSET_KEY;
-    bytes_to_copy = oldIndexOffset;
-    bytes_copied = old_data_body_end;
+    // 遍历 old_entry_indices[1]之后的所有 Entry ，调整其 压缩快start/end偏移 ，调用 SerializeHeadData 重新序列化 head94，并写入数据体
 
-    while (bytes_copied < bytes_to_copy)
+    for (uint32_t i = old_entry_indices[1] +1 ; i < src_data.NumOfInstances; i++)
     {
-        size_t to_read = (size_t)(bytes_to_copy - bytes_copied < buffer_size ? bytes_to_copy - bytes_copied : buffer_size);
-        ssize_t bytesRead = pread(SrcPakFile, buffer, to_read, bytes_copied);
-        if (bytesRead <= 0)
-            break; // 如果读取失败或结束，就退出
-
-        if (write(NewPakFile, buffer, bytesRead) != bytesRead)
+        Entry e = src_data.FileEntries[i]; // 深拷贝一份，不污染原始数据
+        // 调整 block 偏移（使用 signed 算术）
+        for (uint32_t b = 0; b < e.NumOfBlocks; b++)
         {
-            fprintf(stderr, "Failed to write remaining data body to new.pak.\n");
-            result = 1;
-            goto cleanup_buffer;
+            int64_t new_start = (int64_t)e.blocks[b].start + offset_delta;
+            int64_t new_end = (int64_t)e.blocks[b].end + offset_delta;
+            e.blocks[b].start = (uint64_t)new_start;
+            e.blocks[b].end = (uint64_t)new_end;
         }
-        bytes_copied += bytesRead;
-        current_new_offset += bytesRead;
+        uint8_t *head = NULL;
+        size_t head_size = 0;
+        e.FileOffset = 0; // 数据块的offset写为0，和原版一致，才能bms解包
+        SerializeHeadData(&e, &head, &head_size);
+        if (write(NewPakFile, head, head_size) != (ssize_t)head_size)
+        {
+            fprintf(stderr, "Failed to write head for entry %u\n", i);
+            free(head);
+            result = 1;
+            goto cleanup;
+        }
+        current_new_offset += head_size;
+        free(head);
+        // 计算 body 位置和大小
+        u_int64_t data_start = src_data.FileEntries[i].FileOffset; // 当前数据块的原始偏移
+        uint64_t data_end = (i + 1 < src_data.NumOfInstances)
+                                   ? src_data.FileEntries[i + 1].FileOffset
+                                   : (src_data.info.offset ^ OFFSET_KEY);
+        size_t body_size = data_end - data_start - head_size;
+        uint64_t body_start = data_start + head_size; 
+        // 检查 body 大小是否合理（防御性编程）
+        if (body_size > CHUNK_SIZE)
+        {
+            fprintf(stderr, "Error: body_size too large (%zu bytes) for entry %u. Max allowed: 65536.\n",
+                    body_size, i);
+            result = 1;
+            goto cleanup;
+        }
+        // 一次性分配并读取 body
+        uint8_t *body_data = malloc(body_size);
+        if (pread(SrcPakFile, body_data, body_size, body_start) != (ssize_t)body_size)
+        {
+            fprintf(stderr, "Failed to read body for entry %u (offset=0x%llx, size=%zu)\n",
+                    i, (unsigned long long)data_start, body_size);
+            free(body_data);
+            result = 1;
+            goto cleanup;
+        }
+        // 写入 body 数据
+        if (write(NewPakFile, body_data, body_size) != (ssize_t)body_size)
+        {
+            fprintf(stderr, "Failed to write body for entry %u\n", i);
+            free(body_data);
+            result = 1;
+            goto cleanup;
+        }
+        current_new_offset += body_size;
+        free(body_data);
     }
-    free(buffer);
-    buffer = NULL;
+
+    // // 复制旧索引之前的数据体剩余部分，从旧数据块末尾开始
+    // uint64_t oldIndexOffset = src_data.info.offset ^ OFFSET_KEY;
+    // bytes_to_copy = oldIndexOffset;
+    // bytes_copied = old_data_body_end;
+
+    // while (bytes_copied < bytes_to_copy)
+    // {
+    //     size_t to_read = (size_t)(bytes_to_copy - bytes_copied < buffer_size ? bytes_to_copy - bytes_copied : buffer_size);
+    //     ssize_t bytesRead = pread(SrcPakFile, buffer, to_read, bytes_copied);
+    //     if (bytesRead <= 0)
+    //         break; // 如果读取失败或结束，就退出
+
+    //     if (write(NewPakFile, buffer, bytesRead) != bytesRead)
+    //     {
+    //         fprintf(stderr, "Failed to write remaining data body to new.pak.\n");
+    //         result = 1;
+    //         goto cleanup_buffer;
+    //     }
+    //     bytes_copied += bytesRead;
+    //     current_new_offset += bytesRead;
+    // }
+    // free(buffer);
+    // buffer = NULL;
 
     // ------------------------------------------------------------------
     // 4. 重建并写入索引数据
