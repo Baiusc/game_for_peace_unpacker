@@ -9,13 +9,13 @@ import hashlib
 import struct
 
 # 配置参数
-start_byte = 291854
-print_byte_size = 246+4
+start_byte = 306190
+print_byte_size = 94+4
 print_byte_size_pre = 0
 print_byte_size_after = 0
 
-src_pak = Path("./paks/game_patch_1.34.12.14515调试ace稳定枪补.pak")
-my_pak = Path("./paks/game_patch_1.34.12.14515调试ace稳定枪补.pak")
+src_pak = Path("./paks/game_patch_1.34.12.14515验证ace稳定1127.pak")
+my_pak = Path("./paks/game_patch_1.34.12.14515验证ace稳定1127.pak")
 
 def compute_file_hash(file_path: Path, algorithm='sha256') -> str:
     """计算文件的哈希值"""

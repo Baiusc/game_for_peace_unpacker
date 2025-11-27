@@ -2,7 +2,7 @@
 Author       : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
 Date         : 2025-08-21 10:10:50
 LastEditors  : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
-LastEditTime : 2025-11-27 10:07:20
+LastEditTime : 2025-11-27 15:27:10
 FilePath     : /game_for_peace_unpacker/python/bms_linux.py
 Description  : 
 
@@ -14,8 +14,7 @@ import time
 from glob import glob
 
 
-pak_file = "./paks/game_patch_1.34.12.14515调试pkm稳定枪补1127.pak"
-
+pak_file = "./paks/game_patch_1.34.12.14515验证ace稳定1127.pak"
 
 dat_dir = "./paks/dat_temp"
 
