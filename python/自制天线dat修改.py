@@ -474,7 +474,7 @@ def swap_ptr_in_dat(dat_path: Path, swaps: List[Tuple[str, str]]):
 # ============ 主流程 ============
 def main():
     # 直接指定要处理的 dat 文件
-    target_dat = Path("./release/RE天线V4发布20250930/00000047原厂（复件）.dat")
+    target_dat = Path("./release/RE天线V4发布20250930/00000014原厂（复件）.dat")
 
     # 第一次 swap 配置
     # swap_config = [(403251, 413497), (405011, 413498)] #  白T <=> 赵云2 。棕鞋 <=> 赵云3
