@@ -1587,7 +1587,12 @@ int main()
         {
             // 在被替换块之后，FileOffset 需要加上增量
             adjusted_offset = e->FileOffset + offset_add;
-            // TODO 压缩块的 start/end 偏移不是相对于 FileOffset 的，而是相对于整个文件开头的偏移，因此需要调整
+            // 在被替换块之后，压缩块的 start/end 偏移，需要加上增量
+            for (uint32_t j = 0; j < e->NumOfBlocks; j++)
+            {
+                e->blocks[j].start += offset_add;
+                e->blocks[j].end += offset_add;
+            }
         }
         else
         {
@@ -1643,14 +1648,14 @@ int main()
     ni1->dir_map.dir_files = 2;
 
     // 手动在 dir_path_raw 开头添加前缀 "Content/"
-    // if (ni0->dir_map.dir_len + 8 < sizeof(ni0->dir_map.dir_path_raw))
-    // {
-    //     memmove(ni0->dir_map.dir_path_raw + 8,
-    //             ni0->dir_map.dir_path_raw,
-    //             ni0->dir_map.dir_len + 1); // +1 保留结尾 '\0'（如果存在）
-    //     memcpy(ni0->dir_map.dir_path_raw, "Content/", 8);
-    //     ni0->dir_map.dir_len += 8;
-    // }
+    if (ni0->dir_map.dir_len + 8 < sizeof(ni0->dir_map.dir_path_raw))
+    {
+        memmove(ni0->dir_map.dir_path_raw + 8,
+                ni0->dir_map.dir_path_raw,
+                ni0->dir_map.dir_len + 1); // +1 保留结尾 '\0'（如果存在）
+        memcpy(ni0->dir_map.dir_path_raw, "Content/", 8);
+        ni0->dir_map.dir_len += 8;
+    }
 
     // 手动删除 dir_path_raw 的前8个字符 "Content/"
     // if (ni0->dir_map.dir_len >= 8 && strncmp(ni0->dir_map.dir_path_raw, "Content/", 8) == 0)

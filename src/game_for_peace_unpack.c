@@ -2,7 +2,7 @@
  * @Author       : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
  * @Date         : 2025-11-04 11:55:58
  * @LastEditors  : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
- * @LastEditTime : 2025-11-26 08:40:49
+ * @LastEditTime : 2025-11-27 09:47:16
  * @FilePath     : /game_for_peace_unpacker/src/game_for_peace_unpack.c
  * @Description  : 解包为ue目录资产。
  * 
@@ -491,7 +491,10 @@ void extract(int PakFile, Entry entry, char *filename) {
             if (entry.Encrypted) {
                 DecryptData(CompressedData, entry.blocks[x].end - entry.blocks[x].start);
             }
-            
+            if(entry.FileSize == 25430)
+            {
+                int debug = 1;
+            }
             // 根据压缩方法进行解压缩
             if (entry.CompressionMethod == 1) { // ZLIB
                 if ((DecompressLength = ZLIB_decompress(CompressedData, entry.blocks[x].end - entry.blocks[x].start, DecompressedData, CHUNK_SIZE)) == 0) {
