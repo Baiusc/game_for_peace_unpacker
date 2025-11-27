@@ -1201,22 +1201,24 @@ int main()
 {
     // 定义源 PAK 文件和包含新数据的 PAK 文件路径
     const char *SRC_PAK_PATH = "../paks/game_patch_1.34.12.14515原厂.pak";
-    const char *MY_PAK_PATH  = "../paks/旧版/map_weapon_1.33.12.14210稳定1104发布.pak";
-    const char *NEW_PAK_PATH = "../paks/game_patch_1.34.12.14515调试ace稳定枪补.pak"; // 🌟 新增：生成的新文件路径
+    const char *MY_PAK_PATH  = "../paks/旧版/game_patch_1.33.12.14383枪补1103稳定.pak";
+    const char *NEW_PAK_PATH = "../paks/game_patch_1.34.12.14515调试pkm稳定枪补1127.pak"; // 🌟 新增：生成的新文件路径
 
     // 定义要替换的旧文件实例的索引（我们假设要替换最后两个 Entry Index）
     int old_entry_indices[2] = {-1, -1};
     // const char *key_str_old[] = {"BP_Muzzle_M762.uasset", "BP_Muzzle_M762.uexp"}; // 旧文件实例的文件名
     // const char *key_str_old[] = {"BP_Sniper_SVD.uasset", "BP_Sniper_SVD.uexp"}; // 旧文件实例的文件名
-    const char *key_str_old[] = {"BP_Rifle_AKM.uasset", "BP_Rifle_AKM.uexp"}; // 旧文件实例的文件名
+    // const char *key_str_old[] = {"BP_Rifle_AKM.uasset", "BP_Rifle_AKM.uexp"}; // 旧文件实例的文件名
+    const char *key_str_old[] = {"BP_Other_PKM.uasset", "BP_Other_PKM.uexp"}; // 旧文件实例的文件名
 
 
     // 定义要提取的新文件实例名（在 my_pak 中寻找）
     // const char *key_str_my[] = { "CH_Base_SK_PhysicsAsset.uasset", "CH_Base_SK_PhysicsAsset.uexp" };
     // const char *key_str_my[] = { "BP_Rifle_M762.uasset", "BP_Rifle_M762.uexp" };
     // const char *key_str_my[] = { "BP_Muzzle_M762.uasset", "BP_Muzzle_M762.uexp" };
+    // const char *key_str_my[] = {"BP_Rifle_ACE32.uasset", "BP_Rifle_ACE32.uexp"};
+    const char *key_str_my[] = {"BP_Other_PKM.uasset", "BP_Other_PKM.uexp"};
 
-    const char *key_str_my[] = {"BP_Rifle_ACE32.uasset", "BP_Rifle_ACE32.uexp"};
 
     // const char *key_str_my[] = { "BP_UGC_ShotGun_S12K.uasset", "BP_UGC_ShotGun_S12K.uexp" }; // 原版 debug
 
@@ -1425,7 +1427,6 @@ int main()
 
     // 3.2 写入两个新实例的 databody ，包含 head + data
     printf("3.2 Writing new instance data blocks...\n");
-    uint64_t offset_add = 0; // 记录新的数据体大小与旧数据体大小的增量偏移
 
     // 写入第一个新实例（先写入size=94的head，再写入size=CompressionLength的data）
 
@@ -1440,10 +1441,11 @@ int main()
             ni0->entry.blocks[b].end = ni0->entry.blocks[b].end - ni0->entry.FileOffset + current_new_offset;
         }
     }
-    ni0->entry.FileOffset = current_new_offset;
-    ni0->entry.FileOffset = 0; // 写为0，和原版一致，才能bms解包
+
+    ni0->entry.FileOffset = 0; // 数据块的offset写为0，和原版一致，才能bms解包
     // 根据新的 entry ，构造新的  ni0->Head （size = 94）字段
     SerializeHeadData(&ni0->entry, &ni0->Head, &ni0->HeadSize);
+    ni0->entry.FileOffset = current_new_offset;  // 更新 Entry 结构体中的 FileOffset，后续重建索引时会用到
     // >>> 新增：写入 ni0->Head 之前，模拟反序列化并打印 Head 数据
     DebugDeserializeAndPrintHead(ni0->Head, ni0->HeadSize, "ni0");
     // 在 write 之前调用：
@@ -1478,10 +1480,11 @@ int main()
             ni1->entry.blocks[b].end = ni1->entry.blocks[b].end - ni1->entry.FileOffset + current_new_offset;
         }
     }
-    ni1->entry.FileOffset = current_new_offset; // 更新 Entry 结构体中的 FileOffset
-    ni1->entry.FileOffset = 0;                  // 写为0，和原版一致，才能bms解包
+
+    ni1->entry.FileOffset = 0; // 数据块的offset写为0，和原版一致，才能bms解包
     // 根据新的 entry ，构造新的  ni1->Head （size = 94）字段
     SerializeHeadData(&ni1->entry, &ni1->Head, &ni1->HeadSize);
+    ni1->entry.FileOffset = current_new_offset; // 更新 Entry 结构体中的 FileOffset，后续重建索引时会用到
     // >>> 新增：写入 ni1->Head 之前，模拟反序列化并打印 Head 数据
     DebugDeserializeAndPrintHead(ni1->Head, ni1->HeadSize, "ni1");
     // 在 write 之前调用：
@@ -1505,10 +1508,10 @@ int main()
 
     // 计算增量偏移
     uint64_t old_size = old_entry_1_after->FileOffset - old_entry_0->FileOffset;
-    uint64_t new_size = ni0->HeadSize + ni0->DataSize +  ni1->HeadSize+  ni1->DataSize;
-
-    offset_add = new_size - old_size;
-    printf("Data body size change: %llu bytes (Offset Add).\n", offset_add);
+    uint64_t new_size = ni0->HeadSize + ni0->DataSize + ni1->HeadSize + ni1->DataSize;
+    // 计算增量偏移（可能为负！）
+    int64_t offset_delta = (int64_t)new_size - (int64_t)old_size;
+    printf("Data body size change: %llu bytes (Offset Delta).\n", offset_delta);
 
     // 3.3 写入 SRC_PAK 中最后两个实例之后的剩余数据 (如果存在)
     printf("3.3 Writing remaining data body...\n");
@@ -1576,7 +1579,7 @@ int main()
 
         // 🌟 核心更新：调整 FileOffset
         // 只有被替换的实例 FileOffset 是绝对值（已在 3.2 更新）。
-        // 其他实例的 FileOffset 需要加上增量偏移 offset_add。
+        // 其他实例的 FileOffset 需要加上增量偏移 offset_delta 。
         uint64_t adjusted_offset = e->FileOffset;
         if (i < old_entry_indices[0])
         {
@@ -1585,14 +1588,8 @@ int main()
         }
         else if (i > old_entry_indices[1])
         {
-            // 在被替换块之后，FileOffset 需要加上增量
-            adjusted_offset = e->FileOffset + offset_add;
-            // 在被替换块之后，压缩块的 start/end 偏移，需要加上增量
-            for (uint32_t j = 0; j < e->NumOfBlocks; j++)
-            {
-                e->blocks[j].start += offset_add;
-                e->blocks[j].end += offset_add;
-            }
+            // 安全地将 int64_t 偏移加到 uint64_t 上
+            adjusted_offset = (uint64_t)((int64_t)e->FileOffset + offset_delta);
         }
         else
         {
@@ -1617,14 +1614,20 @@ int main()
         if (e->CompressionMethod != 0)
         {
             write_data(NewIndexData, &NewIndexDataSize, &e->NumOfBlocks, 4);
-            for (uint32_t i = 0; i < e->NumOfBlocks; i++)
+            for (uint32_t k = 0; k < e->NumOfBlocks; k++)
             {
-                if (i > 1)
+                // 计算调整后的 start/end
+                uint64_t write_start = e->blocks[k].start;
+                uint64_t write_end = e->blocks[k].end;
+                // 在被替换块之后，压缩块的 start/end 偏移，需要加上增量
+                if (i > old_entry_indices[1])
                 {
-                    int debug = i;
+                    // 安全地应用 signed 偏移到 uint64_t 的 start/end
+                    int64_t new_start = (int64_t)write_start + offset_delta;
+                    int64_t new_end = (int64_t)write_end + offset_delta;
                 }
-                write_data(NewIndexData, &NewIndexDataSize, &e->blocks[i].start, 8);
-                write_data(NewIndexData, &NewIndexDataSize, &e->blocks[i].end, 8);
+                write_data(NewIndexData, &NewIndexDataSize, &write_start, 8);
+                write_data(NewIndexData, &NewIndexDataSize, &write_end, 8);
             }
         }
         write_data(NewIndexData, &NewIndexDataSize, &e->CompressedBlockSize, 4);
@@ -1648,14 +1651,14 @@ int main()
     ni1->dir_map.dir_files = 2;
 
     // 手动在 dir_path_raw 开头添加前缀 "Content/"
-    if (ni0->dir_map.dir_len + 8 < sizeof(ni0->dir_map.dir_path_raw))
-    {
-        memmove(ni0->dir_map.dir_path_raw + 8,
-                ni0->dir_map.dir_path_raw,
-                ni0->dir_map.dir_len + 1); // +1 保留结尾 '\0'（如果存在）
-        memcpy(ni0->dir_map.dir_path_raw, "Content/", 8);
-        ni0->dir_map.dir_len += 8;
-    }
+    // if (ni0->dir_map.dir_len + 8 < sizeof(ni0->dir_map.dir_path_raw))
+    // {
+    //     memmove(ni0->dir_map.dir_path_raw + 8,
+    //             ni0->dir_map.dir_path_raw,
+    //             ni0->dir_map.dir_len + 1); // +1 保留结尾 '\0'（如果存在）
+    //     memcpy(ni0->dir_map.dir_path_raw, "Content/", 8);
+    //     ni0->dir_map.dir_len += 8;
+    // }
 
     // 手动删除 dir_path_raw 的前8个字符 "Content/"
     // if (ni0->dir_map.dir_len >= 8 && strncmp(ni0->dir_map.dir_path_raw, "Content/", 8) == 0)
@@ -1704,7 +1707,7 @@ int main()
         goto cleanup;
     }
     current_new_offset += 45;
-    printf("Successfully created and updated %s (New Size: %llu bytes, Size Delta: %+lld bytes).\n", NEW_PAK_PATH, (unsigned long long)current_new_offset, (long long)offset_add);
+    printf("Successfully created and updated %s (New Size: %llu bytes, Size Delta: %+lld bytes).\n", NEW_PAK_PATH, (unsigned long long)current_new_offset, (long long)offset_delta);
 
 cleanup_buffer:
     if (buffer)
