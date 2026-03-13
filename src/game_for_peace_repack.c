@@ -1204,7 +1204,7 @@ void DebugReadFirst94Bytes(const char *file_path)
 int main()
 {
     // 定义源 PAK 文件和包含新数据的 PAK 文件路径
-    const char *SRC_PAK_PATH = "../paks/game_patch_1.34.12.14515原厂.pak";
+    const char *SRC_PAK_PATH = "../paks/map_weapon_1.34.12.14500原厂.pak";
     const char *MY_PAK_PATH  = "../paks/旧版/map_lobby_1.32.11.13800_0.67.pak";
     const char *NEW_PAK_PATH = "../paks/game_patch_1.34.12.14515调试0.67范围1127.pak"; // 🌟 新增：生成的新文件路径
 

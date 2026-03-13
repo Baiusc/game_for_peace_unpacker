@@ -183,24 +183,30 @@ ID_LIST_MY = [
 """
 # 天线美化。核心替换项
 SWAP_CONFIG_CORE = [
-    (404007, 413619),   # 竞技裤(黑)-创建角色已占用 <=> 幽焰骑士1 413619 
-    (405011, 413739),   # 棕色高帮运动鞋-创建角色已占用 <=> 幽焰骑士2 413739
-    (812018, 413495),    # 默认鞋子(女) ↔  关羽3
-    (812019, 413494),    # 默认鞋子(男) ↔ 关羽2
+    (404007, 413740),   # 竞技裤(黑)-创建角色已占用 <=> 关羽2 413494 幽焰骑士1 413619 幽焰骑士3 413740 
+    (405011, 413739),   # 棕色高帮运动鞋-创建角色已占用 <=> 关羽3 413495 幽焰骑士2 413739
+    (812018, 413818),    # 默认鞋子(女) ↔  瑞拉1
+    (812019, 413819),    # 默认鞋子(男) ↔ 瑞拉2
     (812020, 413820),    # 默认鞋子(通用) ↔ 瑞拉3 
-    (405001, 413851),    # 运动鞋(白) ↔ 金蛇镇世-烛九3
-    (404110, 413063),     # 牛仔裤(蓝) ↔ 初号机款机体服
+    (405001, 413655),    # 运动鞋(白) ↔ 宇宙1 金蛇镇世-烛九3
+    (404110, 413656),     # 牛仔裤(蓝) ↔ 宇宙2 初号机款机体服
     (403251, 413657)    # T恤(白)(新)(创建角色使用) <=> 宇宙3
 ]
 # 天线美化。扩展替换项
 SWAP_CONFIG_PLUGIN = [
+# 幻影飞狐 413702 辉羽雀灵3 413862 暮色玫影3 423054
+    (802397, 423054),    # 背包挂件-扫描仪 802397 背包挂件-花香恋语 802116  <=> 异瞳寒姬 413671 紫俏灵猫 413672 绯色魅影 413670 
+    (503001, 413497),    # 1级甲 <=> 赵云2 413497
+    (503002, 413498),    # 2级甲 <=> 赵云3 413498
+    (503003, 413495)     # 3级甲 <=> 关羽3 413495
+]
 
-# 幻影飞狐 413702 辉羽雀灵3 413862
-    (802116, 413670),    # 背包挂件-扫描仪 802397 背包挂件-花香恋语 802116  <=> 异瞳寒姬 413671 紫俏灵猫 413672 绯色魅影 413670 
-    (503001, 413740),    # 1级甲 <=> 幽焰骑士3 
-    (503002, 413497),    # 2级甲 <=> 赵云2 413497
-    (503003, 413498)     # 3级甲 <=> 赵云3 413498
-
+# 天线美化。无防弹衣
+SWAP_CONFIG_LOW = [
+    (802397, 423054),    # 背包挂件-扫描仪 802397 背包挂件-花香恋语 802116  <=> 异瞳寒姬 413671 紫俏灵猫 413672 绯色魅影 413670 
+    (404007, 413498) ,   # 竞技裤(黑)-创建角色已占用 <=> 赵云3 413498
+    (405011, 413497) ,   # 棕色高帮运动鞋-创建角色已占用 <=> 赵云2 413497
+    (403251, 413739)     # T恤(白)(新)(创建角色使用) <=> 幽焰骑士2 413739
 ]
 
 # ============ 工具函数 ============
@@ -474,7 +480,7 @@ def swap_ptr_in_dat(dat_path: Path, swaps: List[Tuple[str, str]]):
 # ============ 主流程 ============
 def main():
     # 直接指定要处理的 dat 文件
-    target_dat = Path("./release/RE天线V4发布20250930/00000014原厂（复件）.dat")
+    target_dat = Path("./release/RE天线V4发布20250930/BattleItem.uasset")
 
     # 第一次 swap 配置
     # swap_config = [(403251, 413497), (405011, 413498)] #  白T <=> 赵云2 。棕鞋 <=> 赵云3
@@ -487,10 +493,9 @@ def main():
 
 
     # swap_in_dat(target_dat, swap_config) # 仅交换ID
-    is_need_print = False # 是否需要打印上下文
+    is_need_print = True # 是否需要打印上下文
     SWAP_CONFIG_CORE_str = [(str(old), str(new)) for old, new in SWAP_CONFIG_CORE] 
-    swap_id_and_ptr_in_dat(target_dat, SWAP_CONFIG_CORE_str, is_need_print) # 交换ID、指针 3组核心交换
-    # swap_ptr_in_dat(target_dat, swap_config_str)
+    # swap_id_and_ptr_in_dat(target_dat, SWAP_CONFIG_CORE_str, is_need_print) # 交换ID、指针 3组核心交换
 
     # # swap_config_my = list(zip(ID_LIST_MY, ID_LIST_SWAP))
     # swap_config_my = swap_config_my[1:]  # 跳过第1组，从第2组开始
@@ -499,7 +504,10 @@ def main():
     # swap_config_my = swap_config_my[2::3]  # 从索引2开始，每隔3个取1个（2,5,8,11,...）
     # swap_config_my_str = [(str(old), str(new)) for old, new in swap_config_my] 
     SWAP_CONFIG_PLUGIN_str = [(str(old), str(new)) for old, new in SWAP_CONFIG_PLUGIN] 
-    swap_id_and_ptr_in_dat(target_dat, SWAP_CONFIG_PLUGIN_str, is_need_print) # 交换ID、指针 n组扩展交换
+    # swap_id_and_ptr_in_dat(target_dat, SWAP_CONFIG_PLUGIN_str, is_need_print) # 交换ID、指针 n组扩展交换
+
+    SWAP_CONFIG_LOW_str = [(str(old), str(new)) for old, new in SWAP_CONFIG_LOW] 
+    swap_id_and_ptr_in_dat(target_dat, SWAP_CONFIG_LOW_str, is_need_print) # 旧版天线，无防弹衣
 
     # 第二次批量替换配置
     # target_code = "405009" # 红色高帮运动鞋

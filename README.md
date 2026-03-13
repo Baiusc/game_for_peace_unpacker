@@ -2,7 +2,7 @@
  * @Author       : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
  * @Date         : 2025-09-02 16:42:02
  * @LastEditors  : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
- * @LastEditTime : 2025-11-26 08:44:27
+ * @LastEditTime : 2026-03-06 11:08:56
  * @FilePath     : /game_for_peace_unpacker/README.md
  * @Description  : 
  * 
@@ -131,9 +131,9 @@ find . -name "*.uasset" -type f -exec grep -ail "SkeletalBodySetup" {} + | xargs
 CH_Base_SK_PhysicsAsset 骨骼box大小 范围  SkeletalBodySetup
 
 部位名称及其含义
-pelvis：骨盆。这是身体的中心，连接上半身和腿部。
+pelvis：骨盆。这是身体的中心，连接上半身和腿部。原版：X=35 Y=33 Z=62 。神0.67：75 75 75 。自制：90 80 75
 
-head：头部。角色的头，通常是游戏中最重要的命中区域，常用于爆头判定。
+head：头部。角色的头，通常是游戏中最重要的命中区域，常用于爆头判定。原版：X=23 Y=23 Z=28 。神0.67：75 75 75 。自制：90 80 75
 
 thigh_r：右大腿。thigh 是大腿，_r 表示右侧（right）。
 
