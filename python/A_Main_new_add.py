@@ -2,12 +2,12 @@
 import shutil
 import struct
 import hashlib
-import zlib  # 引入 zlib 压缩库
+import zlib
 import B_PackTool_quickbms as pt
 
 WATERMARK = """
     ·  ˚  ✦  ˚  ·  ˚  ✦  ·  ˚  ✦  ˚  ·
-  老 6 工 具 - V10 资产无缝注入 (Zip=3 压缩版) 
+  老 6 工 具 - V10 资产无缝注入 (Zip=3 终极修复版) 
     ·  ˚  ✦  ˚  ·  ˚  ✦  ·  ˚  ✦  ˚  ·
 """
 
@@ -17,37 +17,26 @@ OFFSET_KEY = 0xD74AF37FAA6B020D
 MAX_CHUNK_SIZE = 65536  # UE4 官方标准压缩块大小 64KB
 
 def xor_bytes(data: bytes, key: int = XOR_KEY) -> bytes:
-    """简单的按位异或加密/解密"""
     return bytes([b ^ key for b in data])
 
 def serialize_ue4_string(s: str) -> bytes:
-    """序列化 UE4 字符串格式: Length(4字节) + 字符串内容 + \\x00"""
     encoded = s.encode('utf-8') + b'\x00'
     length = len(encoded)
     return struct.pack('<i', length) + encoded
 
 def compress_and_create_fpakentry(file_offset: int, uncompressed_data: bytes) -> tuple:
-    """
-    【核心改造】构造 UE4 标准的 Zip=3 (Zlib) 格式的 FPakEntry 头与压缩数据
-    返回: (meta_bytes, compressed_payload_bytes)
-    """
     uncompressed_size = len(uncompressed_data)
     compressed_chunks = []
     
-    # 1. 按照 MAX_CHUNK_SIZE (64KB) 对数据进行切片并 zlib 压缩
     for i in range(0, uncompressed_size, MAX_CHUNK_SIZE):
         raw_chunk = uncompressed_data[i : i + MAX_CHUNK_SIZE]
-        comp_chunk = zlib.compress(raw_chunk, level=9) # 使用最高压缩率，保证与官方一致
+        comp_chunk = zlib.compress(raw_chunk, level=9)
         compressed_chunks.append(comp_chunk)
         
     chunk_count = len(compressed_chunks)
-    
-    # 2. 计算 Meta 结构占用的大小，以推导第一个 Chunk 的起始绝对偏移
-    # Base(69) + ChunkCount(4) + Chunks(16 * count) + MaxChunkSize(4) + Encrypted(1)
     meta_size = 69 + 4 + (16 * chunk_count) + 5
     payload_start_offset = file_offset + meta_size
     
-    # 3. 计算每个压缩块的 Start 和 End 偏移量，以及总压缩后体积 ZSize
     chunk_offsets = []
     current_offset = payload_start_offset
     zsize = 0
@@ -59,30 +48,24 @@ def compress_and_create_fpakentry(file_offset: int, uncompressed_data: bytes) ->
         
     data_hash = hashlib.sha1(uncompressed_data).digest()
 
-    # 4. 组装 FPakEntry 字节流
     meta = bytearray()
-    meta.extend(data_hash)                     # 20 bytes: Hash (未压缩数据的哈希)
-    meta.extend(struct.pack('<q', file_offset))# 8 bytes: Offset (文件的绝对起始偏移)
-    meta.extend(struct.pack('<q', uncompressed_size)) # 8 bytes: Size (解压后总大小)
-    meta.extend(struct.pack('<i', 3))          # 4 bytes: Zip = 3 (Zlib压缩格式)
-    meta.extend(struct.pack('<q', zsize))      # 8 bytes: ZSize (压缩后总大小)
-    meta.extend(b'\x00' * 21)                  # 21 bytes: Dummy
-    
-    # --- Chunks 记录区 ---
-    meta.extend(struct.pack('<i', chunk_count))# 4 bytes: 压缩块数量
+    meta.extend(data_hash)                     
+    meta.extend(struct.pack('<q', file_offset))
+    meta.extend(struct.pack('<q', uncompressed_size)) 
+    meta.extend(struct.pack('<i', 3))          
+    meta.extend(struct.pack('<q', zsize))      
+    meta.extend(b'\x00' * 21)                  
+    meta.extend(struct.pack('<i', chunk_count))
     for start_off, end_off in chunk_offsets:
-        meta.extend(struct.pack('<q', start_off)) # 8 bytes: Chunk 起始偏移
-        meta.extend(struct.pack('<q', end_off))   # 8 bytes: Chunk 结束偏移
-        
-    # --- Tail 尾部区 ---
-    meta.extend(struct.pack('<i', MAX_CHUNK_SIZE)) # 4 bytes: MaxChunkSize (65536)
-    meta.extend(b'\x00')                           # 1 byte: Encrypted = 0
+        meta.extend(struct.pack('<q', start_off)) 
+        meta.extend(struct.pack('<q', end_off))   
+    meta.extend(struct.pack('<i', MAX_CHUNK_SIZE)) 
+    meta.extend(b'\x00')                           
 
     compressed_payload = b''.join(compressed_chunks)
     return bytes(meta), compressed_payload
 
 def extract_asset(tool: pt.UE4PakEngine, pak_path: str, ext: str, asset_base_name: str):
-    """从高版本提取池中提取资产数据"""
     target_idx = -1
     target_path = ""
     search_str = asset_base_name + ext
@@ -202,28 +185,48 @@ def rebuild_v10_index(index_data, is_enc, new_assets, src_mp, target_mp):
     if is_enc: return xor_bytes(new_index)
     return new_index
 
-def compare_extracted_assets_debug(target_asset_pak, injected_pak, asset_base_name):
-    print("\n  [🔍 深度Debug] === 自动解包与差异溯源测试 (Zip=3 压缩版) ===")
+def compare_extracted_assets_debug(src_pak, target_asset_pak, injected_pak, asset_base_name):
+    print("\n  [🔍 深度Debug] === 自动解包与差异溯源测试 (Zip=3 三方比对版) ===")
     
-    orig_tool = pt.UE4PakEngine(target_asset_pak)
-    orig_tool.parse()
-    _, orig_uasset = extract_asset(orig_tool, target_asset_pak, ".uasset", asset_base_name)
-    _, orig_uexp = extract_asset(orig_tool, target_asset_pak, ".uexp", asset_base_name)
+    # 1. 尝试从原版基础包 (src_pak) 中提取，看之前到底有没有这个文件
+    print(f"  [🔍] 正在解析原版基础包: {os.path.basename(src_pak)}...")
+    src_tool = pt.UE4PakEngine(src_pak)
+    src_tool.parse()
+    _, src_uasset = extract_asset(src_tool, src_pak, ".uasset", asset_base_name)
+    _, src_uexp = extract_asset(src_tool, src_pak, ".uexp", asset_base_name)
     
+    if not src_uasset:
+        print(f"  [🔍] 注入前状态: 原包内未找到 '{asset_base_name}' (这是一个纯新增的注入跨界资产！)")
+    else:
+        print(f"  [🔍] 注入前状态: 原包内存在旧资产，uasset 解压后体积: {len(src_uasset)} 字节")
+
+    # 2. 从目标资产池 (target_asset_pak，即范围伤害OBB) 提取，作为【标准答案】
+    target_tool = pt.UE4PakEngine(target_asset_pak)
+    target_tool.parse()
+    _, target_uasset = extract_asset(target_tool, target_asset_pak, ".uasset", asset_base_name)
+    _, target_uexp = extract_asset(target_tool, target_asset_pak, ".uexp", asset_base_name)
+
+    # 3. 从我们生成的注入包 (injected_pak) 中提取，验证注入结果
+    print(f"  [🔍] 正在解析注入生成包: {os.path.basename(injected_pak)}...")
     inj_tool = pt.UE4PakEngine(injected_pak)
     inj_tool.parse()
     _, inj_uasset = extract_asset(inj_tool, injected_pak, ".uasset", asset_base_name)
     _, inj_uexp = extract_asset(inj_tool, injected_pak, ".uexp", asset_base_name)
     
-    if not orig_uasset or not inj_uasset:
-        print("  [!] 提取失败，无法比对。")
+    if not target_uasset or not inj_uasset:
+        print("  [!] 提取失败，无法进行比对验证。")
         return
 
-    print(f"  [🔍] 原版 uasset 解压后体积: {len(orig_uasset)} 字节")
-    print(f"  [🔍] 注入版 uasset 解压后体积: {len(inj_uasset)} 字节")
+    print(f"  [🔍] 注入后状态: 新包内 uasset 解压后体积: {len(inj_uasset)} 字节")
     
-    if orig_uasset == inj_uasset and orig_uexp == inj_uexp:
-        print("  [✅ 终极确认] 从 Injected Pak 解包提取的资产数据，与官方原包解包数据 100% 完美一致！(Zip=3 压缩与解压闭环通过)")
+    # --- 终极交叉对比 ---
+    if target_uasset == inj_uasset and target_uexp == inj_uexp:
+        print("  [✅ 终极确认] 从 Injected Pak 解包出的新资产，与高版本提取池的【标准答案】 100% 完美一致！(Zip=3 压缩闭环通过)")
+        if src_uasset:
+            if src_uasset != inj_uasset:
+                print("  [✅ 覆盖确认] 成功覆盖了基础包中原有的旧资产，替换生效！")
+            else:
+                print("  [⚠️ 提示] 注入的资产与基础包中原有的资产内容完全相同，体积未发生实质性变化。")
     else:
         print("  [❌ 错误] 压缩/解压缩过程存在数据不一致！")
 
@@ -231,15 +234,11 @@ def add_asset_to_pak(src_pak, target_asset_pak, asset_base_name, out_pak):
     print(f"\n[+] 开始跨版本无缝移植 V10 资产 (Zip=3 压缩模式): {asset_base_name}")
     
     target_tool = pt.UE4PakEngine(target_asset_pak)
-    if not target_tool.parse():
-        return False
+    if not target_tool.parse(): return False
         
     uasset_path, uasset_data = extract_asset(target_tool, target_asset_pak, ".uasset", asset_base_name)
     uexp_path, uexp_data = extract_asset(target_tool, target_asset_pak, ".uexp", asset_base_name)
-    
-    if not uasset_data or not uexp_data:
-        print("[!] 错误：找不到完整的资产文件！")
-        return False
+    if not uasset_data or not uexp_data: return False
         
     src_tool = pt.UE4PakEngine(src_pak)
     if not src_tool.parse(): return False
@@ -254,75 +253,70 @@ def add_asset_to_pak(src_pak, target_asset_pak, asset_base_name, out_pak):
         file_size = f.tell()
         index_size = file_size - 45 - index_offset
         
+        # ================= 救命的修复：提前读取并解析 PakInfo =================
+        f.seek(file_size - 45)
+        pak_info = bytearray(f.read(45))
+        
+        # 解析原始的 PakInfo，为了验证我们没有弄坏它
+        orig_enc_flag = pak_info[0]
+        orig_magic = struct.unpack('<I', pak_info[1:5])[0]
+        orig_version = struct.unpack('<I', pak_info[5:9])[0]
+        
+        print(f"\n  [🔍 尾部防覆盖保护] 成功读取原始 PakInfo。")
+        print(f"      -> 原始 Magic: 0x{orig_magic:X} (游戏引擎识别的核心标志)")
+        print(f"      -> 原始 Version: {orig_version} (确保不会变成乱码)")
+        # ======================================================================
+
+        # 读取旧的索引区数据
         f.seek(index_offset)
         old_index_data = bytearray(f.read(index_size))
         
-        # --- 尾部追加数据阶段 (Zip=3 分块压缩写入) ---
+        # --- 尾部追加数据阶段 ---
         f.seek(index_offset)
-        
         def append_new_file_zip3(uncompressed_data, name_ext):
             file_offset = f.tell()
-            # 获取构造好的 Meta 和 已经压缩好的数据体
             meta, compressed_payload = compress_and_create_fpakentry(file_offset, uncompressed_data)
-            
             f.write(meta) 
             f.write(compressed_payload) 
-            
-            hash_hex = hashlib.sha1(uncompressed_data).digest().hex().upper()
-            print(f"  [🔍 Debug] 写入 {name_ext} (Zlib) -> 偏移: 0x{file_offset:X} | 解压SHA1: {hash_hex} | 压缩率: {len(compressed_payload)}/{len(uncompressed_data)} 字节")
             return file_offset, meta, compressed_payload
             
         uasset_offset, uasset_meta, uasset_comp = append_new_file_zip3(uasset_data, "uasset")
         uexp_offset, uexp_meta, uexp_comp = append_new_file_zip3(uexp_data, "uexp")
-        print("[*] 物理数据追加完成 (Zip=3 Zlib 分块压缩模式)。")
         
         # --- 重建 V10 Directory Map 阶段 ---
-        new_assets_list = [
-            (uasset_path, uasset_meta),
-            (uexp_path, uexp_meta)
-        ]
-        
-        new_index_bytes = rebuild_v10_index(
-            old_index_data, is_enc, new_assets_list, 
-            src_tool.mount_point, target_tool.mount_point
-        )
+        new_assets_list = [(uasset_path, uasset_meta), (uexp_path, uexp_meta)]
+        new_index_bytes = rebuild_v10_index(old_index_data, is_enc, new_assets_list, src_tool.mount_point, target_tool.mount_point)
         
         new_index_offset = f.tell()
         f.write(new_index_bytes)
         new_index_size = len(new_index_bytes)
         
         # --- 尾部指针重写阶段 (PakInfo) ---
-        f.seek(file_size - 45)
-        pak_info = bytearray(f.read(45))
+        # 此时不再去硬盘读了！直接使用内存中受保护的、携带正确 Magic 和 Version 的 pak_info
         
         new_offset_enc = new_index_offset ^ OFFSET_KEY
         pak_info[37:45] = struct.pack('<Q', new_offset_enc)
         pak_info[29:37] = struct.pack('<q', new_index_size)
-        
         index_hash = hashlib.sha1(new_index_bytes).digest()
         pak_info[9:29] = index_hash
         
+        # 封口并截断 (多余的数据会被物理删除)
+        final_file_size = new_index_offset + new_index_size + 45
         f.seek(new_index_offset + new_index_size)
         f.write(pak_info)
         f.truncate()
         
-        # ================== 硬盘逐字节比对自检 ==================
-        print("\n  [🔍 Debug] --- 终极二进制一致性自检 (Byte-for-byte Validation) ---")
-        def verify_written_data(name_ext, offset, expected_meta, expected_comp_data):
-            expected_full_chunk = expected_meta + expected_comp_data
-            expected_len = len(expected_full_chunk)
-            f.seek(offset)
-            actual_full_chunk = f.read(expected_len)
-            
-            if expected_full_chunk == actual_full_chunk:
-                print(f"  [✅ 成功] {name_ext} 压缩块硬盘写入 ({expected_len} 字节) 逐字节比对 100% 完美吻合！")
-            else:
-                print(f"  [❌ 失败] {name_ext} 压缩块硬盘写入数据损坏！")
-                
-        verify_written_data("uasset", uasset_offset, uasset_meta, uasset_comp)
-        verify_written_data("uexp", uexp_offset, uexp_meta, uexp_comp)
+        # ================= 封口自测：验证 Version 依然完好 =================
+        f.seek(-45, 2)
+        verify_pak_info = f.read(45)
+        verify_version = struct.unpack('<I', verify_pak_info[5:9])[0]
+        if verify_version == orig_version:
+            print(f"  [✅ 成功] 物理尾部封口完成！(Version 保持为: {verify_version})，游戏引擎可正常识别！\n")
+        else:
+            print(f"  [❌ 致命错误] 尾部被污染！当前 Version 为: {verify_version}\n")
+        # ===================================================================
 
-    print(f"\n[+] 资产无缝注入成功！文件已生成: {out_pak}\n")
+    print(f"[+] 资产无缝注入成功！文件已生成: {out_pak}\n")
     return True
 
 def main():
@@ -368,8 +362,8 @@ def main():
             out_pak = os.path.join(base_path, f"{file_name}_Injected{ext}")
             
             if add_asset_to_pak(src_pak, target_pak, asset_name, out_pak):
-                # 自动调用解包验证以确保 UAssetGUI 兼容性
-                compare_extracted_assets_debug(target_pak, out_pak, asset_name)
+                # 传入 src_pak (原包), target_pak (标准答案包), out_pak (注入包) 进行三方交叉比对
+                compare_extracted_assets_debug(src_pak, target_pak, out_pak, asset_name)
                 
         except (ValueError, IndexError):
             print("\n[-] 输入无效！程序退出。")
