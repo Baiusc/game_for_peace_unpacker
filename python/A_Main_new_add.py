@@ -231,7 +231,7 @@ def compare_extracted_assets_debug(src_pak, target_asset_pak, injected_pak, asse
         print("  [❌ 错误] 压缩/解压缩过程存在数据不一致！")
 
 def add_asset_to_pak(src_pak, target_asset_pak, asset_base_name, out_pak):
-    print(f"\n[+] 开始跨版本无缝移植 V10 资产 (Zip=3 压缩模式): {asset_base_name}")
+    print(f"\n[+] 开始跨版本无缝移植 V10 资产 (严格等大免验版): {asset_base_name}")
     
     target_tool = pt.UE4PakEngine(target_asset_pak)
     if not target_tool.parse(): return False
@@ -250,73 +250,100 @@ def add_asset_to_pak(src_pak, target_asset_pak, asset_base_name, out_pak):
     
     with open(out_pak, 'r+b') as f:
         f.seek(0, 2)
-        file_size = f.tell()
-        index_size = file_size - 45 - index_offset
+        original_file_size = f.tell()
+        index_size = original_file_size - 45 - index_offset
         
-        # ================= 救命的修复：提前读取并解析 PakInfo =================
-        f.seek(file_size - 45)
+        # 提取原版 PakInfo 保护魔数和版本号
+        f.seek(original_file_size - 45)
         pak_info = bytearray(f.read(45))
-        
-        # 解析原始的 PakInfo，为了验证我们没有弄坏它
-        orig_enc_flag = pak_info[0]
-        orig_magic = struct.unpack('<I', pak_info[1:5])[0]
         orig_version = struct.unpack('<I', pak_info[5:9])[0]
         
-        print(f"\n  [🔍 尾部防覆盖保护] 成功读取原始 PakInfo。")
-        print(f"      -> 原始 Magic: 0x{orig_magic:X} (游戏引擎识别的核心标志)")
-        print(f"      -> 原始 Version: {orig_version} (确保不会变成乱码)")
-        # ======================================================================
-
         # 读取旧的索引区数据
         f.seek(index_offset)
         old_index_data = bytearray(f.read(index_size))
+
+        print(f"\n  [🔍 体积欺骗引擎] 目标原文件绝对大小: {original_file_size} 字节")
+        print(f"  [🔍 体积欺骗引擎] 开始执行双重预计算 (Two-Pass Calculation)...")
+
+        # ================= 第一阶段：内存虚拟计算大小 =================
+        # 预压缩获得真实体积
+        _, uasset_comp = compress_and_create_fpakentry(0, uasset_data)
+        _, uexp_comp = compress_and_create_fpakentry(0, uexp_data)
         
-        # --- 尾部追加数据阶段 ---
-        f.seek(index_offset)
-        def append_new_file_zip3(uncompressed_data, name_ext):
-            file_offset = f.tell()
-            meta, compressed_payload = compress_and_create_fpakentry(file_offset, uncompressed_data)
-            f.write(meta) 
-            f.write(compressed_payload) 
-            return file_offset, meta, compressed_payload
-            
-        uasset_offset, uasset_meta, uasset_comp = append_new_file_zip3(uasset_data, "uasset")
-        uexp_offset, uexp_meta, uexp_comp = append_new_file_zip3(uexp_data, "uexp")
+        # 虚拟构造 Meta 来获取精准长度
+        dummy_uasset_meta, _ = compress_and_create_fpakentry(0, uasset_data)
+        dummy_uexp_meta, _ = compress_and_create_fpakentry(0, uexp_data)
         
-        # --- 重建 V10 Directory Map 阶段 ---
-        new_assets_list = [(uasset_path, uasset_meta), (uexp_path, uexp_meta)]
-        new_index_bytes = rebuild_v10_index(old_index_data, is_enc, new_assets_list, src_tool.mount_point, target_tool.mount_point)
+        dummy_assets_list = [(uasset_path, dummy_uasset_meta), (uexp_path, dummy_uexp_meta)]
+        dummy_index_bytes = rebuild_v10_index(old_index_data, False, dummy_assets_list, src_tool.mount_point, target_tool.mount_point)
         
-        new_index_offset = f.tell()
-        f.write(new_index_bytes)
-        new_index_size = len(new_index_bytes)
+        # 精确计算需要占据的尾部总空间
+        required_tail_size = len(dummy_uasset_meta) + len(uasset_comp) + \
+                             len(dummy_uexp_meta) + len(uexp_comp) + \
+                             len(dummy_index_bytes) + 45
+                             
+        print(f"  [🔍 体积欺骗引擎] 新尾部总需空间: {required_tail_size} 字节")
+        # ==============================================================
+
+        # ================= 第二阶段：精准物理覆写 =====================
+        # 逆向推导安全起写点
+        new_start_offset = original_file_size - required_tail_size
         
-        # --- 尾部指针重写阶段 (PakInfo) ---
-        # 此时不再去硬盘读了！直接使用内存中受保护的、携带正确 Magic 和 Version 的 pak_info
+        # 计算真实物理偏移
+        real_uasset_offset = new_start_offset
+        real_uexp_offset = real_uasset_offset + len(dummy_uasset_meta) + len(uasset_comp)
+        new_index_offset = real_uexp_offset + len(dummy_uexp_meta) + len(uexp_comp)
         
+        print(f"  [🔍 体积欺骗引擎] 逆向计算最佳起写偏移: 0x{new_start_offset:X}")
+        print(f"  [⚠️ 提示] 这将覆盖末尾 {index_offset - new_start_offset} 字节的旧数据以维持体积守恒。")
+
+        # 使用真实偏移构造最终写入数据
+        real_uasset_meta, _ = compress_and_create_fpakentry(real_uasset_offset, uasset_data)
+        real_uexp_meta, _ = compress_and_create_fpakentry(real_uexp_offset, uexp_data)
+        
+        real_assets_list = [(uasset_path, real_uasset_meta), (uexp_path, real_uexp_meta)]
+        final_index_bytes = rebuild_v10_index(old_index_data, is_enc, real_assets_list, src_tool.mount_point, target_tool.mount_point)
+        
+        # 开始真实硬盘写入
+        f.seek(new_start_offset)
+        f.write(real_uasset_meta)
+        f.write(uasset_comp)
+        f.write(real_uexp_meta)
+        f.write(uexp_comp)
+        f.write(final_index_bytes)
+        
+        # 构造并写入最终封口 PakInfo
         new_offset_enc = new_index_offset ^ OFFSET_KEY
         pak_info[37:45] = struct.pack('<Q', new_offset_enc)
-        pak_info[29:37] = struct.pack('<q', new_index_size)
-        index_hash = hashlib.sha1(new_index_bytes).digest()
-        pak_info[9:29] = index_hash
+        pak_info[29:37] = struct.pack('<q', len(final_index_bytes))
+        pak_info[9:29] = hashlib.sha1(final_index_bytes).digest()
         
-        # 封口并截断 (多余的数据会被物理删除)
-        final_file_size = new_index_offset + new_index_size + 45
-        f.seek(new_index_offset + new_index_size)
         f.write(pak_info)
-        f.truncate()
-        
-        # ================= 封口自测：验证 Version 依然完好 =================
-        f.seek(-45, 2)
-        verify_pak_info = f.read(45)
-        verify_version = struct.unpack('<I', verify_pak_info[5:9])[0]
-        if verify_version == orig_version:
-            print(f"  [✅ 成功] 物理尾部封口完成！(Version 保持为: {verify_version})，游戏引擎可正常识别！\n")
-        else:
-            print(f"  [❌ 致命错误] 尾部被污染！当前 Version 为: {verify_version}\n")
-        # ===================================================================
+        f.truncate(original_file_size) # 强制截断，以防万一
+        # ==============================================================
 
-    print(f"[+] 资产无缝注入成功！文件已生成: {out_pak}\n")
+        # 终极一致性自测
+        f.seek(0, 2)
+        final_file_size = f.tell()
+        print(f"\n  [✅ 校验] 注入后文件体积: {final_file_size} 字节")
+        if final_file_size == original_file_size:
+            print(f"  [✅ 完美] 注入前后体积差为 0 字节，已具备免校验防封体质！")
+        else:
+            print(f"  [❌ 异常] 体积控制失败！差值: {final_file_size - original_file_size} 字节")
+
+        # 字节级对比验证
+        def verify_written_data(name, offset, exp_meta, exp_comp):
+            exp_chunk = exp_meta + exp_comp
+            f.seek(offset)
+            if f.read(len(exp_chunk)) == exp_chunk:
+                print(f"  [✅ 成功] {name} 压缩块物理写入完全吻合。")
+            else:
+                print(f"  [❌ 失败] {name} 写入损坏。")
+                
+        verify_written_data("uasset", real_uasset_offset, real_uasset_meta, uasset_comp)
+        verify_written_data("uexp", real_uexp_offset, real_uexp_meta, uexp_comp)
+
+    print(f"\n[+] 资产无缝等大注入成功！文件已生成: {out_pak}\n")
     return True
 
 def main():
