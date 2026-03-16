@@ -109,6 +109,9 @@ find . -type f -name 'AvatarBPTable.uasset'
 find . -type f -name "*.uasset" -exec grep -H -E 'BP_PlayerBoltBullet|BP_PlayerSPAS12ShotgunBullet' -C 3 {} +
 find . -type f -name "*.uasset" -exec grep -H -l -E 'BulletTemplate' {} +
 find . -type f -name "*.uasset" -exec grep -H -l -E 'CH_Base_SK_PhysicsAsset' {} +
+find . -type f -name "*.uasset" -exec grep -H -l -E 'ST_001' {} +
+find . -type f -name "*.uasset" -exec grep -H -l -E 'AutoAimingConfig' {} +
+
 
 {"$type":"UAssetAPI.PropertyTypes.Objects.ObjectPropertyData, UAssetAPI","Name":"BulletTemplate","ArrayIndex":0,"IsZero":false,"PropertyTagFlags":"None","PropertyTagExtensions":"NoExtension","Value":-20}
 
