@@ -185,7 +185,7 @@ class UE4PakEngine:
 
         e['chunks'] = []
         # if e['zip'] == 0:
-            # print("zip == 0 !!!")  # ← 新增的打印语句
+        #     print("zip == 0 !!!")  # ← 新增的打印语句
         if e['zip'] != 0:
             c_cnt_bytes = f.read(4)
             if self.is_encrypted: c_cnt_bytes = self.xor_data(c_cnt_bytes)

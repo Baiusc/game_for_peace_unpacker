@@ -1,0 +1,126 @@
+#include <windows.h>
+#include <iostream>
+#include <string>
+#include <thread>
+#include "MinHook.h" // 请确保项目中包含了 MinHook 库
+
+// Windows 下 UE4 的 TCHAR 对应 wchar_t
+typedef wchar_t TCHAR;
+
+// ======================================================================
+// 1. 定义原函数的函数指针类型
+// Windows x64 下 C++ 类成员函数调用约定通常是 __fastcall (隐式传递 this 指针在 RCX)
+// ======================================================================
+typedef void* (__fastcall* OpenRead_t)(void* _this, const TCHAR* Filename, bool bAllowWrite);
+OpenRead_t Original_OpenRead = nullptr;
+
+// ======================================================================
+// 2. 编写我们的替代函数 (Hook Payload)
+// ======================================================================
+void* __fastcall Hooked_OpenRead(void* _this, const TCHAR* Filename, bool bAllowWrite) {
+    if (Filename == nullptr) {
+        return Original_OpenRead(_this, Filename, bAllowWrite);
+    }
+
+    // 转换为 C++ 的 wstring 以便操作
+    std::wstring strFilename(Filename);
+
+    // 目标特征串：我们要找的变态骨骼
+    std::wstring targetAsset = L"CH_Base_SK_PhysicsAsset";
+
+    // 拦截逻辑
+    if (strFilename.find(targetAsset) != std::wstring::npos) {
+        
+        // 设置控制台输出颜色为亮绿色，醒目显示
+        SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_GREEN | FOREGROUND_INTENSITY);
+        std::wcout << L"\n[!] 拦截到变态骨骼加载请求!" << std::endl;
+        std::wcout << L"    ├─ 引擎原始请求: " << strFilename << std::endl;
+        
+        // 构建伪造路径 (精确指向你在 pak 里覆盖的 DP28 宿主)
+        // 注意 L 前缀表示宽字符串
+        std::wstring fakePath = L"ShadowTrackerExtra/Content/Arts_PlayerBluePrints/Weapon/MainWeapon/Other/DP28/BP_Other_DP28.uasset";
+        
+        std::wcout << L"    └─ 偷天换日重定向至: " << fakePath << std::endl;
+        SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE); // 恢复默认颜色
+
+        // 将伪造的路径传给原始的 OpenRead 函数
+        return Original_OpenRead(_this, fakePath.c_str(), bAllowWrite);
+    }
+
+    // 放行其他正常文件
+    return Original_OpenRead(_this, Filename, bAllowWrite);
+}
+
+// ======================================================================
+// 3. 核心初始化与 Hook 挂载线程
+// ======================================================================
+DWORD WINAPI MainThread(LPVOID lpReserved) {
+    // 【神级技巧】在游戏进程中动态分配一个 CMD 控制台窗口用于调试输出
+    AllocConsole();
+    FILE* fDummy;
+    freopen_s(&fDummy, "CONIN$", "r", stdin);
+    freopen_s(&fDummy, "CONOUT$", "w", stdout);
+    freopen_s(&fDummy, "CONOUT$", "w", stderr);
+    
+    // 使得 wcout 能正确打印中文宽字符
+    std::wcout.imbue(std::locale("chs"));
+
+    std::cout << "    ·  ˚  ✦  ˚  ·  ˚  ✦  ·  ˚  ✦  ˚  ·\n";
+    std::cout << "      UE4 VFS 底层路径劫持控制台 (PC版) \n";
+    std::cout << "    ·  ˚  ✦  ˚  ·  ˚  ✦  ·  ˚  ✦  ˚  ·\n\n";
+
+    // 1. 获取主程序 (wgprojectm.exe) 的基址
+    HMODULE hModule = GetModuleHandle(NULL);
+    uintptr_t baseAddress = (uintptr_t)hModule;
+    std::cout << "[*] 游戏主模块基址: 0x" << std::hex << uppercase << baseAddress << std::endl;
+
+    // 2. 设定 OpenRead 函数的偏移量
+    // 【极其关键】: 你需要用 IDA Pro 分析 wgprojectm.exe 找出这个偏移！
+    // 下面这个 0x1234567 只是占位符。
+    uintptr_t openRead_offset = 0x1234567; 
+    uintptr_t target_addr = baseAddress + openRead_offset;
+
+    std::cout << "[*] 目标 OpenRead 绝对内存地址: 0x" << target_addr << std::endl;
+
+    // 3. 初始化 MinHook
+    if (MH_Initialize() != MH_OK) {
+        std::cout << "[❌] MinHook 初始化失败！" << std::endl;
+        return FALSE;
+    }
+
+    // 4. 创建 Hook
+    if (MH_CreateHook((void*)target_addr, &Hooked_OpenRead, (LPVOID*)&Original_OpenRead) != MH_OK) {
+        std::cout << "[❌] 创建 Hook 失败！(偏移量错误或已被反作弊保护)" << std::endl;
+        return FALSE;
+    }
+
+    // 5. 启用 Hook
+    if (MH_EnableHook((void*)target_addr) == MH_OK) {
+        std::cout << "[✅] VFS 劫持已成功生效！等待游戏引擎加载资产..." << std::endl;
+    } else {
+        std::cout << "[❌] 启用 Hook 失败！" << std::endl;
+    }
+
+    return TRUE;
+}
+
+// ======================================================================
+// 4. DLL 入口点
+// ======================================================================
+BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserved) {
+    switch (ul_reason_for_call) {
+    case DLL_PROCESS_ATTACH:
+        // 禁用线程库调用优化，提高注入稳定性
+        DisableThreadLibraryCalls(hModule);
+        // 创建独立线程运行，防止卡死游戏主线程
+        CreateThread(nullptr, 0, MainThread, hModule, 0, nullptr);
+        break;
+    case DLL_PROCESS_DETACH:
+        // 卸载 DLL 时清理 Hook 和控制台
+        MH_DisableHook(MH_ALL_HOOKS);
+        MH_Uninitialize();
+        FreeConsole();
+        break;
+    }
+    return TRUE;
+}
