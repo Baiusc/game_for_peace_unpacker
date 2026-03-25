@@ -2,7 +2,7 @@
  * @Author       : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
  * @Date         : 2025-09-02 16:42:02
  * @LastEditors  : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
- * @LastEditTime : 2026-03-16 17:27:22
+ * @LastEditTime : 2026-03-18 09:29:44
  * @FilePath     : /game_for_peace_unpacker/README.md
  * @Description  : 
  * 
@@ -12,6 +12,17 @@
 # game_for_peace_unpacker
 
 # 和平精英解包/打包/paks/obb改文件 
+
+下一步终极行动指南：Blackbone + KDU 联合打击
+现在，你的技术栈已经完全闭环：
+
+脱壳工具：KsDumper（已完成）
+
+漏洞加载器：KDU（你已掌握，用于绕过 DSE）
+
+注入核心：Blackbone（提供内核级隐写注入引擎）
+
+Payload：我们刚才写的 HWBP 硬件断点 Hook DLL（实现无痕修改偏移 0x18ddac0）
 
 ---
 ====================================================================
