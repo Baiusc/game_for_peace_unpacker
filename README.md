@@ -2,7 +2,7 @@
  * @Author       : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
  * @Date         : 2025-09-02 16:42:02
  * @LastEditors  : baizs_work_pc_ubuntu_kioxia zhongshan.bai@vitalchem.com
- * @LastEditTime : 2026-03-18 09:29:44
+ * @LastEditTime : 2026-03-25 15:57:25
  * @FilePath     : /game_for_peace_unpacker/README.md
  * @Description  : 
  * 
@@ -12,6 +12,13 @@
 # game_for_peace_unpacker
 
 # 和平精英解包/打包/paks/obb改文件 
+
+关键资产名称：
+
+WHSJ_P_Clothing_Jacket_727_Knee 赵云膝盖
+
+cafl_l_cafl_r 幽焰骑士左右小腿 
+
 
 下一步终极行动指南：Blackbone + KDU 联合打击
 现在，你的技术栈已经完全闭环：
@@ -161,7 +168,7 @@ find . -type f -name '*BP_Player*Bullet*'
 find . -type f -name '*BP_*_Bullet*'
 find . -type f -name '*Bullet*Template*'
 find . -type f -name 'AvatarBPTable.uasset'
-
+ 
 示例 (搜索 "Weapon" 或 "Damage" 或 "Mesh" 并在上下各打印 3 行):
 
 find . -type f -name "*.uasset" -exec grep -H -E 'BP_PlayerBoltBullet|BP_PlayerSPAS12ShotgunBullet' -C 3 {} +

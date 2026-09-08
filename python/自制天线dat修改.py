@@ -20,15 +20,15 @@ SWAP_CONFIG_CLOTH = [
     (405011, 413740),   # 棕色高帮运动鞋-创建角色已占用 <=> 幽焰骑士3 413740
     (812018, 413660),    # 默认鞋子(女) ↔  不知火舞 413660
     (812019, 413445),    # 默认鞋子(男) ↔ 2b战斗服 413445
-    (812020, 413904),    # 默认鞋子(通用) ↔ 狂魅哈莉 413904
+    (812020, 413782),    # 默认鞋子(通用) ↔ 风玲 413782 
     (405001, 413704),    # 运动鞋(白) ↔ 闪电轻猫 413704
-    (404110, 413703),    # 牛仔裤(蓝) ↔ 旋风灵鼠 413703
-    (403251, 413702)     # T恤(白)(新)(创建角色使用) <=> 幻影飞狐 413702
+    (404110, 413702),    # 牛仔裤(蓝) ↔  幻影飞狐 413702 旋风灵鼠 413703
+    (403251, 413495)     # T恤(白)(新)(创建角色使用) <=> 关羽3 413495 
 ]
 
 # 天线美化。防弹衣和背包挂件  AvatarBPTable
 SWAP_CONFIG_ARMOR = [
-    (802397, 413697),    # 背包挂件-扫描仪 802397 <=> 樱桃泡泡 413697
+    (802397, 413904),    # 背包挂件-扫描仪 802397 <=> 狂魅哈莉 413904 樱桃泡泡 413697 
     (503001, 413619),    # 1级甲 <=> 幽焰骑士1 413619
     (503002, 413497),    # 2级甲 <=> 赵云2 413497
     (503003, 413498)     # 3级甲 <=> 赵云3 413498
@@ -314,14 +314,14 @@ def main():
     is_need_print = True # 是否需要打印上下文
 
     # 直接指定要处理的 dat 文件
-    path_BattleItem = Path("./release/RE天线V4发布20250930/BattleItem.uasset") #  BattleItem 衣服 裤子 鞋子 
+    path_BattleItem = Path("./release/RE天线V4发布20250930/BattleItem原厂（复件）.uasset") #  BattleItem 衣服 裤子 鞋子 
     SWAP_CONFIG_CLOTH_str = [(str(old), str(new)) for old, new in SWAP_CONFIG_CLOTH] 
     swap_id_and_ptr_in_dat(path_BattleItem, SWAP_CONFIG_CLOTH_str, is_need_print) 
 
-    path_AvatarBPTable = Path("./release/RE天线V4发布20250930/AvatarBPTable.uasset") # AvatarBPTable 防弹衣和背包挂件
+    path_AvatarBPTable = Path("./release/RE天线V4发布20250930/AvatarBPTable原厂（复件）.uasset") # AvatarBPTable 防弹衣和背包挂件
     SWAP_CONFIG_ARMOR_str = [(str(old), str(new)) for old, new in SWAP_CONFIG_ARMOR] 
     swap_id_and_ptr_in_dat(path_AvatarBPTable, SWAP_CONFIG_ARMOR_str, is_need_print) 
-
+    
     print("[ALL DONE] 处理完成！")
 
 if __name__ == "__main__":
