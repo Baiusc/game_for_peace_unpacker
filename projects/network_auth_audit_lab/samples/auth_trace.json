@@ -1,0 +1,21 @@
+{
+  "sample": "synthetic-auth-trace-v1",
+  "transport": "HTTPS",
+  "messages": [
+    {
+      "phase": "init",
+      "fields": ["client_id", "version", "timestamp"],
+      "request_signature": "present",
+      "nonce": "missing",
+      "client_secret_storage": "embedded_static"
+    },
+    {
+      "phase": "login",
+      "fields": ["client_id", "credential", "timestamp"],
+      "request_signature": "present",
+      "nonce": "missing",
+      "response_signature_verified": false,
+      "session_binding": "none"
+    }
+  ]
+}
