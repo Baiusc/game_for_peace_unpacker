@@ -1,1 +1,4 @@
 /target
+/build/
+/build-baseline/
+/config.toml
