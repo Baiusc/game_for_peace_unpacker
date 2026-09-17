@@ -217,4 +217,4 @@ projects/*/*.iml
 
 *.bin
 my_exe/
-*_evidence*/
+*evidence*/
