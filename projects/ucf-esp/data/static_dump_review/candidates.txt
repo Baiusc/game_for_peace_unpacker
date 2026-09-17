@@ -1,0 +1,103 @@
+=== local player candidates ===
+80238:	|-List<Player>..ctor
+80871:	|-List<Player>.get_Count
+81453:	|-List<Player>.get_Item
+82149:	|-List<Player>.Add
+82475:	|-List<Player>.AddRange
+82863:	|-List<Player>.Clear
+82996:	|-List<Player>.Contains
+83884:	|-List<Player>.FindIndex
+84288:	|-List<Player>.GetEnumerator
+84907:	|-List<Player>.Insert
+85377:	|-List<Player>.Remove
+85751:	|-List<Player>.RemoveAt
+221812:	private List<Player> <FindAttackTarget>g__GetAttackTargetList|106_0() { }
+225435:	private List<Player> respawningPlayer; // 0xAC
+225442:	protected List<Player> randomPlayerList; // 0xB4
+229411:	private List<Player> checkedEnemy; // 0x14
+230784:	public List<Player> playersBL; // 0x18
+230785:	public List<Player> playersBL_Alive; // 0x1C
+230786:	public List<Player> playersGR; // 0x20
+230787:	public List<Player> playersGR_Alive; // 0x24
+235477:	private List<Player> secKillTargets; // 0xDC
+=== manager candidates ===
+224470:private sealed class PlayerCameraManager.<>c__DisplayClass31_0 // TypeDefIndex: 4990
+224492:private sealed class PlayerCameraManager.<>c__DisplayClass35_0.<<PlayKnifeHitStunShake>g__HitAnim|0>d : IEnumerator<object>, IEnumerator, IDisposable // TypeDefIndex: 4991
+224536:private sealed class PlayerCameraManager.<>c__DisplayClass35_0 // TypeDefIndex: 4992
+224553:public class PlayerCameraManager : MonoBehaviour // TypeDefIndex: 4993
+230680:public sealed class GameManager.DamageEvent : MulticastDelegate // TypeDefIndex: 5139
+230698:public sealed class GameManager.DeathEvent : MulticastDelegate // TypeDefIndex: 5140
+230716:public sealed class GameManager.SpecialKillChecker : MulticastDelegate // TypeDefIndex: 5141
+230735:private sealed class GameManager.<RestRoundCoroutine>d__76 : IEnumerator<object>, IEnumerator, IDisposable // TypeDefIndex: 5142
+230773:public class GameManager : Singleton<GameManager> // TypeDefIndex: 5143
+=== camera sources ===
+111236:	public CameraType cameraType { get; }
+111239:	public CameraClearFlags clearFlags { get; set; }
+111255:	public static Camera main { get; }
+111339:	public CameraType get_cameraType() { }
+111351:	public CameraClearFlags get_clearFlags() { }
+111452:	public static Camera get_main() { }
+112486:	public static Display get_main() { }
+113252:	public Texture get_mainTexture() { }
+113258:	public Vector2 get_mainTextureOffset() { }
+113264:	public Vector2 get_mainTextureScale() { }
+130623:	public Camera camera; // 0x4
+136446:	public Camera worldCamera { get; }
+136521:	public Camera get_worldCamera() { }
+138529:	public virtual Texture get_mainTexture() { }
+139048:	public override Texture get_mainTexture() { }
+141529:	public override Texture get_mainTexture() { }
+142082:	public Camera camera; // 0x1C
+143013:	public override Texture get_mainTexture() { }
+144528:	public Camera enterEventCamera { get; }
+144529:	public Camera pressEventCamera { get; }
+144704:	public Camera get_enterEventCamera() { }
+144707:	public Camera get_pressEventCamera() { }
+148503:	public Camera[] m_Cameras; // 0xC
+155765:	public Camera camera { get; }
+155777:	public Camera get_camera() { }
+158560:	public ParticleSystem.MainModule get_main() { }
+162783:	public Camera target; // 0x8
+162802:	public Camera target; // 0x8
+162821:	public Camera target; // 0x8
+162840:	public Camera target; // 0x8
+162859:	public Camera target; // 0x8
+162878:	public Camera target; // 0x8
+162897:	public Camera target; // 0x8
+162916:	public Camera target; // 0x8
+162935:	public Camera target; // 0x8
+162954:	public Camera target; // 0x8
+162973:	public Camera target; // 0x8
+162992:	public Camera target; // 0x8
+173743:	public LightRenderingMode get_mainLightRenderingMode() { }
+173749:	public int get_mainLightShadowmapResolution() { }
+176455:	public CameraOverrideOption requiresDepthOption { get; set; }
+176456:	public CameraOverrideOption requiresColorOption { get; set; }
+176457:	public CameraRenderType renderType { get; set; }
+176493:	public CameraOverrideOption get_requiresDepthOption() { }
+176499:	public CameraOverrideOption get_requiresColorOption() { }
+176505:	public CameraRenderType get_renderType() { }
+176902:	public CameraData cameraData; // 0x8
+176931:	public Camera camera; // 0x80
+176932:	public CameraRenderType renderType; // 0x84
+176941:	public CameraType cameraType; // 0xE4
+177535:	public Camera camera; // 0x0
+196680:	public Camera OutputCamera { get; }
+196686:	public CameraState CurrentCameraState { get; set; }
+196691:	public Camera get_OutputCamera() { }
+196774:	public CameraState get_CurrentCameraState() { }
+200062:	public CameraState.BlendHintValue BlendHint { get; set; }
+200167:	public CameraState.BlendHintValue get_BlendHint() { }
+200186:	public CameraState.CustomBlendable GetCustomBlendable(int index) { }
+200238:	public CameraState State { get; }
+200304:	public CameraState get_State() { }
+200376:	public CameraState State { get; set; }
+200426:	public CameraState get_State() { }
+200479:	public CameraState State { get; set; }
+200529:	public CameraState get_State() { }
+200548:	public CameraState CalculateNewState(float deltaTime) { }
+200624:	public CameraState VcamState { get; }
+200671:	public CameraState get_VcamState() { }
+204317:	public Camera Target; // 0x20
+204395:	public Camera Target; // 0x20
+224558:	public Camera modelCamera; // 0x10

@@ -218,3 +218,4 @@ projects/*/*.iml
 *.bin
 my_exe/
 *evidence*/
+!projects/ucf-esp/data

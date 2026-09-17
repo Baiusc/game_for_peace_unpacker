@@ -1,0 +1,261 @@
+public class Entity : MonoBehaviour // TypeDefIndex: 4981
+{
+	// Fields
+	[HideInInspector] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	public float baseMoveSpeed; // 0xC
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	private float <speedPenalty>k__BackingField; // 0x10
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	private float <damageRate>k__BackingField; // 0x14
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	private HealthData <healthData>k__BackingField; // 0x18
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	private Team <team>k__BackingField; // 0x1C
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	private Action<Team> team_Listenner; // 0x20
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	private Animator <characterAnimator>k__BackingField; // 0x24
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	private CharacterController <characterController>k__BackingField; // 0x28
+	private List<Buff> buffs; // 0x2C
+	public Action<bool> LifeState_Listenner; // 0x30
+	public Ref2Float SpeedPenalty_BuffUpdater; // 0x34
+	public Ref2Float DamageRate_BuffUpdater; // 0x38
+
+	// Properties
+	public float speedPenalty { get; set; }
+	public float damageRate { get; set; }
+	public HealthData healthData { get; set; }
+	public bool isDead { get; }
+	public Team team { get; set; }
+	public Animator characterAnimator { get; set; }
+	public CharacterController characterController { get; set; }
+
+	// Methods
+
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	// RVA: 0x1C58C0 Offset: 0x1C44C0 VA: 0x101C58C0
+	public float get_speedPenalty() { }
+
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	// RVA: 0x1C5950 Offset: 0x1C4550 VA: 0x101C5950
+	private void set_speedPenalty(float value) { }
+
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	// RVA: 0x1C58A0 Offset: 0x1C44A0 VA: 0x101C58A0
+	public float get_damageRate() { }
+
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	// RVA: 0x1C5910 Offset: 0x1C4510 VA: 0x101C5910
+	private void set_damageRate(float value) { }
+
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	// RVA: 0x1C4050 Offset: 0x1C2C50 VA: 0x101C4050
+	public HealthData get_healthData() { }
+
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	// RVA: 0x1C4060 Offset: 0x1C2C60 VA: 0x101C4060
+	protected void set_healthData(HealthData value) { }
+
+	// RVA: 0x1D80B0 Offset: 0x1D6CB0 VA: 0x101D80B0
+	public bool get_isDead() { }
+
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	// RVA: 0x1D80E0 Offset: 0x1D6CE0 VA: 0x101D80E0
+	public Team get_team() { }
+
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	// RVA: 0x1D8190 Offset: 0x1D6D90 VA: 0x101D8190
+	protected void set_team(Team value) { }
+
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	// RVA: 0x1D8020 Offset: 0x1D6C20 VA: 0x101D8020
+	public void add_team_Listenner(Action<Team> value) { }
+
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	// RVA: 0x1D80F0 Offset: 0x1D6CF0 VA: 0x101D80F0
+	public void remove_team_Listenner(Action<Team> value) { }
+
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	// RVA: 0x1CA660 Offset: 0x1C9260 VA: 0x101CA660
+	public Animator get_characterAnimator() { }
+
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	// RVA: 0x1CD270 Offset: 0x1CBE70 VA: 0x101CD270
+	protected void set_characterAnimator(Animator value) { }
+
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	// RVA: 0x1D80A0 Offset: 0x1D6CA0 VA: 0x101D80A0
+	public CharacterController get_characterController() { }
+
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	// RVA: 0x1D8170 Offset: 0x1D6D70 VA: 0x101D8170
+	protected void set_characterController(CharacterController value) { }
+
+	// RVA: 0x1D7490 Offset: 0x1D6090 VA: 0x101D7490 Slot: 4
+	protected virtual void Awake() { }
+
+	// RVA: 0x1D7E00 Offset: 0x1D6A00 VA: 0x101D7E00 Slot: 5
+	protected virtual void Update() { }
+
+	// RVA: 0x1D7820 Offset: 0x1D6420 VA: 0x101D7820 Slot: 6
+	protected virtual void OnDestroy() { }
+
+	// RVA: 0x1D7BE0 Offset: 0x1D67E0 VA: 0x101D7BE0 Slot: 7
+	public virtual void SetTeam(Team newTeam) { }
+
+	// RVA: 0x1D76A0 Offset: 0x1D62A0 VA: 0x101D76A0
+	protected int GetLocalDirection(Vector3 point, bool inverse = False) { }
+
+	// RVA: 0x1D7C30 Offset: 0x1D6830 VA: 0x101D7C30 Slot: 8
+	public virtual void Spawn() { }
+
+	// RVA: 0x1D78A0 Offset: 0x1D64A0 VA: 0x101D78A0 Slot: 9
+	public virtual void OnEntityHurt(DamageEventData eventData) { }
+
+	// RVA: 0x1D7840 Offset: 0x1D6440 VA: 0x101D7840 Slot: 10
+	public virtual void OnEntityDeath(DeathEventData eventData) { }
+
+	// RVA: 0x1D7390 Offset: 0x1D5F90 VA: 0x101D7390
+	public Buff AddSpeedPenalty(float penalty, float time, string buffName = "Simple") { }
+
+	// RVA: 0x1D7A20 Offset: 0x1D6620 VA: 0x101D7A20
+	public Buff SetDamageRate(float subRate, float time) { }
+
+	// RVA: 0x1D78E0 Offset: 0x1D64E0 VA: 0x101D78E0
+	public void RemoveBuff(string buffName) { }
+
+	// RVA: 0x1D7510 Offset: 0x1D6110 VA: 0x101D7510
+	public void CleanAllBuff() { }
+
+	// RVA: 0x1D75E0 Offset: 0x1D61E0 VA: 0x101D75E0
+	public Buff FindBuff(string buffName) { }
+
+	// RVA: 0x1D7340 Offset: 0x1D5F40 VA: 0x101D7340
+	public void AddBuff(Buff newBuff) { }
+
+	// RVA: 0x1D7CB0 Offset: 0x1D68B0 VA: 0x101D7CB0
+	public Buff TryAddBuff(string buffName, float duration, Func<Buff> buffCreater) { }
+
+	// RVA: 0x1D7E00 Offset: 0x1D6A00 VA: 0x101D7E00
+	private void UpdateBuff() { }
+
+	// RVA: 0x1D7D60 Offset: 0x1D6960 VA: 0x101D7D60 Slot: 11
+	protected virtual void UpdateBuffProperty() { }
+
+	// RVA: 0x1D7EE0 Offset: 0x1D6AE0 VA: 0x101D7EE0
+	protected void UpdateColliderLayer() { }
+
+	// RVA: 0x1D7FB0 Offset: 0x1D6BB0 VA: 0x101D7FB0
+	public void .ctor() { }
+}
+
+// Namespace: 
+public enum Player.SkillSlot // TypeDefIndex: 4982
+{
+	// Fields
+	public int value__; // 0x0
+	public const Player.SkillSlot F = 0;
+	public const Player.SkillSlot G = 1;
+	public const Player.SkillSlot H = 2;
+	public const Player.SkillSlot WW = 3;
+}
+
+// Namespace: 
+private enum Player.MoveType // TypeDefIndex: 4983
+{
+	// Fields
+	public int value__; // 0x0
+	public const Player.MoveType None = 0;
+	public const Player.MoveType GroundWalk = 1;
+	public const Player.MoveType ClimbStair = 2;
+	public const Player.MoveType Swim = 3;
+	public const Player.MoveType AirMove = 4;
+}
+
+// Namespace: 
+[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+private sealed class Player.<>c__DisplayClass187_0 // TypeDefIndex: 4984
+{
+	// Fields
+	public string name; // 0x8
+
+	// Methods
+
+	// RVA: 0x1D6010 Offset: 0x1D4C10 VA: 0x101D6010
+	public void .ctor() { }
+
+	// RVA: 0x53CB00 Offset: 0x53B700 VA: 0x1053CB00
+	internal bool <SetExistentCharacter>b__0(CharacterModel x) { }
+}
+
+// Namespace: 
+private sealed class Player.<>c__DisplayClass210_0.<<Respawn>g__WaitForRespawn|0>d : IEnumerator<object>, IEnumerator, IDisposable // TypeDefIndex: 4985
+{
+	// Fields
+	private int <>1__state; // 0x8
+	private object <>2__current; // 0xC
+	public Player.<>c__DisplayClass210_0 <>4__this; // 0x10
+
+	// Properties
+	private object System.Collections.Generic.IEnumerator<System.Object>.Current { get; }
+	private object System.Collections.IEnumerator.Current { get; }
+
+	// Methods
+
+	[DebuggerHiddenAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	// RVA: 0x3216F0 Offset: 0x3202F0 VA: 0x103216F0
+	public void .ctor(int <>1__state) { }
+
+	[DebuggerHiddenAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	// RVA: 0x18D000 Offset: 0x18BC00 VA: 0x1018D000 Slot: 5
+	private void System.IDisposable.Dispose() { }
+
+	// RVA: 0x53A840 Offset: 0x539440 VA: 0x1053A840 Slot: 6
+	private bool MoveNext() { }
+
+	[DebuggerHiddenAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	// RVA: 0x1A06E0 Offset: 0x19F2E0 VA: 0x101A06E0 Slot: 4
+	private object System.Collections.Generic.IEnumerator<System.Object>.get_Current() { }
+
+	[DebuggerHiddenAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	// RVA: 0x53A9C0 Offset: 0x5395C0 VA: 0x1053A9C0 Slot: 8
+	private void System.Collections.IEnumerator.Reset() { }
+
+	[DebuggerHiddenAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	// RVA: 0x1A06E0 Offset: 0x19F2E0 VA: 0x101A06E0 Slot: 7
+	private object System.Collections.IEnumerator.get_Current() { }
+}
+
+// Namespace: 
+[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+private sealed class Player.<>c__DisplayClass210_0 // TypeDefIndex: 4986
+{
+	// Fields
+	public Player <>4__this; // 0x8
+	public float respawnTime; // 0xC
+	public float invisibleTime; // 0x10
+	public Action<Player> callBack; // 0x14
+
+	// Methods
+
+	// RVA: 0x1D6010 Offset: 0x1D4C10 VA: 0x101D6010
+	public void .ctor() { }
+
+	[IteratorStateMachineAttribute] // RVA: 0xB60D0 Offset: 0xB54D0 VA: 0x100B60D0
+	// RVA: 0x53CBD0 Offset: 0x53B7D0 VA: 0x1053CBD0
+	internal IEnumerator <Respawn>g__WaitForRespawn|0() { }
+}
+
+// Namespace: 
+[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+private struct Player.<>c__DisplayClass236_0 // TypeDefIndex: 4987
+{
+	// Fields
+	public bool isDrop; // 0x0
+	public Player <>4__this; // 0x4
+	public string sndName; // 0x8
+}
+
+// Namespace: 
+public class Player : Entity // TypeDefIndex: 4988

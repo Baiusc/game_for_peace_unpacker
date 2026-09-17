@@ -1,0 +1,375 @@
+public class Player : Entity // TypeDefIndex: 4988
+{
+	// Fields
+	public static readonly float defaultMoveSpeed; // 0x0
+	public static readonly float playerHeight; // 0x4
+	public static readonly float crouchSubHeight; // 0x8
+	public static readonly float mapCmrHeight; // 0xC
+	public static readonly float mapCmrCrouchSubHeight; // 0x10
+	public static readonly Vector3 playerGravity; // 0x14
+	public PlayerCameraManager cameraManager; // 0x3C
+	private Vector2 cameraRotation; // 0x40
+	public Recoil recoil; // 0x48
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	private Transform <characterContainer>k__BackingField; // 0x4C
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	private CharacterModel <currentCharacter>k__BackingField; // 0x50
+	private List<CharacterModel> characters; // 0x54
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	private PlayerWeapons <wpns>k__BackingField; // 0x58
+	[SerializeField] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	private EffectObj bulletEffect; // 0x5C
+	public const float Acceleration = 6;
+	public const float Acceleration_Air = 2;
+	public const float JumpPower = 10.5;
+	private bool autonomousJump; // 0x60
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	private bool <isGrounded>k__BackingField; // 0x61
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	private string <groundMatName>k__BackingField; // 0x64
+	private float jumpDropSndNextPlayTime; // 0x68
+	private float lastFallTime; // 0x6C
+	private float startMoveTime; // 0x70
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	private Vector3Int <tryMoveDir>k__BackingField; // 0x74
+	public Vector3 velocity; // 0x80
+	public float moveVelocityUnlockTime; // 0x8C
+	public float airVelControlEndTime; // 0x90
+	private bool coliderState_Side; // 0x94
+	public ClientData clientData; // 0x98
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	private PlayerData <playerData>k__BackingField; // 0x9C
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	private WeaponBag <weaponBag>k__BackingField; // 0xA0
+	public NanoRoleSelect nanoRoleSelect; // 0xA4
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	private bool <isSniper>k__BackingField; // 0xA8
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	private Vector3 <spawnPos>k__BackingField; // 0xAC
+	private Coroutine respawn_Coroutine; // 0xB8
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	private Action<Player> StartRespawn_Listener; // 0xBC
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	private Action<Player> NextPreRespawnInRound_Listener; // 0xC0
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	private Action<Player> NextRespawnInRound_Listener; // 0xC4
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	private bool <isRespawning>k__BackingField; // 0xC8
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	private float <crouchDuration>k__BackingField; // 0xCC
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	private bool <walking>k__BackingField; // 0xD0
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	private Skill[] <skills>k__BackingField; // 0xD4
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	private ObscuredInt <nanoClothCount>k__BackingField; // 0xD8
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	private float <lastStopStartTime>k__BackingField; // 0xEC
+	private float nextRegenTime; // 0xF0
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	private KeyInputState <input_Interact>k__BackingField; // 0xF4
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	private Action<Player, KeyInputState> Interact_Listener; // 0xF8
+	public MapTrigger mapTrigger; // 0xFC
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	private WPN_Gun.AmmoData <mapGunAmmo1>k__BackingField; // 0x100
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	private WPN_Gun.AmmoData <mapGunAmmo2>k__BackingField; // 0x104
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	private Transform <climbStair>k__BackingField; // 0x108
+	private bool Buff_CameraRotDisabled; // 0x10C
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	private RefBool CameraRotDisabled_BuffUpdater; // 0x110
+	private bool Buff_JumpDisabled; // 0x114
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	private RefBool JumpDisabled_BuffUpdater; // 0x118
+
+	// Properties
+	public Vector3 mapCameraPos { get; }
+	public Vector3 mapCameraForward { get; }
+	public Transform characterContainer { get; set; }
+	public CharacterModel currentCharacter { get; set; }
+	public Vector3 footPos { get; }
+	public PlayerWeapons wpns { get; set; }
+	public bool isGrounded { get; set; }
+	public string groundMatName { get; set; }
+	public float fallTime { get; }
+	public bool tryMoving { get; }
+	public Vector3Int tryMoveDir { get; set; }
+	private bool canControlVelInAir { get; }
+	public bool isMoveVelocityUnlock { get; }
+	public PlayerData playerData { get; set; }
+	public WeaponBag weaponBag { get; set; }
+	public bool isSniper { get; set; }
+	public Vector3 spawnPos { get; set; }
+	public bool isRespawning { get; set; }
+	public bool isMyPlayer { get; }
+	public bool isFocusPlayer { get; }
+	public bool isFocusPlayerInPV { get; }
+	public bool isNanoGhost { get; }
+	public bool isBlackList { get; }
+	public bool isGlobalRisk { get; }
+	public float crouchDuration { get; set; }
+	public bool isCrouching { get; }
+	public bool walking { get; set; }
+	public Skill[] skills { get; set; }
+	public ObscuredInt nanoClothCount { get; set; }
+	public float lastStopStartTime { get; set; }
+	public KeyInputState input_Interact { get; set; }
+	public WPN_Gun.AmmoData mapGunAmmo1 { get; set; }
+	public WPN_Gun.AmmoData mapGunAmmo2 { get; set; }
+	public Transform climbStair { get; set; }
+	public bool isClimbing { get; }
+	public string nickName { get; }
+	public int level { get; }
+	public int vipLevel { get; }
+	public int kill { get; set; }
+	public int death { get; set; }
+	public int survival { get; set; }
+	public int score { get; set; }
+	public HUD_Role.AceSign aceSign { get; set; }
+	public NanoRole nanoRole { get; set; }
+
+	// Methods
+
+	// RVA: 0x2C3E40 Offset: 0x2C2A40 VA: 0x102C3E40
+	public Vector3 get_mapCameraPos() { }
+
+	// RVA: 0x2C3DF0 Offset: 0x2C29F0 VA: 0x102C3DF0
+	public Vector3 get_mapCameraForward() { }
+
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	// RVA: 0x1F9280 Offset: 0x1F7E80 VA: 0x101F9280
+	public Transform get_characterContainer() { }
+
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	// RVA: 0x2C4430 Offset: 0x2C3030 VA: 0x102C4430
+	private void set_characterContainer(Transform value) { }
+
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	// RVA: 0x1F9260 Offset: 0x1F7E60 VA: 0x101F9260
+	public CharacterModel get_currentCharacter() { }
+
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	// RVA: 0x2C4490 Offset: 0x2C3090 VA: 0x102C4490
+	private void set_currentCharacter(CharacterModel value) { }
+
+	// RVA: 0x2C3910 Offset: 0x2C2510 VA: 0x102C3910
+	public Vector3 get_footPos() { }
+
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	// RVA: 0x1F92A0 Offset: 0x1F7EA0 VA: 0x101F92A0
+	public PlayerWeapons get_wpns() { }
+
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	// RVA: 0x1F9330 Offset: 0x1F7F30 VA: 0x101F9330
+	private void set_wpns(PlayerWeapons value) { }
+
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	// RVA: 0x2C3C40 Offset: 0x2C2840 VA: 0x102C3C40
+	public bool get_isGrounded() { }
+
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	// RVA: 0x2C4540 Offset: 0x2C3140 VA: 0x102C4540
+	private void set_isGrounded(bool value) { }
+
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	// RVA: 0x2C39B0 Offset: 0x2C25B0 VA: 0x102C39B0
+	public string get_groundMatName() { }
+
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	// RVA: 0x2C4500 Offset: 0x2C3100 VA: 0x102C4500
+	private void set_groundMatName(string value) { }
+
+	// RVA: 0x2C38D0 Offset: 0x2C24D0 VA: 0x102C38D0
+	public float get_fallTime() { }
+
+	// RVA: 0x2C4000 Offset: 0x2C2C00 VA: 0x102C4000
+	public bool get_tryMoving() { }
+
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	// RVA: 0x2C3FE0 Offset: 0x2C2BE0 VA: 0x102C3FE0
+	public Vector3Int get_tryMoveDir() { }
+
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	// RVA: 0x2C47B0 Offset: 0x2C33B0 VA: 0x102C47B0
+	private void set_tryMoveDir(Vector3Int value) { }
+
+	// RVA: 0x2C3840 Offset: 0x2C2440 VA: 0x102C3840
+	private bool get_canControlVelInAir() { }
+
+	// RVA: 0x2C3C50 Offset: 0x2C2850 VA: 0x102C3C50
+	public bool get_isMoveVelocityUnlock() { }
+
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	// RVA: 0x2C3F20 Offset: 0x2C2B20 VA: 0x102C3F20
+	public PlayerData get_playerData() { }
+
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	// RVA: 0x2C46B0 Offset: 0x2C32B0 VA: 0x102C46B0
+	protected void set_playerData(PlayerData value) { }
+
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	// RVA: 0x1F9240 Offset: 0x1F7E40 VA: 0x101F9240
+	public WeaponBag get_weaponBag() { }
+
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	// RVA: 0x1F92F0 Offset: 0x1F7EF0 VA: 0x101F92F0
+	protected void set_weaponBag(WeaponBag value) { }
+
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	// RVA: 0x2C3D70 Offset: 0x2C2970 VA: 0x102C3D70
+	public bool get_isSniper() { }
+
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	// RVA: 0x2C4570 Offset: 0x2C3170 VA: 0x102C4570
+	protected void set_isSniper(bool value) { }
+
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	// RVA: 0x2C3F80 Offset: 0x2C2B80 VA: 0x102C3F80
+	public Vector3 get_spawnPos() { }
+
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	// RVA: 0x2C4740 Offset: 0x2C3340 VA: 0x102C4740
+	protected void set_spawnPos(Vector3 value) { }
+
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	// RVA: 0x2C3780 Offset: 0x2C2380 VA: 0x102C3780
+	public void add_StartRespawn_Listener(Action<Player> value) { }
+
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	// RVA: 0x2C4360 Offset: 0x2C2F60 VA: 0x102C4360
+	public void remove_StartRespawn_Listener(Action<Player> value) { }
+
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	// RVA: 0x2C3680 Offset: 0x2C2280 VA: 0x102C3680
+	public void add_NextPreRespawnInRound_Listener(Action<Player> value) { }
+
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	// RVA: 0x2C4260 Offset: 0x2C2E60 VA: 0x102C4260
+	public void remove_NextPreRespawnInRound_Listener(Action<Player> value) { }
+
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	// RVA: 0x2C3700 Offset: 0x2C2300 VA: 0x102C3700
+	public void add_NextRespawnInRound_Listener(Action<Player> value) { }
+
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	// RVA: 0x2C42E0 Offset: 0x2C2EE0 VA: 0x102C42E0
+	public void remove_NextRespawnInRound_Listener(Action<Player> value) { }
+
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	// RVA: 0x2C3D60 Offset: 0x2C2960 VA: 0x102C3D60
+	public bool get_isRespawning() { }
+
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	// RVA: 0x2C4550 Offset: 0x2C3150 VA: 0x102C4550
+	private void set_isRespawning(bool value) { }
+
+	// RVA: 0x2C3C80 Offset: 0x2C2880 VA: 0x102C3C80
+	public bool get_isMyPlayer() { }
+
+	// RVA: 0x2C3B90 Offset: 0x2C2790 VA: 0x102C3B90
+	public bool get_isFocusPlayer() { }
+
+	// RVA: 0x2C3A60 Offset: 0x2C2660 VA: 0x102C3A60
+	public bool get_isFocusPlayerInPV() { }
+
+	// RVA: 0x2C3D00 Offset: 0x2C2900 VA: 0x102C3D00
+	public bool get_isNanoGhost() { }
+
+	// RVA: 0x2C39D0 Offset: 0x2C25D0 VA: 0x102C39D0
+	public bool get_isBlackList() { }
+
+	// RVA: 0x2C3C30 Offset: 0x2C2830 VA: 0x102C3C30
+	public bool get_isGlobalRisk() { }
+
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	// RVA: 0x2C3880 Offset: 0x2C2480 VA: 0x102C3880
+	public float get_crouchDuration() { }
+
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	// RVA: 0x2C4470 Offset: 0x2C3070 VA: 0x102C4470
+	private void set_crouchDuration(float value) { }
+
+	// RVA: 0x2C3A40 Offset: 0x2C2640 VA: 0x102C3A40
+	public bool get_isCrouching() { }
+
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	// RVA: 0x2C40D0 Offset: 0x2C2CD0 VA: 0x102C40D0
+	public bool get_walking() { }
+
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	// RVA: 0x2C47D0 Offset: 0x2C33D0 VA: 0x102C47D0
+	private void set_walking(bool value) { }
+
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	// RVA: 0x2C3F70 Offset: 0x2C2B70 VA: 0x102C3F70
+	public Skill[] get_skills() { }
+
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	// RVA: 0x2C4720 Offset: 0x2C3320 VA: 0x102C4720
+	private void set_skills(Skill[] value) { }
+
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	// RVA: 0x2C3EA0 Offset: 0x2C2AA0 VA: 0x102C3EA0
+	public ObscuredInt get_nanoClothCount() { }
+
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	// RVA: 0x2C4640 Offset: 0x2C3240 VA: 0x102C4640
+	private void set_nanoClothCount(ObscuredInt value) { }
+
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	// RVA: 0x2C3DC0 Offset: 0x2C29C0 VA: 0x102C3DC0
+	public float get_lastStopStartTime() { }
+
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	// RVA: 0x2C45E0 Offset: 0x2C31E0 VA: 0x102C45E0
+	private void set_lastStopStartTime(float value) { }
+
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	// RVA: 0x2C39C0 Offset: 0x2C25C0 VA: 0x102C39C0
+	public KeyInputState get_input_Interact() { }
+
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	// RVA: 0x2C4520 Offset: 0x2C3120 VA: 0x102C4520
+	private void set_input_Interact(KeyInputState value) { }
+
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	// RVA: 0x2C3580 Offset: 0x2C2180 VA: 0x102C3580
+	public void add_Interact_Listener(Action<Player, KeyInputState> value) { }
+
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	// RVA: 0x2C4160 Offset: 0x2C2D60 VA: 0x102C4160
+	public void remove_Interact_Listener(Action<Player, KeyInputState> value) { }
+
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	// RVA: 0x1F9720 Offset: 0x1F8320 VA: 0x101F9720
+	public WPN_Gun.AmmoData get_mapGunAmmo1() { }
+
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	// RVA: 0x2C4600 Offset: 0x2C3200 VA: 0x102C4600
+	private void set_mapGunAmmo1(WPN_Gun.AmmoData value) { }
+
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	// RVA: 0x2C3E90 Offset: 0x2C2A90 VA: 0x102C3E90
+	public WPN_Gun.AmmoData get_mapGunAmmo2() { }
+
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	// RVA: 0x2C4620 Offset: 0x2C3220 VA: 0x102C4620
+	private void set_mapGunAmmo2(WPN_Gun.AmmoData value) { }
+
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	// RVA: 0x2C3870 Offset: 0x2C2470 VA: 0x102C3870
+	public Transform get_climbStair() { }
+
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	// RVA: 0x2C4450 Offset: 0x2C3050 VA: 0x102C4450
+	private void set_climbStair(Transform value) { }
+
+	// RVA: 0x2C39E0 Offset: 0x2C25E0 VA: 0x102C39E0
+	public bool get_isClimbing() { }
+
+	[CompilerGeneratedAttribute] // RVA: 0x99E10 Offset: 0x99210 VA: 0x10099E10
+	// RVA: 0x2C3500 Offset: 0x2C2100 VA: 0x102C3500
+	public void add_CameraRotDisabled_BuffUpdater(RefBool value) { }
+
