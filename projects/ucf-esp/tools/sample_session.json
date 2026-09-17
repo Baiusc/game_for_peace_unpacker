@@ -1,0 +1,51 @@
+{
+  "type": "frame",
+  "tick": 1,
+  "width": 1280,
+  "height": 720,
+  "w2c": [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1],
+  "proj": [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1],
+  "local": {
+    "isLocal": true,
+    "pos": {"x": 0.0, "y": 0.0, "z": 0.0},
+    "team": 0,
+    "isDead": false,
+    "isMyPlayer": true,
+    "hp": 100,
+    "maxHp": 100
+  },
+  "players": [
+    {
+      "isLocal": false,
+      "pos": {"x": -0.35, "y": 0.55, "z": 0.0},
+      "team": 1,
+      "isDead": false,
+      "hp": 75,
+      "maxHp": 100
+    },
+    {
+      "isLocal": false,
+      "pos": {"x": 0.4, "y": -0.45, "z": 0.0},
+      "team": 1,
+      "isDead": false,
+      "hp": 50,
+      "maxHp": 100
+    },
+    {
+      "isLocal": false,
+      "pos": {"x": 0.2, "y": 0.1, "z": 0.0},
+      "team": 0,
+      "isDead": false,
+      "hp": 100,
+      "maxHp": 100
+    },
+    {
+      "isLocal": false,
+      "pos": {"x": 5.0, "y": 0.0, "z": 0.0},
+      "team": 1,
+      "isDead": false,
+      "hp": 100,
+      "maxHp": 100
+    }
+  ]
+}

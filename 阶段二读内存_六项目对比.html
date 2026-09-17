@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>六项目·阶段二读内存机制对比</title>
+<style>
+  :root{
+    --ink:#1a2333; --sub:#5b6b83; --line:#dde4ee;
+    --bg:#f6f8fb; --card:#ffffff;
+    --cat-proc:#1f8a5f; --cat-proc-bg:#e5f4ed;   /* 进程内运行时 */
+    --cat-mock:#2f6fd6; --cat-mock-bg:#e8f0fc;   /* 合成数据/mock */
+    --cat-file:#c07a14; --cat-file-bg:#fbf0dd;   /* 文件/消息读取 */
+    --cat-model:#7c5cd6; --cat-model-bg:#f0ebfc; /* 建模/防御 */
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{background:var(--bg); color:var(--ink);
+       font-family:"Microsoft YaHei","PingFang SC","Segoe UI",system-ui,sans-serif;
+       line-height:1.55; padding:24px 20px 40px;}
+  .wrap{max-width:1160px; margin:0 auto;}
+  h1{font-size:24px; margin-bottom:6px;}
+  .sub{color:var(--sub); font-size:14px; margin-bottom:18px;}
+  .legend{display:flex; flex-wrap:wrap; gap:10px 18px; margin-bottom:22px; font-size:13px;}
+  .badge{display:inline-flex; align-items:center; gap:6px; padding:3px 10px; border-radius:999px; font-weight:600;}
+  .badge .dot{width:9px; height:9px; border-radius:50%; flex:0 0 auto;}
+  .b-proc{background:var(--cat-proc-bg); color:var(--cat-proc);} .b-proc .dot{background:var(--cat-proc);}
+  .b-mock{background:var(--cat-mock-bg); color:var(--cat-mock);} .b-mock .dot{background:var(--cat-mock);}
+  .b-file{background:var(--cat-file-bg); color:var(--cat-file);} .b-file .dot{background:var(--cat-file);}
+  .b-model{background:var(--cat-model-bg); color:var(--cat-model);} .b-model .dot{background:var(--cat-model);}
+
+  section{margin-bottom:26px;}
+  .sec-title{font-size:16px; font-weight:700; margin-bottom:10px; display:flex; align-items:center; gap:8px;}
+  .sec-title::before{content:""; width:4px; height:16px; border-radius:2px; background:var(--ink);}
+
+  /* ---- 阶段链 ---- */
+  .chain{background:var(--card); border:1px solid var(--line); border-radius:12px; padding:18px 16px;}
+  .chain-row{display:flex; align-items:stretch; gap:0; flex-wrap:wrap;}
+  .stage{flex:1 1 150px; min-width:150px; text-align:center; padding:10px 8px;}
+  .stage .num{display:inline-block; font-size:12px; font-weight:700; padding:2px 10px; border-radius:999px;
+              background:#eef1f6; color:var(--sub); margin-bottom:6px;}
+  .stage .name{font-size:15px; font-weight:700; margin-bottom:4px;}
+  .stage .who{font-size:12.5px; color:var(--sub);}
+  .stage .who b{color:var(--ink); font-weight:600;}
+  .arrow{align-self:center; color:#9aa8bd; font-size:20px; flex:0 0 22px; text-align:center;}
+  .chain-note{font-size:12.5px; color:var(--sub); border-top:1px dashed var(--line);
+              margin-top:12px; padding-top:10px;}
+  .chain-note b{color:var(--ink);}
+
+  /* ---- 卡片 ---- */
+  .grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(340px,1fr)); gap:14px;}
+  .card{background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px 16px;
+        border-left:5px solid #ccc;}
+  .card.proc{border-left-color:var(--cat-proc);}
+  .card.mock{border-left-color:var(--cat-mock);}
+  .card.file{border-left-color:var(--cat-file);}
+  .card.model{border-left-color:var(--cat-model);}
+  .card-head{display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; margin-bottom:6px;}
+  .card h3{font-size:16px;}
+  .card .tagline{font-size:13px; color:var(--sub); margin-bottom:10px;}
+  .kv{width:100%; border-collapse:collapse; font-size:13px;}
+  .kv td{padding:3px 0; vertical-align:top;}
+  .kv td.k{width:88px; flex:0 0 auto; color:var(--sub); white-space:nowrap; padding-right:8px;}
+  .kv code{background:#f1f4f9; border:1px solid #e3e9f2; border-radius:4px; padding:0 4px;
+           font-family:Consolas,"Courier New",monospace; font-size:12px; word-break:break-all;}
+  .road{margin-top:8px;}
+
+  /* ---- 三路对照 ---- */
+  table.roads{width:100%; border-collapse:collapse; background:var(--card); border:1px solid var(--line);
+              border-radius:12px; overflow:hidden; font-size:13.5px;}
+  table.roads th, table.roads td{border-bottom:1px solid var(--line); padding:9px 12px; text-align:left;}
+  table.roads th{background:#eef1f6; font-size:13px;}
+  table.roads tr:last-child td{border-bottom:none;}
+  .yes{color:var(--cat-proc); font-weight:700;}
+  .no{color:#9aa8bd;}
+  .who2{color:var(--sub); font-size:12.5px;}
+
+  .foot{font-size:12.5px; color:var(--sub); border-top:1px solid var(--line); padding-top:12px; margin-top:26px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>六项目 · 「阶段二 · 读内存」机制对比</h1>
+  <p class="sub">只读分析仓库现有代码与 README 边界：每个项目“把静态信息变成可消费运行时数据”的方式、对象与验证。</p>
+
+  <div class="legend">
+    <span class="badge b-proc"><span class="dot"></span>进程内运行时读取（真·读进程内存）</span>
+    <span class="badge b-mock"><span class="dot"></span>合成数据代替（mock，不读进程）</span>
+    <span class="badge b-file"><span class="dot"></span>文件 / 消息级读取（非进程内存）</span>
+    <span class="badge b-model"><span class="dot"></span>机制建模与防御检测</span>
+  </div>
+
+  <section>
+    <div class="sec-title">ESP 链路上的位置</div>
+    <div class="chain">
+      <div class="chain-row">
+        <div class="stage"><span class="num">阶段 1</span><div class="name">静态分析</div>
+          <div class="who">ucf-esp：<b>il2cpp_dump</b>（dump.cs / script.json）＋ Ghidra 初筛<br>ue_pak：格式结构分析</div></div>
+        <div class="arrow">→</div>
+        <div class="stage"><span class="num">阶段 2</span><div class="name">运行时读取</div>
+          <div class="who">ucf-esp：<b>tools/frida_dump.js</b>（Frida＋IL2CPP bridge）<br>ac-esp：<b>FixtureEntitySource 合成帧代替</b></div></div>
+        <div class="arrow">→</div>
+        <div class="stage"><span class="num">阶段 3</span><div class="name">投影</div>
+          <div class="who">ucf-esp：<b>esp_core.py</b> / projection.cpp<br>ac-esp：<b>projection.cpp</b></div></div>
+        <div class="arrow">→</div>
+        <div class="stage"><span class="num">阶段 4</span><div class="name">绘制</div>
+          <div class="who">ucf-esp：<b>overlay_tk / render_html</b><br>ac-esp：<b>矩形＋诊断输出</b></div></div>
+      </div>
+      <div class="chain-note"><b>旁支（不在 ESP 链上）：</b>
+        ue_pak_archive_lab＝读 PAK 归档文件；network_auth_audit_lab＝读协议消息；
+        android_loader_forensics_lab＝读样本文件做静态取证；kernel_memory_defense_lab＝建模“读内存”机制并从防御侧检测。</div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-title">逐项目：数据从哪来、怎么来</div>
+    <div class="grid">
+
+      <div class="card proc">
+        <div class="card-head"><h3>ucf-esp</h3><span class="badge b-proc"><span class="dot"></span>进程内·桥接 API</span></div>
+        <div class="tagline">唯一实现“真·运行时读进程内存”的项目，对应<strong>路 A（bridge）</strong>。</div>
+        <table class="kv">
+          <tr><td class="k">读取对象</td><td>UnityCrossFire.exe 的 GameAssembly（IL2CPP 运行时对象）</td></tr>
+          <tr><td class="k">手段</td><td>Frida 注入 ＋ <code>frida-il2cpp-bridge</code>：按类名/方法名调 API——<code>Camera.get_main()</code> → <code>get_worldToCameraMatrix()/get_projectionMatrix()</code>；<code>GameManager.myPlayer</code> 静态字段、<code>get_instance()</code> → <code>allPlayers</code>；玩家 <code>get_transform().get_position()</code>、<code>get_team()</code>、<code>get_isDead()</code>、<code>healthData</code>（<code>ObscuredInt.InternalDecrypt()</code> 解密）</td></tr>
+          <tr><td class="k">产出</td><td>每 1s <code>send()</code> 一帧 JSON：<code>{w2c[16], proj[16], local, players[]}</code>（列主序）</td></tr>
+          <tr><td class="k">消费</td><td><code>frida_host.py</code> 收帧 → <code>esp_core.py</code> 投影 → <code>overlay_tk</code> 叠加层；<code>--replay</code> 走离线回放</td></tr>
+          <tr><td class="k">验证</td><td><code>replay.py</code> ＋ <code>sample_session.json</code> 黄金样本断言（3 个 world→screen 点 ±1px）</td></tr>
+          <tr><td class="k">边界</td><td>注释明确“仅限自有授权单机游戏；勿用于联机或他人游戏”；开发期用关闭反作弊的构建</td></tr>
+        </table>
+      </div>
+
+      <div class="card mock">
+        <div class="card-head"><h3>ac-esp</h3><span class="badge b-mock"><span class="dot"></span>合成数据 mock</span></div>
+        <div class="tagline">阶段二被“编译期合成帧”替代，不读任何进程。</div>
+        <table class="kv">
+          <tr><td class="k">读取对象</td><td>无（不附加进程、不加载 DLL/驱动）</td></tr>
+          <tr><td class="k">手段</td><td><code>EntitySource</code> 抽象，唯一实现 <code>FixtureEntitySource::read_frame()</code> 返回硬编码单位矩阵 ＋ 3 个实体（hp 100/75/0）</td></tr>
+          <tr><td class="k">产出</td><td><code>FrameSnapshot</code>（view_matrix ＋ entities）</td></tr>
+          <tr><td class="k">消费</td><td><code>app.cpp</code> 投影为矩形 ＋ 诊断输出；CTest 校验投影与失效实体过滤</td></tr>
+          <tr><td class="k">边界</td><td>README：“不实现进程附加、隐蔽加载或反检测逻辑”；数据源抽象留给日后替换</td></tr>
+        </table>
+      </div>
+
+      <div class="card file">
+        <div class="card-head"><h3>ue_pak_archive_lab</h3><span class="badge b-file"><span class="dot"></span>文件级读取</span></div>
+        <div class="tagline">读的是磁盘归档，不是进程内存。</div>
+        <table class="kv">
+          <tr><td class="k">读取对象</td><td>已授权本地 PAK 归档文件</td></tr>
+          <tr><td class="k">手段</td><td>文件 I/O：尾部 <code>PakInfo</code>（magic/version/SHA1/offset）→ 索引 → <code>Entry</code> 结构 → 0x79 XOR 解密 → zlib 解压 → 写盘</td></tr>
+          <tr><td class="k">产出</td><td>解包出的 UE 资产文件 / 重打包归档</td></tr>
+          <tr><td class="k">验证</td><td>SHA-256、大小、索引摘要前后对比</td></tr>
+          <tr><td class="k">阶段二关系</td><td>若宽泛理解为“按偏移把静态格式变可消费数据”，它是文件按偏移读结构；对象是文件非内存</td></tr>
+        </table>
+      </div>
+
+      <div class="card file">
+        <div class="card-head"><h3>network_auth_audit_lab</h3><span class="badge b-file"><span class="dot"></span>消息级读取</span></div>
+        <div class="tagline">读的是协议消息，审计其健壮性。</div>
+        <table class="kv">
+          <tr><td class="k">读取对象</td><td><code>samples/auth_trace.json</code> 合成轨迹；127.0.0.1 回环 TCP</td></tr>
+          <tr><td class="k">手段</td><td>JSON 解析 ＋ RC4/MD5 codec ＋ 字段变异测试（<code>mutation_test.py</code>）</td></tr>
+          <tr><td class="k">产出</td><td>风险清单（静态密钥 / 缺 nonce / 响应未验签 / 会话未绑定，共 5 项）＋ 整改项</td></tr>
+          <tr><td class="k">阶段二关系</td><td>读“消息内容”而非内存；方向是协议风险审计（防御视角）</td></tr>
+        </table>
+      </div>
+
+      <div class="card file">
+        <div class="card-head"><h3>android_loader_forensics_lab</h3><span class="badge b-file"><span class="dot"></span>静态取证</span></div>
+        <div class="tagline">从样本文件字节流里找嵌入载荷，不执行、不加载。</div>
+        <table class="kv">
+          <tr><td class="k">读取对象</td><td><code>samples/synthetic_loader.bin</code></td></tr>
+          <tr><td class="k">手段</td><td>正则 <code>7f454c46…</code> 定位 hex 编码 ELF → 解码为静态副本 → 记录字节数 ＋ SHA-256</td></tr>
+          <tr><td class="k">产出</td><td><code>analysis_output/embedded_*.elf</code> ＋ <code>manifest.tsv</code></td></tr>
+          <tr><td class="k">阶段二关系</td><td>对应“载荷如何藏在样本里”的发现，非运行时内存；脚本无 subprocess/加载逻辑</td></tr>
+        </table>
+      </div>
+
+      <div class="card model">
+        <div class="card-head"><h3>kernel_memory_defense_lab</h3><span class="badge b-model"><span class="dot"></span>建模＋防御</span></div>
+        <div class="tagline">把“读内存 / 隐藏模块”机制做成用户态合成模型，用于理解与检测。</div>
+        <table class="kv">
+          <tr><td class="k">读取对象</td><td><code>samples/</code> 合成页表 / ABI 清单 / 可见性快照（fixture 强制 <code>scope=synthetic-only</code>）</td></tr>
+          <tr><td class="k">手段</td><td><code>page_table_model.py</code> 四级页表 PGD→PUD→PMD→PTE 虚拟→物理翻译＋跨页只读；<code>abi_router.py</code> 路由；<code>module_visibility_audit.py</code> 模块链表/sysfs/设备节点/ioremap 调用者不一致检测</td></tr>
+          <tr><td class="k">产出</td><td>页表路径、物理地址、读取字节；4 个可见性检测信号（退出码 1）</td></tr>
+          <tr><td class="k">阶段二关系</td><td>从防御侧建模读内存机制；不打开 /dev/mem、不调 process_vm_readv、不加载驱动</td></tr>
+        </table>
+      </div>
+
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-title">与「三条路」的对应关系</div>
+    <table class="roads">
+      <tr><th style="width:180px">路线</th><th>仓库内实现情况</th><th>说明</th></tr>
+      <tr><td><strong>路 A</strong> · bridge（类名/方法名调 IL2CPP API）</td>
+          <td class="yes">✔ 已实现</td>
+          <td>ucf-esp / <code>tools/frida_dump.js</code>＋<code>frida-il2cpp-bridge</code>；可读性好、需打包，目标为自有单机游戏</td></tr>
+      <tr><td><strong>路 B</strong> · script.json 偏移 ＋ <code>Memory.read*</code></td>
+          <td class="no">✘ 无实现</td>
+          <td><code>il2cpp_dump/script.json</code> 仅作静态参考；frida_dump.js 全程走方法调用，未按偏移直读内存</td></tr>
+      <tr><td><strong>路 C</strong> · 外部进程 <code>ReadProcessMemory</code></td>
+          <td class="no">✘ 无实现</td>
+          <td>仓库内不存在外部 RPM 读取器（ac-esp 明确不实现进程附加）</td></tr>
+    </table>
+  </section>
+
+  <div class="foot">
+    数据来源：仓库内各项目 README、AGENTS.md 与核心源码（ucf-esp/tools/frida_dump.js、frida_host.py、esp_core.py、replay.py；ac-esp/src/entity_source.cpp、app.cpp；ue_pak_archive_lab/src/game_for_peace_unpack.c；network_auth_audit_lab/*.py；android_loader_forensics_lab/extract_hex_elf.py；kernel_memory_defense_lab/*.py）。本图仅为仓库现状的机制归纳，非任何在线游戏客户端的行为描述。
+  </div>
+
+</div>
+</body>
+</html>
