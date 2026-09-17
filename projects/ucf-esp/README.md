@@ -31,7 +31,13 @@ python tests/test_process_selection.py    # 进程选择 + --game 路径解析�
 python tests/test_dump_contract.py        # dump.cs <-> frida_dump.js 契约（偏移/方法名），离线
 python tests/test_script_config.py        # 档位/探测/UCFG 是否源码与打包产物同步，离线
 python tests/test_projection_calibration.py  # 真实对局帧锁死投影数学与 NDC 裁剪，离线
+python tests/test_overlay_geometry.py     # 叠加层映射/DPI/失焦隐藏/防闪烁/鼠标穿透，离线
 ```
+
+叠加层相关（位置偏移、画到别的窗口、闪烁、点击穿透）都有实测证据与修法记录，
+见 `docs/HOST_OVERLAY.md` 的「框位置和实际对不上 / 画到别的窗口 / 闪烁」一节；
+其中最关键的一条：宿主必须声明 **DPI 感知**（本机 250% 缩放下，
+不声明时坐标系只有实际的一半多点，框会整体缩放错位）。
 
 细节、参数与排错见 `docs/HOST_OVERLAY.md`；静态地址/偏移见 `docs/STATIC_REFERENCE.md`。
 

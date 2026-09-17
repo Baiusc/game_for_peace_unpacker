@@ -58,6 +58,7 @@
 - `python tests/test_process_selection.py`  进程选择 + `--game` 路径解析（8 例）
 - `python tests/test_dump_contract.py`  解析 `il2cpp_dump/dump.cs` 校验偏移/方法名/列主序/Team 枚举（9 项）
 - `python tests/test_projection_calibration.py`  真实对局帧锁死投影数学 + NDC 裁剪（24 项，含合成样本不被误裁）
+- `python tests/test_overlay_geometry.py`  叠加层几何/DPI/闪烁/鼠标穿透/线程投递（16 项，假 Tk + 假 user32，离线）
 - `python tests/test_script_config.py`  档位/单步探测/UCFG 透传/payload 解析/isDead 推导/主线程调度，含"源码与 bundle 是否同步"（10 项）
 - `python tools/replay.py --golden`  黄金样本 3/3（`(-0.35,0.55,0)→(416,162)` 等）
 - `--game` 支持裸文件名：按 环境变量 `UCF_GAME` → 已知安装目录 → 当前目录 解析（`resolve_game_path()`）。
@@ -95,13 +96,44 @@
   结果合成样本（尺度是"1 单位"不是米，玩家离相机 0.65）被误裁到全不可见。
   `world_to_screen` **不做裁剪**、仍返回原始值（便于诊断），裁剪只在 `_make` 标 `clipped`。
 - Mark 新增 `dist`（到相机距离）与 `clipped`；打印成 `[不可画: ndc 超界, 0.95m]`。
-- **叠加层对齐（方向别搞反）**：投影用 frame 的 width/height，所以**画布尺寸必须等于帧分辨率**；
-  游戏窗口客户区只提供**位置**。旧代码硬编码 `OverlayWindow(1280,720)` 而游戏是 800x600
-  → 框放大 1.6 倍错位。`overlay_tk.game_client_rect()` 用 `FindWindowW("UnityWndClass")`
-  + `GetClientRect` + `ClientToScreen`（**刻意不用 EnumWindows 回调**：64 位 ctypes 回调
-  会 OverflowError）。**必须校验客户区尺寸 == 帧分辨率（±2px）才采信其位置** —— 别用宽高比
-  判断，实测抓到过无关的 320x240 Unity 窗口（和 800x600 同为 1.333）。锚点确认后锁定。
-  `Screen.get_width/height()` 是渲染分辨率，开了 render scale 时会≠客户区，画布仍按它走。
+## 叠加层显示（DPI / 映射 / 闪烁 / 鼠标 / 线程）— 2026-09-17 实测定案
+**实测环境：屏幕 3840x2160 物理，Windows 显示缩放 250%（`GetDpiForSystem`=240）。**
+未声明 DPI 的进程 `GetSystemMetrics` 只返回 **1536x864** —— Tk 按逻辑像素布局后被系统整体
+放大 2.5 倍，这是"框尺寸不对"的真凶（实测框 ~100x150 = 40x60 × 2.5）。
+游戏画面是 **2880x2160 居中、左右黑边**（逐列量得黑边 0..476 / 3360..3836）→ 相对帧 800x600 等比 **3.6×**。
+
+1. **必须声明 DPI 感知，且要在 `tk.Tk()` 之前**：`SetProcessDpiAwarenessContext(PER_MONITOR_V2)`
+   → 回退 `shcore.SetProcessDpiAwareness(2)` → `SetProcessDPIAware()`。声明后
+   `GetSystemMetrics` 变 3840x2160。见 `overlay_tk.enable_dpi_awareness()`。
+2. **帧坐标 ≠ 屏幕坐标**，靠 `compute_viewport(client, frame_w, frame_h, fit)` 映射：返回显示区
+   矩形+缩放+mode。`auto` = 宽高比差 ≤2% 走 stretch，否则 **letterbox**（4:3 内容进 16:9 必须
+   留黑边，不能拉伸）。映射用 `map_point`（画布内坐标）/ `to_screen`（屏幕坐标）。
+   `--overlay-fit stretch|letterbox|auto` 可强制。**画布尺寸 == 显示区尺寸**（不是帧分辨率，
+   letterbox 时两者不同）。实测 (480,0,2880,2160)/3.6 与截图黑边完全吻合。
+3. **找窗口按 pid**：遍历 `UnityWndClass` 顶层窗口、取客户区最大者（`GetTopWindow`+`GetWindow`，
+   **不用 FindWindowW 按类名、绝不用 EnumWindows 回调** —— 64 位 ctypes 回调必 OverflowError）。
+   0.5s 重探，游戏关掉重开会自动重定位；失焦/最小化/不可见走 `withdraw()` 隐藏
+   （`--no-overlay-clip` 可关）。`--overlay-rect x,y,w,h` 手动兜底。
+4. **闪烁的成因有三个，别只修一个**：
+   a) 不用 `canvas.delete("all")`（删到重建之间露一帧全黑）—— 复用 item 只改坐标，
+      内容未变（0.1px 四舍五入）直接跳过重绘；
+   b) 重申 topmost 用原生 `SetWindowPos(SWP_NOACTIVATE|NOMOVE|NOSIZE|NOOWNERZORDER|NOSENDCHANGING)`
+      —— **Tk 的 `lift()`/`attributes("-topmost")` 会闪且抢前台焦点**；我们的策略是"游戏在前台才
+      显示"，一旦叠加层抢到前台 → 判自己出局 → 隐藏 → 焦点回游戏 → 再显示 = **2 秒一轮的
+      周期性闪烁**（这就是"游戏内闪、切出游戏不闪"的主因）；
+   c) 前台判断**必须排除自身句柄**：`is_foreground(hwnd, ignore=(own_hwnd,))`，否则 topmost 的
+      叠加层偶尔成为前台 → 自己判自己出局 → 同样周期闪烁。
+   另加 **0.35s 隐藏迟滞**（`HIDE_DELAY_S`），避免切菜单/系统通知抢焦点时"藏-显-藏"抖动。
+5. **鼠标穿透**：Tk 的 `-transparentcolor` 只设 `LWA_COLORKEY`，**只有纯黑像素**才穿透；我们画的
+   红蓝绿框会拦住鼠标（游戏里偶发"点不动"）。必须补 `WS_EX_TRANSPARENT|WS_EX_LAYERED|
+   WS_EX_NOACTIVATE`（实测 exstyle `0x00080088` → `0x080800A8`）。
+6. **线程安全（tkinter 只保证创建它的线程可用）**：宿主是"看门狗线程 + frida 消息线程"，
+   直接调 `OVERLAY.update()` / `OVERLAY.clear()` 属未定义行为。改为宿主只调 `push()` /
+   `request_clear()` **入队**，所有 Tk 操作都在 `_tick()`（`root.after` 定时器，主线程）里做；
+   队列积压丢旧帧留最新；`_last_draw` 在 `_drain` 收到帧时就记时（`update` 提前返回也算活着）；
+   `_tick` 同时负责帧断流 1.2s 清屏 + 每 2s 重申置顶。
+7. `_probe` 的 manual_rect 分支曾有个**永假条件**（`self.hwnd is None and _is_window(self.hwnd)`）；
+   手动指定显示区时**仍要**定位游戏窗口，否则失焦隐藏失效。
 - **已结案（2026-09-17）**：`--probe --level 3` 把崩点钉死在 `▶ [13/16] player.get_isDead()`
   （前 12 步全通：`allPlayers.length=30`、坐标 `(7.53,11.97,25.24)`、`team=GlobalRisk`）。
   → 真因是 frida 线程调有方法体的 getter；已用"主线程调度 + isDead 由 hp 推导"修掉。

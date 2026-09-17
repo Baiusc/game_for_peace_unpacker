@@ -488,6 +488,16 @@ Il2Cpp.perform(() => {
   const WARN_MS = 3000;
   const REPORT_MS = 5000;
 
+  // 不在对局 / 还没相机 时也要照常发帧（inGame:false）：
+  // 以前直接 return，宿主既看不到"我还活着"（会误报 10s 无数据），
+  // 又不会清屏 —— 回菜单后屏幕上一直留着上一次的框。
+  const sendStatus = (reason) => {
+    let scr = { width: 0, height: 0 };
+    try { scr = screenSize(); } catch (e) { /* 拿不到就算了 */ }
+    send({ type: "frame", tick, inGame: false, reason,
+           width: scr.width, height: scr.height, local: null, players: [] });
+  };
+
   // 单帧逻辑（会被调度到 Unity 主线程执行，见 callOnMainThread）
   const frameTick = () => {
     tick++;
@@ -498,10 +508,12 @@ Il2Cpp.perform(() => {
       M = grabMatrices();
     } catch (e) {
       if (now - lastErr > WARN_MS) { lastErr = now; console.log("[!] 读矩阵失败:", e.message || e); }
+      sendStatus("matrix-error");
       return;
     }
     if (!M) {
       if (now - lastWarn > WARN_MS) { console.log("[!] 等待主相机 Camera.main ..."); lastWarn = now; }
+      sendStatus("no-camera");
       return;
     }
 
@@ -532,6 +544,7 @@ Il2Cpp.perform(() => {
           : "[*] 等待 GameManager 实例（尚未创建，进对局后再按 INS 注入更省事）...");
         lastWarn = now;
       }
+      sendStatus(everHadGm ? "left-match" : "no-game-manager");
       return;
     }
     everHadGm = true;
@@ -542,6 +555,7 @@ Il2Cpp.perform(() => {
     const frame = {
       type: "frame",
       tick,
+      inGame: true,
       width: scr.width,
       height: scr.height,
       w2c: M.w2c,

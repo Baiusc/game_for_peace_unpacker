@@ -3756,6 +3756,23 @@ ${this.isEnum ? `enum` : this.isStruct ? `struct` : this.isInterface ? `interfac
       let lastErr = 0;
       const WARN_MS = 3e3;
       const REPORT_MS = 5e3;
+      const sendStatus = (reason) => {
+        let scr = { width: 0, height: 0 };
+        try {
+          scr = screenSize();
+        } catch (e) {
+        }
+        send({
+          type: "frame",
+          tick,
+          inGame: false,
+          reason,
+          width: scr.width,
+          height: scr.height,
+          local: null,
+          players: []
+        });
+      };
       const frameTick = () => {
         tick++;
         const now = Date.now();
@@ -3767,6 +3784,7 @@ ${this.isEnum ? `enum` : this.isStruct ? `struct` : this.isInterface ? `interfac
             lastErr = now;
             console.log("[!] 读矩阵失败:", e.message || e);
           }
+          sendStatus("matrix-error");
           return;
         }
         if (!M) {
@@ -3774,6 +3792,7 @@ ${this.isEnum ? `enum` : this.isStruct ? `struct` : this.isInterface ? `interfac
             console.log("[!] 等待主相机 Camera.main ...");
             lastWarn = now;
           }
+          sendStatus("no-camera");
           return;
         }
         const scr = screenSize();
@@ -3805,6 +3824,7 @@ ${this.isEnum ? `enum` : this.isStruct ? `struct` : this.isInterface ? `interfac
             console.log(everHadGm ? "[*] 不在对局中（GameManager 实例已销毁，进对局后自动恢复）..." : "[*] 等待 GameManager 实例（尚未创建，进对局后再按 INS 注入更省事）...");
             lastWarn = now;
           }
+          sendStatus(everHadGm ? "left-match" : "no-game-manager");
           return;
         }
         everHadGm = true;
@@ -3813,6 +3833,7 @@ ${this.isEnum ? `enum` : this.isStruct ? `struct` : this.isInterface ? `interfac
         const frame = {
           type: "frame",
           tick,
+          inGame: true,
           width: scr.width,
           height: scr.height,
           w2c: M.w2c,

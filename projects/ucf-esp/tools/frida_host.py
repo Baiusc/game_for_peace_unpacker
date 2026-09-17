@@ -58,6 +58,7 @@ FRIDA_BUNDLE = os.path.join(SCRIPT_DIR, "frida_dump.bundle.js")
 FRIDA_SRC = os.path.join(SCRIPT_DIR, "frida_dump.js")
 
 OVERLAY = None  # 全局，便于 on_message 推送
+OVERLAY_CFG = {"fit": "auto", "rect": None, "clip": True}  # --overlay-* 参数
 LAST_MSG_TS = 0.0   # 最近一次收到 send 帧的时间，用于“静默看门狗”
 LAST_PRINT_TS = 0.0  # 控制台打印节流（20Hz 收帧 -> 2Hz 打印）
 PRINT_THROTTLE_S = 0.5
@@ -144,6 +145,7 @@ def watch_loop(pid, t0, level, silence=10.0):
     """阻塞式看门狗：进程一没就立刻报告存活时长 + Unity 日志尾部。
 
     以前是 sys.stdin.read()，游戏偷偷死了宿主还傻等，排查时根本看不出死在哪一步。
+    顺带负责"帧断流就清空叠加层"，避免回菜单后屏幕上留着上一次的框。
     """
     global LAST_MSG_TS
     warned = False
@@ -155,6 +157,8 @@ def watch_loop(pid, t0, level, silence=10.0):
             print("    换更低的 --level 再跑一次即可把范围缩到单个调用。")
             print_player_log()
             return
+        # 帧断流清屏交给叠加层自己的 Tk 定时器（overlay_tk._tick）做：
+        # 这里是后台线程，跨线程碰 canvas 不是线程安全的。
         if level >= 2 and LAST_MSG_TS and not warned and (time.time() - LAST_MSG_TS) > silence:
             warned = True
             print(f"[!] 已 {silence:.0f}s 没收到帧数据：agent 可能卡住，"
@@ -244,24 +248,30 @@ def on_message(message, data):
     if not isinstance(frame, dict) or frame.get("type") != "frame":
         return
     LAST_MSG_TS = time.time()
+
+    # 不在对局 / 还没拿到矩阵：JS 会照常发帧（inGame:false），这里只需清屏。
+    # 以前是几秒一条"不在对局中"，叠加层却一直留着上一次的框 —— 菜单里也会看到鬼影。
+    if not frame.get("inGame", True) or not frame.get("w2c"):
+        if OVERLAY is not None:
+            OVERLAY.request_clear()      # 跨线程入口：真正的清屏在主线程 _tick 里做
+        return
+
     try:
         vp, marks = esp_core.project_frame(frame)
     except Exception as e:
         if not WARNED_ONCE.get("project"):
-            WARNED_ONCE["payload"] = True
             WARNED_ONCE["project"] = True
             print(f"[frida] 投影失败（后续同类错误不再打印）: {e}")
         return
     if OVERLAY is not None:
-        # 叠加层必须先和游戏真实分辨率对齐，否则框会整体缩放错位
-        # （实测游戏 800x600，硬编码 1280x720 会放大 1.6 倍）
-        try:
-            OVERLAY.fit(frame.get("width"), frame.get("height"))
-        except Exception as e:
-            if not WARNED_ONCE.get("overlay_fit"):
-                WARNED_ONCE["overlay_fit"] = True
-                print(f"[overlay] 尺寸自适应失败（后续不再打印）: {e}")
-        OVERLAY.update(marks)
+        # 叠加层要按游戏窗口客户区做映射（帧坐标 ≠ 屏幕坐标），详见 overlay_tk 顶部说明。
+        # 注意用 push 而不是 update：本回调跑在 frida 的消息线程上，
+        # 而 tkinter 只保证创建它的线程可用 —— 由 Tk 主线程的定时器取队列绘制。
+        OVERLAY.push(marks, frame.get("width"), frame.get("height"))
+        if not WARNED_ONCE.get("overlay_status"):
+            if OVERLAY.vp is not None:
+                WARNED_ONCE["overlay_status"] = True
+                print(f"[overlay] {OVERLAY.status()}")
     else:
         # 帧率 20Hz，控制台打印节流到 2Hz，否则一屏滚得什么都看不清
         now = time.time()
@@ -441,17 +451,20 @@ def inject(device, js_path, use_overlay, forced_pid=None, wait_seconds=DEFAULT_W
     """挑进程 -> 读脚本 -> attach -> 注入。日志顺序按真实执行顺序打印，便于排查。"""
     global OVERLAY
 
-    if use_overlay:
-        try:
-            from overlay_tk import OverlayWindow
-            OVERLAY = OverlayWindow(1280, 720)
-        except Exception as e:
-            print("[overlay] 不可用，降级为纯打印：", e)
-            OVERLAY = None
-
     game_name = os.path.basename(_GAME_PATH or DEFAULT_GAME_NAME)
     pid = select_game_pid(device, game_name, wait_seconds=wait_seconds,
                           forced_pid=forced_pid)
+
+    if use_overlay:
+        try:
+            from overlay_tk import OverlayWindow, enable_dpi_awareness
+            print(f"[overlay] DPI 感知: {enable_dpi_awareness()}")
+            # pid 用来精确定位游戏窗口（按类名找可能撞上系统里别的 Unity 窗口）
+            OVERLAY = OverlayWindow(pid=pid, fit=OVERLAY_CFG["fit"],
+                                    rect=OVERLAY_CFG["rect"], clip=OVERLAY_CFG["clip"])
+        except Exception as e:
+            print("[overlay] 不可用，降级为纯打印：", e)
+            OVERLAY = None
 
     with open(js_path, "r", encoding="utf-8") as f:
         js = f.read()
@@ -606,7 +619,29 @@ def main():
     ap.add_argument("--silence", type=float, default=10.0,
                     help="多少秒没收到帧就告警（默认 10）")
     ap.add_argument("--script", default=None, help="指定要加载的 JS 文件（默认 frida_dump.bundle.js）")
+    ap.add_argument("--overlay-fit", default="auto", choices=["auto", "stretch", "letterbox"],
+                    help="帧坐标 → 屏幕的映射方式（默认 auto）："
+                         "auto=宽高比一致就拉伸、不一致就等比居中；"
+                         "stretch=按客户区各轴独立缩放；letterbox=等比缩放并居中。"
+                         "实测本机：游戏 800x600 全屏到 4K，屏幕上是 2880x2160 居中带黑边，"
+                         "auto 会选 letterbox，与截图像素一致")
+    ap.add_argument("--overlay-rect", default=None, metavar="x,y,w,h",
+                    help="手动指定显示区（屏幕物理像素），跳过自动找游戏窗口")
+    ap.add_argument("--no-overlay-clip", action="store_true",
+                    help="不隐藏叠加层（默认游戏不在前台/最小化时隐藏，避免画到别的窗口上）")
     args = ap.parse_args()
+
+    OVERLAY_CFG["fit"] = args.overlay_fit
+    OVERLAY_CFG["clip"] = not args.no_overlay_clip
+    if args.overlay_rect:
+        try:
+            parts = [int(v) for v in args.overlay_rect.replace("，", ",").split(",")]
+            if len(parts) != 4:
+                raise ValueError("需要 4 个数字")
+            OVERLAY_CFG["rect"] = tuple(parts)
+        except Exception as e:
+            print(f"[!] --overlay-rect 解析失败（应为 x,y,w,h）: {e}")
+            return
 
     if args.replay:
         run_replay(args.replay)

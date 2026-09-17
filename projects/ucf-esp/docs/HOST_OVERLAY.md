@@ -9,12 +9,15 @@
 |---|---|
 | `tools/esp_core.py` | 投影数学（`combine_pv` / `world_to_screen`）+ 帧处理（`project_frame` → `Mark` 列表）。复刻 `src/projection.cpp` 列主序约定，与 `validate_projection.py` 一致。 |
 | `tools/render_html.py` | 离线把 marks 渲染成静态 SVG（无游戏也可核对投影）。 |
-| `tools/overlay_tk.py` | Windows 透明置顶叠加层骨架（tkinter，点击穿透）。 |
+| `tools/overlay_tk.py` | Windows 透明置顶叠加层。**含 DPI 感知、帧坐标→屏幕物理像素映射（stretch/letterbox）、按 pid 定位游戏窗口、失焦隐藏、鼠标穿透、防闪烁、跨线程队列**；细节见文末"框位置对不上"一节。 |
 | `tools/replay.py` | 离线验证器：加载 frida 帧样本 → 投影 → 打印 → 跑黄金样本断言 → 可选 SVG。 |
 | `tools/frida_host.py` | 实时宿主：**先清理同名残留进程 → 正常启动游戏 → 按 `INS` 键才把 frida 注入到真正跑 IL2CPP 的 `UnityCrossFire.exe`** → 收帧 → 投影 → 推叠加层。 |
 | `tools/frida_probe.py` | 进程探针：列出所有同名进程及其 `arch` / 模块数 / 是否加载了 `GameAssembly.dll`，用来确认该注哪一个（排查“注进空壳”的利器）。 |
 | `tests/test_process_selection.py` | 进程选择逻辑的离线单元测试（假进程表 + monkeypatch，不需要 frida / 游戏）。 |
 | `tests/test_dump_contract.py` | 契约测试：解析 `il2cpp_dump/dump.cs`，校验 `frida_dump.js` 写死的方法名与字段偏移（矩阵列主序、`*_Injected` 签名、`ObscuredInt` 解密布局）。离线、不需要游戏。 |
+| `tests/test_projection_calibration.py` | 投影校准测试：用**真实帧**（`tests/fixtures/real_frame_*.json`）断言 `P*V` 顺序、相机位置反推、NDC 裁剪、team 可比较。离线。 |
+| `tests/test_overlay_geometry.py` | 叠加层几何/显示策略测试：DPI 场景下的映射、窗口几何、前台排除自身、迟滞、topmost 原生调用、鼠标穿透、跨线程队列。假 Tk + 假 user32，离线。 |
+| `tests/fixtures/real_frame_*.json` | 从实机日志里抠出来的真实帧，作为投影/叠加层的回归基准。 |
 | `tools/frida_dump.js` | **源码**：基于 `frida-il2cpp-bridge` 的运行时数据源（含 `DISCOVER` 开关）。 |
 | `tools/frida_dump.bundle.js` | **打包产物**（自包含，已内联 bridge）。`frida_host.py` 实际加载它，无需本机 `npm i frida-il2cpp-bridge`。若改了源码需重打包（见下）。 |
 | `tools/sample_session.json` | 与 `frida_dump.js` 同构的合成帧（identity VP，含三组黄金样本点），用于离线自测。 |
@@ -90,6 +93,9 @@ python tools/frida_host.py --list          # 只看进程：哪些同名进程�
 | `--silence <秒>` | 多少秒没收到帧就告警（默认 10） |
 | `--script <文件>` | 指定要加载的 JS（默认 `frida_dump.bundle.js`） |
 | `--no-overlay` | 不创建叠加窗口，仅控制台打印 |
+| `--overlay-fit {auto,stretch,letterbox}` | 帧坐标 → 屏幕的映射方式（默认 `auto`）。详见文末"框位置对不上" |
+| `--overlay-rect x,y,w,h` | 手动指定显示区（屏幕**物理**像素），跳过自动找游戏窗口 |
+| `--no-overlay-clip` | 不因游戏失焦/最小化而隐藏叠加层（默认会隐藏，避免画到别的窗口上） |
 | `--game <路径>` | 指定游戏 exe：完整路径或裸文件名都行。裸文件名会在已知安装目录 / 环境变量 `UCF_GAME` / 当前目录里找；都找不到会打印三种正确写法（不会再抛 `[WinError 2]`） |
 
 > `INS` 用 `GetAsyncKeyState` 轮询实现（纯标准库、无第三方依赖），即使游戏窗口在前台也能触发；`ENTER` 也可；非 Windows 环境退化为“按回车注入”。
@@ -409,30 +415,115 @@ frida 16+ 会把 `send(对象)` **直接解成 dict** 递给 `on_message`，而�
 回归：`python tests/test_projection_calibration.py`（用真实对局帧做黄金断言，
 含"投影数学未被篡改"和"合成样本不被误裁"两条）。
 
-## 排错：叠加层的框位置和实际对不上
+## 排错：叠加层的框位置和实际对不上 / 画到别的窗口 / 闪烁
 
-叠加层窗口**必须和游戏画面的分辨率/位置一致**，否则框会整体缩放错位。
-实测游戏是 **800x600**，而旧代码硬编码 `OverlayWindow(1280, 720)` —— 会放大 1.6 倍。
+这三类问题的根因都已定位并修掉，每条都有实测数据支撑。按**出错顺序**记录：
 
-**方向别搞反**：投影用的是 frame 的 `width/height`，所以**画布尺寸必须等于帧分辨率**；
-游戏窗口客户区只用来提供**位置**。
+### ① 位置整体偏移 —— DPI 虚拟化（头号原因）
 
-现在 `overlay_tk.OverlayWindow.fit(w, h)` 每帧被调用，做两件事：
+宿主进程默认是 **DPI-unaware**。本机实测 4K 屏 + 250% 缩放：
 
-1. 画布尺寸 = 帧分辨率（游戏实测 800x600，硬编码 1280x720 会放大 1.6 倍）；
-2. 位置锚点 = 游戏窗口客户区左上角：用 `FindWindowW("UnityWndClass")` +
-   `GetClientRect` + `ClientToScreen` 取得（**刻意不用 EnumWindows 回调**，
-   ctypes 回调在 64 位 Python 下极易 `OverflowError`，本项目已栽过一次）。
+```
+未声明 DPI 感知时：GetSystemMetrics() = 1536 x 864   ← 只有逻辑像素
+声明之后：          GetSystemMetrics() = 3840 x 2160   ← 物理像素，与截图/光标同一坐标系
+```
 
-第 2 步有个必须做的校验：**只有客户区尺寸与帧分辨率严格相等（±2px）才采信它的位置**。
-别退化成"宽高比一致"——实测系统里抓到过无关的 320x240 Unity 窗口，它和 800x600 的
-宽高比都是 1.333，靠比例判断会把框画到错误位置。拿不到窗口就用 `(0,0)`。
+也就是说 Tk 窗口按"逻辑像素"布局、再被 Windows 整体放大 2.5 倍：800x600 的画布在屏幕上
+变成 2000x1500，框实测约 100x150 像素（= 40x60 × 2.5），位置也整体乘了 2.5。
 
-锚点确认后锁定（`anchor_locked`），避免每帧抖动。
+**修法**：`overlay_tk.enable_dpi_awareness()`，必须在 `tk.Tk()` **之前**调用：
 
-> `Screen.get_width/height()` 返回的是**渲染分辨率**。窗口化时通常等于窗口客户区；
-> 若游戏开了 render scale 导致两者不等，画布仍按渲染分辨率走（与投影一致），
-> 只是叠加层不会铺满窗口——坐标本身依然正确。
+```
+[overlay] DPI 感知: per-monitor-v2 (系统 DPI 240)
+```
+
+> 看到 `unaware（窗口会被系统缩放，框会偏…）` 就说明声明失败，检查 exe 的兼容性设置
+> 里有没有勾"替代高 DPI 缩放行为"。
+
+### ② 位置对但比例/留白不对 —— 帧坐标 ≠ 屏幕坐标
+
+投影出来的是**帧坐标系**（`Screen.get_width/height`，本游戏实测 800x600），而游戏窗口
+在 4K 全屏上是 **2880x2160 居中、左右各留黑边**。从截图逐列量黑边得到：
+
+```
+黑列范围 0..476 与 3360..3836  →  显示区 (480, 0, 2880, 2160)
+2880/800 = 2160/600 = 3.6      →  等比缩放 3.60x
+```
+
+`compute_viewport()` 按客户区算映射，三种模式：
+
+| `--overlay-fit` | 行为 | 何时用 |
+|---|---|---|
+| `auto`（默认） | 宽高比一致（±2%）→ `stretch`；不一致 → `letterbox` | 一般不用管 |
+| `stretch` | 各轴独立缩放铺满客户区 | 游戏窗口与渲染分辨率严格同比例 |
+| `letterbox` | 等比缩放 + 居中（保留黑边） | 像本机 4:3 游戏全屏到 16:9 |
+
+**必须 letterbox 而不是 stretch**：上面这个场景用 stretch 会把画面横向压扁，
+框虽然"贴"在客户区里，但和游戏内的物体对不上。
+
+诊断行（首帧打印一次）：
+
+```
+[overlay] 帧 800x600 → 显示区 2880x2160@(480,0) 缩放 3.60x [letterbox] | 客户区 3840x2160@(0,0) | DPI per-monitor-v2 (系统 DPI 240)
+```
+
+`--overlay-rect x,y,w,h` 可以手动指定显示区（屏幕物理像素），跳过自动找窗口。
+
+### ③ 画到别的窗口上
+
+`clip`（默认开）：游戏窗口**不在前台 / 被最小化 / 不可见**时 `withdraw()` 隐藏。
+
+找窗口**按 pid** 遍历 `UnityWndClass` 顶层窗口取客户区最大的那个：
+不用 `FindWindowW` 按类名（系统里可能有别的 Unity 窗口，实测抓到过无关的 320x240 窗口），
+也不用 `EnumWindows` 回调（64 位 ctypes 回调极易 `OverflowError`）。
+定期重探（0.5s），窗口被关掉重开会自动重新定位。
+
+关掉前台判断用 `--no-overlay-clip`（多屏调试时想看它一直在）。
+
+### ④ 闪烁 —— 三个独立的成因，都修了
+
+**(a) 每帧 `canvas.delete("all")`**：删除到重建之间会露出一帧全黑。
+现在复用 canvas item 只改坐标，而且**内容没变就不重绘**（坐标四舍五入到 0.1px 比较）。
+
+**(b) 重申 topmost 用 Tk 的 `lift()` / `attributes("-topmost")`**：会闪一下，
+还会**抢走前台焦点** —— 于是"游戏是前台才显示"的判断瞬间变 False → 隐藏自己 →
+焦点回到游戏 → 再显示。**两秒一轮的闪烁，周期性极强**，这是"游戏内闪、切出去不闪"的主因。
+
+现在用原生 `SetWindowPos(SWP_NOACTIVATE|SWP_NOMOVE|SWP_NOSIZE|SWP_NOOWNERZORDER)` 原地重申，
+不激活、不重绘。
+
+**(c) 前台判断没排除自己的句柄**：叠加层是 topmost，偶尔会被系统当成前台窗口。
+不排除就是"自己判自己出局"，同样周期性闪烁。`is_foreground(hwnd, ignore=(自身 hwnd,))`。
+
+另外隐藏加了 **0.35s 迟滞**：切菜单、系统通知抢焦点时不立刻藏，
+否则会「藏-显-藏」抖动。
+
+### ⑤ 游戏里偶尔点不动 —— 叠加层挡住了鼠标
+
+Tk 的 `-transparentcolor` 只设 `LWA_COLORKEY`：**只有纯黑像素**的点击会穿透，
+而我们画的框/文字是红蓝绿，那些像素照样拦鼠标。
+
+补 `WS_EX_TRANSPARENT`（整窗不接收鼠标）+ `WS_EX_NOACTIVATE`（永不抢焦点）。
+实测 exstyle：`0x00080088` → `0x080800A8`。
+
+### ⑥ 线程 —— 只允许在 Tk 主线程碰 canvas
+
+tkinter 只保证**创建它的线程**可用。宿主的 frida 消息回调、看门狗都在别的线程上，
+以前直接在里面调 `OVERLAY.update()` / `OVERLAY.clear()`，属于未定义行为
+（可能偶发崩溃，也可能表现为画面撕裂）。
+
+现在宿主只调 `push()` / `request_clear()` 入队，真正的 Tk 操作统一在
+`_tick()`（`root.after` 定时器，主线程）里做。队列积压时丢旧帧、只保留最新。
+
+### 回归
+
+```bash
+python tests/test_overlay_geometry.py     # 12 组离线用例，假 Tk + 假 user32
+```
+
+覆盖：4K+800x600 → (480,0,2880,2160)/3.6x、auto 阈值、强制模式、map_point/to_screen 自洽、
+窗口几何 == 显示区、**前台判断排除自身（并验证不排除确实会误判）**、迟滞、
+最小化隐藏、topmost 走原生且不用 lift、鼠标穿透、队列投递、断流清屏、`--overlay-rect`。
 
 ## 反作弊提示
 
