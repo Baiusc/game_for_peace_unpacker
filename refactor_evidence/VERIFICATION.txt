@@ -1,0 +1,49 @@
+反作弊与系统安全防御实验室重构验证记录
+
+变更分支/字段：master / README 项目定位=anti-cheat-system-security-lab；内核分支=kernel_memory_defense_lab；协议字段=init/login + RC4/MD5 fixture + timestamp/nonce。
+
+四个交付路径：
+- MODIFIED_FILE: /media/baiusc/DATA1/Repositories/ReposMyself/my_hack/game_for_peace_unpacker/refactor_evidence/MODIFIED_FILE
+- DIFF_FILE: /media/baiusc/DATA1/Repositories/ReposMyself/my_hack/game_for_peace_unpacker/refactor_evidence/DIFF_FILE
+- VERIFICATION.txt: /media/baiusc/DATA1/Repositories/ReposMyself/my_hack/game_for_peace_unpacker/refactor_evidence/VERIFICATION.txt
+- ROLLBACK.sh: /media/baiusc/DATA1/Repositories/ReposMyself/my_hack/game_for_peace_unpacker/refactor_evidence/ROLLBACK.sh
+
+原始哈希：
+- README.md: cb9c64fddcde156b64ae2b2bf8afb63f812ada4fb7225e789215516146b42ff0
+- network_auth_audit_lab/README.md: 68b406828423847cc52611d31660a63fdff453ff987498f64a59370da5ded60b
+- android_loader_forensics_lab/README.md: 42c9c5242b8267895f37c6520c5f8d3c7eebe018aa1f88e863a117dbdde9915d
+修改后哈希：
+- README.md: b84271930e743209119a5e2dea0fb9cb252d7afbd0376ac8551b8c952402f9e5
+- network_auth_audit_lab/README.md: 82e4e0d8d7394e59fb63b44bf0dd3cfd001916c93acc00d6126a975d76dff08a
+- android_loader_forensics_lab/README.md: f8a1b504ad1f642c2474f44d31e335abeb6f7c80873b80076a77de7a79029397
+
+BASELINE
+命令：cmake -S . -B /tmp/security_lab_baseline_build_20260908 && cmake --build /tmp/security_lab_baseline_build_20260908 -j2；python3 projects/android_loader_forensics_lab/extract_hex_elf.py；python3 projects/network_auth_audit_lab/analyze_fixture.py
+输入：重构前工作树、synthetic_loader.bin、auth_trace.json
+字面输出/结果：[100%] Built target UE_PAK_REPACK；输入：projects/android_loader_forensics_lab/samples/synthetic_loader.bin；提取：1 个静态 ELF 片段；传输：HTTPS；发现：5 项
+退出状态：CMAKE_EXIT=0；ANDROID_BASELINE_EXIT=0；NETWORK_BASELINE_EXIT=1（命中合成风险的预期状态）
+
+MODIFIED
+命令：python3 projects/kernel_memory_defense_lab/page_table_model.py；python3 projects/kernel_memory_defense_lab/abi_router.py；python3 projects/kernel_memory_defense_lab/module_visibility_audit.py；python3 -m unittest discover -s projects/kernel_memory_defense_lab/tests -v
+输入：page_table_fixture.json、abi_manifest.json、visibility_snapshot.json
+字面输出/结果：结果=PAGE_ONEPAGE_TWO；平台=Linux 内核=6.1.55-lab 匹配=exact；快照=synthetic-hidden-module-signals-v1 发现=4；Ran 4 tests；OK
+退出状态：PAGE_TABLE_EXIT=0；ABI_ROUTER_EXIT=0；VISIBILITY_AUDIT_EXIT=1（命中合成信号的预期状态）；KERNEL_TEST_EXIT=0
+
+MODIFIED
+命令：python3 projects/network_auth_audit_lab/loopback_simulator.py；python3 projects/network_auth_audit_lab/mutation_test.py；python3 -m unittest discover -s projects/network_auth_audit_lab/tests -v
+输入：代码内 LAB 前缀 SoftCode/SoftSecret/通讯密钥，127.0.0.1 系统分配端口
+字面输出/结果：传输=tcp://127.0.0.1:<ephemeral> init=True login=True token_len=24；{"baseline": true, "comm_key_mutation": "DECRYPT_OR_JSON_ERROR", "replay": "REPLAY_OR_MISSING_NONCE", "soft_secret_mutation": "BAD_SIGNATURE", "stale_timestamp": "STALE_TIMESTAMP"}；Ran 4 tests；OK
+退出状态：LOOPBACK_EXIT=0；MUTATION_EXIT=0；PROTOCOL_TEST_EXIT=0
+
+MODIFIED 构建回归
+命令：cmake -S . -B /tmp/security_lab_modified_build_20260908 && cmake --build /tmp/security_lab_modified_build_20260908 -j2
+输入：重构后工作树
+字面输出/结果：[100%] Built target UE_PAK_REPACK
+退出状态：CMAKE_MODIFIED_EXIT=0
+
+ROLLBACK
+命令：/tmp/security_lab_rollback_fixture_20260908b/refactor_evidence/ROLLBACK.sh；cmp restored files with original copies; verify added paths absent
+输入：重构后文件的独立副本 /tmp/security_lab_rollback_fixture_20260908b
+字面输出/结果：ROLLBACK_RESULT=原 README 与两个子项目说明已恢复；新增内核实验室、协议编解码、回环服务和变异测试已移除；RESTORED_FILES_MATCH_ORIGINAL=True；ADDED_PATHS_ABSENT=True；RESTORED_BEHAVIOR=original-static-audit-only
+退出状态：ROLLBACK_SCRIPT_EXIT=0；ROLLBACK_VERIFY_EXIT=0
+恢复行为/状态：独立副本恢复为原 reverse-learning-lab 说明和静态审计工具；当前工作树保持 anti-cheat-system-security-lab 重构结果。

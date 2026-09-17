@@ -1,0 +1,9 @@
+{
+  "sample": "synthetic-hidden-module-signals-v1",
+  "module_list": ["baseline_storage"],
+  "sysfs_modules": ["baseline_storage"],
+  "device_nodes": [{"path": "/dev/lab_shadow0", "claimed_module": "lab_probe"}],
+  "events": ["module_list_unlink", "module_kobject_delete"],
+  "allowed_ioremap_callers": ["baseline_storage"],
+  "ioremap_callers": ["baseline_storage", "lab_probe"]
+}

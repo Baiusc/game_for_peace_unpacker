@@ -1,0 +1,21 @@
+[package]
+edition = "2024"
+name = "ac-esp"
+version = "0.2.0"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+anyhow = "*"
+windows = {git = "https://github.com/microsoft/windows-rs", features = [
+  "Win32_System_LibraryLoader",
+  "Win32_System_SystemServices",
+]}
+windows-ez-overlay = {git = "https://github.com/jerryshell/windows-ez-overlay"}
+
+[profile.release]
+codegen-units = 1
+lto = true
+panic = "abort"
+strip = true

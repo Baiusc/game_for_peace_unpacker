@@ -1,0 +1,8 @@
+{
+  "scope": "descriptors-only",
+  "artifacts": [
+    {"system": "Linux", "release": "6.1.55-lab", "descriptor": "linux-6.1-readonly-observer"},
+    {"system": "Linux", "release": "5.15.0-lab", "descriptor": "linux-5.15-readonly-observer"},
+    {"system": "Windows", "release": "10.0.22631", "descriptor": "windows-22631-readonly-observer"}
+  ]
+}

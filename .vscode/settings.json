@@ -75,5 +75,6 @@
     "initializer_list": "c",
     "ranges": "c",
     "errno.h": "c"
-  }
+  },
+  "python-envs.defaultEnvManager": "ms-python.python:system"
 }
