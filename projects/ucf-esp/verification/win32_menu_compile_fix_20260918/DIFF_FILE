@@ -1,0 +1,10 @@
+--- projects/ucf-esp/verification/win32_menu_compile_fix_20260918/ORIGINAL_FILE	2026-09-18 17:33:12.521698400 +0800
++++ projects/ucf-esp/verification/win32_menu_compile_fix_20260918/MODIFIED_FILE	2026-09-18 17:33:12.527377400 +0800
+@@ -1,6 +1,7 @@
+ #include "menu_win32.hpp"
+
+ #ifdef _WIN32
++#include "shared_state.hpp" // MAX_BONES：菜单取点槽位范围与 Frame 契约保持一致
+ #include <imgui.h>
+ #include <windows.h>
+ #include <cstring>

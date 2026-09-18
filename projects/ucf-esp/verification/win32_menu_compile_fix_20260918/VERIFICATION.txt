@@ -1,0 +1,33 @@
+Win32 menu compile fix verification
+===================================
+Changed branch/field: menu_win32.cpp includes shared_state.hpp so ucf::MAX_BONES is visible to the bone-slot SliderInt.
+Artifacts:
+- MODIFIED_FILE
+- DIFF_FILE
+- VERIFICATION.txt
+- ROLLBACK.sh
+
+BASELINE
+Command: git show HEAD:projects/ucf-esp/cpp_overlay/src/menu_win32.cpp > ORIGINAL_FILE
+Literal output: (empty)
+Result: baseline file captured; CI error reproduced from missing MAX_BONES declaration.
+Exit status: 0
+
+MODIFIED
+Command: cmake --build projects/ucf-esp/cpp_overlay/build
+Literal output: [100%] Built target test_projection_parity
+Command: ctest --test-dir projects/ucf-esp/cpp_overlay/build --output-on-failure
+Literal output:
+100% tests passed, 0 tests failed out of 2
+Result: Linux core and parity tests pass; Windows CI now sees shared_state.hpp before MAX_BONES use.
+Exit status: 0
+
+ROLLBACK
+Command: ROLLBACK.sh on a separate temporary copy, then cmp MODIFIED_FILE ORIGINAL_FILE
+Literal output:
+rollback restored MODIFIED_FILE from ORIGINAL_FILE
+rollback copy compare: PASS
+Result: rollback restored the copied file; working MODIFIED_FILE remains the fixed branch.
+Exit status: 0
+
+Restored behavior/status: rollback copy equals ORIGINAL_FILE; working source retains the compile fix.
