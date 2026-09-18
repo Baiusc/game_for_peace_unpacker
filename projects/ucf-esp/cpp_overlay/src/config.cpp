@@ -16,6 +16,7 @@ bool save_settings(const Settings& s, const char* path) {
     fprintf(f, "show_enemy=%d\n",     s.show_enemy ? 1 : 0);
     fprintf(f, "show_health=%d\n",    s.show_health ? 1 : 0);
     fprintf(f, "show_distance=%d\n",  s.show_distance ? 1 : 0);
+    fprintf(f, "show_fov_circle=%d\n", s.show_fov_circle ? 1 : 0);
     fprintf(f, "max_distance=%.3f\n", s.max_distance);
     fprintf(f, "line_thickness=%.3f\n", s.line_thickness);
     fprintf(f, "aimbot_enabled=%d\n", s.aimbot_enabled ? 1 : 0);
@@ -74,6 +75,7 @@ bool load_settings(Settings& s, const char* path) {
         else if (!std::strcmp(key, "show_enemy"))     s.show_enemy     = std::atoi(val) != 0;
         else if (!std::strcmp(key, "show_health"))    s.show_health    = std::atoi(val) != 0;
         else if (!std::strcmp(key, "show_distance"))  s.show_distance  = std::atoi(val) != 0;
+        else if (!std::strcmp(key, "show_fov_circle")) s.show_fov_circle = std::atoi(val) != 0;
         else if (!std::strcmp(key, "max_distance"))   s.max_distance   = std::atof(val);
         else if (!std::strcmp(key, "line_thickness")) s.line_thickness = std::atof(val);
         else if (!std::strcmp(key, "aimbot_enabled")) s.aimbot_enabled = std::atoi(val) != 0;

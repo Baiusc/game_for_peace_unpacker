@@ -36,6 +36,14 @@ static void test_draw_list() {
     // 血条比例 50/100 = 0.5
     CHECK(approx(dl.bars[0].ratio, 0.5f));
 
+    ucf::DrawStyle limited{};
+    limited.max_distance = 1.0f;
+    ucf::build_draw_list(vp, marks, 1, limited, dl);
+    CHECK(dl.boxCount == 0 && dl.barCount == 0 && dl.labelCount == 0);
+    limited.max_distance = 0.0f;
+    ucf::build_draw_list(vp, marks, 1, limited, dl);
+    CHECK(dl.boxCount == 0); // 0m means zero range, not unlimited
+
     ucf::DrawStyle style{};
     style.show_box = false;
     style.show_skeleton = true;
@@ -106,6 +114,7 @@ static void test_config_roundtrip() {
     s.esp_enabled = false; s.show_enemy = false; s.fov_deg = 110.0f; s.target_mode = 1;
     s.color_enemy[0] = 0.1f;
     s.show_skeleton = true; s.aimbot_enabled = true; s.aim_max_distance = 42.0f;
+    s.show_fov_circle = true;
     s.exit_delete_config = true;
     CHECK(ucf::save_settings(s, "settings_test.txt"));
     ucf::Settings r{};
@@ -116,6 +125,7 @@ static void test_config_roundtrip() {
     CHECK(r.target_mode == 1);
     CHECK(approx(r.color_enemy[0], 0.1f));
     CHECK(r.show_skeleton && r.aimbot_enabled && approx(r.aim_max_distance, 42.0f));
+    CHECK(r.show_fov_circle);
     CHECK(r.exit_delete_config && !r.exit_delete_log);
     std::remove("settings_test.txt");
 }

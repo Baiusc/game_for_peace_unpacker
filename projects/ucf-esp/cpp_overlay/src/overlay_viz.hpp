@@ -45,6 +45,9 @@ struct DrawStyle {
     bool show_skeleton = false;
     bool show_health = true;
     bool show_distance = true;
+    bool show_local = false;
+    bool show_teammate = true;
+    bool show_enemy = true;
     float max_distance = 250.0f;
     float line_thickness = 2.0f;
     float local[3] = {0.22f, 0.83f, 0.33f};

@@ -137,6 +137,8 @@ static ImU32 rgb(float r, float g, float b) {
 void render_draw_list(ImDrawList* dl, const DrawList& d) {
     for (int i = 0; i < d.boxCount; ++i) {
         const BoxPrim& b = d.boxes[i];
+        dl->AddRectFilled(ImVec2(b.x, b.y), ImVec2(b.x + b.w, b.y + b.h), IM_COL32(0, 0, 0, 24));
+        dl->AddRect(ImVec2(b.x, b.y), ImVec2(b.x + b.w, b.y + b.h), IM_COL32(0, 0, 0, 230), 0, 0, b.thickness + 2.0f);
         dl->AddRect(ImVec2(b.x, b.y), ImVec2(b.x + b.w, b.y + b.h), rgb(b.r, b.g, b.b), 0, 0, b.thickness);
     }
     for (int i = 0; i < d.barCount; ++i) {
@@ -149,6 +151,7 @@ void render_draw_list(ImDrawList* dl, const DrawList& d) {
     }
     for (int i = 0; i < d.labelCount; ++i) {
         const LabelPrim& L = d.labels[i];
+        dl->AddText(ImVec2(L.x + 1.0f, L.y + 1.0f), IM_COL32(0, 0, 0, 220), L.text);
         dl->AddText(ImVec2(L.x, L.y), rgb(L.r, L.g, L.b), L.text);
     }
     for (int i = 0; i < d.boneLineCount; ++i) {

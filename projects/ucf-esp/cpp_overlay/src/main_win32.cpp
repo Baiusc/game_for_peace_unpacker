@@ -430,6 +430,9 @@ static void frame() {
         style.show_skeleton = g_settings.show_skeleton;
         style.show_health = g_settings.show_health;
         style.show_distance = g_settings.show_distance;
+        style.show_local = g_settings.show_local;
+        style.show_teammate = g_settings.show_teammate;
+        style.show_enemy = g_settings.show_enemy;
         style.max_distance = g_settings.max_distance;
         style.line_thickness = g_settings.line_thickness;
         std::copy(g_settings.color_local, g_settings.color_local + 3, style.local);
@@ -471,6 +474,12 @@ static void frame() {
     }
 
     ImDrawList* bdl = ImGui::GetBackgroundDrawList();
+    if (g_settings.show_fov_circle && g_settings.aimbot_enabled) {
+        const float fov = std::max(1.0f, std::min(180.0f, g_settings.fov_deg));
+        const float radius = std::tan(fov * 0.5f * 0.0174532925f) * (vp.h * 0.5f);
+        bdl->AddCircle(ImVec2(vp.x + vp.w * 0.5f, vp.y + vp.h * 0.5f),
+                       radius, IM_COL32(255, 220, 80, 180), 96, 1.0f);
+    }
     const auto draw_begin = std::chrono::steady_clock::now();
     ucf::render_draw_list(bdl, dl);
     const float draw_ms = std::chrono::duration<float, std::milli>(

@@ -74,6 +74,7 @@ void draw_menu(Settings& s, bool& show_menu, bool& request_exit,
         ImGui::Checkbox("敌人",     &s.show_enemy);
         ImGui::Checkbox("血条",     &s.show_health);
         ImGui::Checkbox("距离",     &s.show_distance);
+        ImGui::Checkbox("显示 FOV 圈", &s.show_fov_circle);
         ImGui::SliderFloat("最大距离", &s.max_distance, 0.0f, 1000.0f, "%.0f m");
         ImGui::SliderFloat("线宽", &s.line_thickness, 1.0f, 5.0f, "%.1f");
         ImGui::TreePop();

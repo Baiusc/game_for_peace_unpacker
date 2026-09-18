@@ -13,6 +13,7 @@ struct Settings {
     bool  show_enemy      = true;
     bool  show_health     = true;
     bool  show_distance   = true;
+    bool  show_fov_circle = false;
     float max_distance    = 250.0f;
     float line_thickness  = 2.0f;
     bool  aimbot_enabled  = false;
