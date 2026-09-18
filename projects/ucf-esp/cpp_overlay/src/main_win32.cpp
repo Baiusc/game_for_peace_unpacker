@@ -18,6 +18,7 @@
 #include <dxgi1_2.h>
 #include <dxgi1_3.h>           // CreateDXGIFactory2
 #include <dwmapi.h>
+#include <cwchar>               // swprintf
 #include <imgui.h>
 #include <imgui_impl_win32.h>
 #include <imgui_impl_dx11.h>
@@ -110,18 +111,16 @@ static bool init_d3d11(HWND hwnd) {
     }
 
     // 3) 交换链：HWND 模式 + DISCARD（虚拟机对 FLIP 支持差），透明靠 DwmExtendFrameIntoClientArea。
-    DXGI_SWAP_CHAIN_DESC sd{};
-    sd.BufferDesc.Width  = 0;
-    sd.BufferDesc.Height = 0;
-    sd.BufferDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
-    sd.BufferDesc.RefreshRate.Numerator   = 1;
-    sd.BufferDesc.RefreshRate.Denominator = 60;
+    DXGI_SWAP_CHAIN_DESC1 sd{};
+    sd.Width      = 0;
+    sd.Height     = 0;
+    sd.Format     = DXGI_FORMAT_B8G8R8A8_UNORM;
     sd.SampleDesc.Count   = 1;
     sd.BufferUsage        = DXGI_USAGE_RENDER_TARGET_OUTPUT;
     sd.BufferCount        = 1;
-    sd.OutputWindow       = hwnd;
-    sd.Windowed           = TRUE;
+    sd.Scaling            = DXGI_SCALING_NONE;
     sd.SwapEffect         = DXGI_SWAP_EFFECT_DISCARD;
+    sd.AlphaMode          = DXGI_ALPHA_MODE_PREMULTIPLIED;   // 透明叠加关键
     sd.Flags              = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
 
     hr = factory->CreateSwapChainForHwnd(g_device, hwnd, &sd, nullptr, nullptr, &g_swap);
