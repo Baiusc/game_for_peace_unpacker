@@ -1,0 +1,26 @@
+diff --git a/projects/ucf-esp/verification/selection_feedback_20260918/ORIGINAL_FILE b/projects/ucf-esp/verification/selection_feedback_20260918/MODIFIED_FILE
+index 8b968a2..fee5a11 100755
+--- a/projects/ucf-esp/verification/selection_feedback_20260918/ORIGINAL_FILE
++++ b/projects/ucf-esp/verification/selection_feedback_20260918/MODIFIED_FILE
+@@ -203,6 +203,12 @@ static void record_frame(const ucf::Frame& f) {
+     ++g_recorded_frames;
+ }
+
++// 当前投影约定使用 OpenGL 风格的相机空间 -Z 为前方。
++// 对正交旋转的 world-to-camera 矩阵取转置，得到世界空间相机前向量。
++static ucf::Vec3 camera_forward_from_view(const float w2c[16]) {
++    return {-w2c[2], -w2c[6], -w2c[10]};
++}
++
+ static void cleanup_render_target() {
+     if (g_rtv) { g_rtv->Release(); g_rtv = nullptr; }
+ }
+@@ -449,7 +455,7 @@ static void frame() {
+                 candidates[i].valid = false;
+             }
+         }
+-        target = ucf::select_target({0, 0, 1}, candidates, player_count,
++        target = ucf::select_target(camera_forward_from_view(f.w2c), candidates, player_count,
+                                     g_settings.fov_deg, g_settings.target_mode);
+         if (target >= 0) {
+             output_angles = ucf::smooth_angles(output_angles,

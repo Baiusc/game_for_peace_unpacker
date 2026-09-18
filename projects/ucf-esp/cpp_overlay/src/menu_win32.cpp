@@ -156,7 +156,9 @@ void draw_menu(Settings& s, bool& show_menu, bool& request_exit,
                 st.flip ? "FLIP" : "BLT", st.shm ? "shm" : "synth",
                 st.players, st.scale, ImGui::GetIO().Framerate);
     ImGui::Text("present: 0x%08lX", st.present_hr);
-    ImGui::Text("target:%d yaw:%.3f pitch:%.3f", st.target, st.target_yaw, st.target_pitch);
+    ImGui::Text("AIM:%s target:%d yaw:%.3f pitch:%.3f delta:%.3f",
+                s.aimbot_enabled ? "ON" : "OFF", st.target,
+                st.target_yaw, st.target_pitch, st.target_delta);
     ImGui::End();
 
     // 配置项在菜单中修改后立即持久化；按钮仍保留给用户显式保存。

@@ -35,7 +35,8 @@ static void health_color(float ratio, float out[3]) {
 
 static void dim_color(float color[3]) {
     const float luminance = color[0] * 0.299f + color[1] * 0.587f + color[2] * 0.114f;
-    for (int i = 0; i < 3; ++i) color[i] = luminance * 0.35f + color[i] * 0.15f;
+    // 保留色相，只降低饱和度/亮度；不能压到灰黑色，否则所有未选中目标都不可辨认。
+    for (int i = 0; i < 3; ++i) color[i] = luminance * 0.55f + color[i] * 0.35f;
 }
 
 void build_draw_list(const Viewport& vp, const ScreenMark* marks, int n, DrawList& out) {
