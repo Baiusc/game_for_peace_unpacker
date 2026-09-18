@@ -158,8 +158,10 @@ init: flip_hr=0x887A0001 used=0 blt_hr=0x00000000 dwm_hr=0x00000000 clear=black-
 ### ⑥ 菜单文字全显示 `????`（ImGui 默认字体无 CJK）
 **现象**：菜单里中文标签全变 `????`。
 **根因**：ImGui 默认字体（proggyClean 等）不含 CJK 字形，`/utf-8` 只解决源码编码，不解决字形。
-**修法**：菜单 / 屏上标签一律用 ASCII 文案；要中文需另加载 CJK 字体（stb_truetype 合并字库），
-体积与首帧开销都不小，暂不引入。
+**修法**：`main_win32.cpp` 的 `init_overlay_fonts()` 在 `ImGui::CreateContext()` 后运行时加载系统 CJK 字体
+（`C:/Windows/Fonts/msyh.ttc` 等候选，用 `GetGlyphRangesChineseFull`），菜单可正常显中文；
+加载失败（如 VM 缺字体文件）则保留默认 ASCII 字体兜底。屏上 ESP 框标签仍用 ASCII 的 kind/hp/距离，
+避免破坏 `overlay_tests` 对标签格式的契约断言。
 
 ---
 

@@ -301,6 +301,25 @@ static void frame() {
     }
 }
 
+// 加载系统中文（CJK）字体，让 ImGui 菜单能显示中文。
+// 失败（如 VM 缺字体文件）则保留默认 ASCII 字体，标签仍可用英文兜底。
+// 注意：Build() 在首帧 NewFrame 时自动触发，这里只需在 CreateContext 后 AddFont 即可。
+static void init_overlay_fonts() {
+    ImGuiIO& io = ImGui::GetIO();
+    static const char* cands[] = {
+        "C:/Windows/Fonts/msyh.ttc",
+        "C:/Windows/Fonts/msyh.ttf",
+        "C:/Windows/Fonts/simhei.ttf",
+        "C:/Windows/Fonts/simsun.ttc",
+    };
+    ImFont* cjk = nullptr;
+    for (const char* p : cands) {
+        cjk = io.Fonts->AddFontFromFileTTF(p, 16.0f, nullptr, io.Fonts->GetGlyphRangesChineseFull());
+        if (cjk) break;
+    }
+    if (cjk) io.FontDefault = cjk;
+}
+
 int WINAPI WinMain(HINSTANCE hinst, HINSTANCE, LPSTR, int) {
     WNDCLASSEXW wc{sizeof(wc)};
     wc.style = CS_HREDRAW | CS_VREDRAW;
@@ -324,6 +343,7 @@ int WINAPI WinMain(HINSTANCE hinst, HINSTANCE, LPSTR, int) {
         return 1;
     }
     ImGui::CreateContext();
+    init_overlay_fonts();
     ImGui_ImplWin32_Init(g_hwnd);
     ImGui_ImplDX11_Init(g_device, g_ctx);
     ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange;

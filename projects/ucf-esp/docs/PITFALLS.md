@@ -52,7 +52,7 @@
 | 透明窗口是黑块 / 不透明 | BLT+UNSPECIFIED 缓冲不透明，没走 colorkey | BLT 路径：清屏不透明黑 + `LWA_COLORKEY` 抠纯黑 |
 | 看不到内容（怀疑渲染没输出） | 先加强制红框 + 黑底白字 HUD 验证管线 | 见 `CPP_OVERLAY.md` §4③ |
 | 菜单按钮点不中，点到背后窗口 | `WS_EX_TRANSPARENT` 常开 → 整窗穿透 | 每帧轮询 `GetCursorPos`，悬停菜单矩形时动态移除该样式；**不要**用 `HTTRANSPARENT`（跨进程不可靠） |
-| 菜单中文全显示 `????` | ImGui 默认字体无 CJK 字形 | 菜单/标签一律 ASCII；要中文须另加载 CJK 字体 |
+| 菜单中文全显示 `????` | ImGui 默认字体无 CJK 字形 | 运行时加载系统 CJK 字体（`msyh.ttc` 等候选），失败退回 ASCII；屏上框标签为 ASCII 以保契约 |
 | INSERT 切菜单与注入键冲突 | 键位占用 | 菜单=HOME、ESP 绘制层=DELETE，`ucf_overlay.ini` 可配；旧 ini 的 INSERT 启动时自动迁移 |
 
 ### 数据契约 / 投影（`STATIC_REFERENCE.md`）
