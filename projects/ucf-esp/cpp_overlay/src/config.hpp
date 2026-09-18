@@ -23,6 +23,9 @@ struct Settings {
     float fov_deg         = 90.0f;
     bool  show_target_ray = true;
     bool  ray_from_bottom = true;
+    int   aim_selection_mode = 0; // 0=屏幕空间距屏心，1=角度空间FOV
+    int   aim_point_mode = 1;     // 0=身体中心，1=头，2=胸，3=指定骨骼
+    int   aim_bone_id = 10;       // HumanBodyBones 槽位，默认 Head
     int   target_mode     = 0;          // 0=最近, 1=最低血量, 2=准星最近
     float aim_max_distance = 250.0f;
     float responsiveness  = 0.35f;      // 平滑系数（0..1]

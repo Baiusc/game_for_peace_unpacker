@@ -26,6 +26,9 @@ bool save_settings(const Settings& s, const char* path) {
     fprintf(f, "fov_deg=%.3f\n",      s.fov_deg);
     fprintf(f, "show_target_ray=%d\n", s.show_target_ray ? 1 : 0);
     fprintf(f, "ray_from_bottom=%d\n", s.ray_from_bottom ? 1 : 0);
+    fprintf(f, "aim_selection_mode=%d\n", s.aim_selection_mode);
+    fprintf(f, "aim_point_mode=%d\n", s.aim_point_mode);
+    fprintf(f, "aim_bone_id=%d\n", s.aim_bone_id);
     fprintf(f, "target_mode=%d\n",    s.target_mode);
     fprintf(f, "aim_max_distance=%.3f\n", s.aim_max_distance);
     fprintf(f, "responsiveness=%.3f\n", s.responsiveness);
@@ -87,6 +90,9 @@ bool load_settings(Settings& s, const char* path) {
         else if (!std::strcmp(key, "fov_deg"))        s.fov_deg        = std::atof(val);
         else if (!std::strcmp(key, "show_target_ray")) s.show_target_ray = std::atoi(val) != 0;
         else if (!std::strcmp(key, "ray_from_bottom")) s.ray_from_bottom = std::atoi(val) != 0;
+        else if (!std::strcmp(key, "aim_selection_mode")) s.aim_selection_mode = std::atoi(val);
+        else if (!std::strcmp(key, "aim_point_mode")) s.aim_point_mode = std::atoi(val);
+        else if (!std::strcmp(key, "aim_bone_id")) s.aim_bone_id = std::atoi(val);
         else if (!std::strcmp(key, "target_mode"))    s.target_mode    = std::atoi(val);
         else if (!std::strcmp(key, "aim_max_distance")) s.aim_max_distance = std::atof(val);
         else if (!std::strcmp(key, "responsiveness")) s.responsiveness = std::atof(val);
@@ -130,6 +136,9 @@ bool load_settings(Settings& s, const char* path) {
     if (s.dev_record_every < 1) s.dev_record_every = 1;
     if (s.dev_record_duration < 0.0f) s.dev_record_duration = 0.0f;
     if (s.dev_replay_speed < 0.1f) s.dev_replay_speed = 0.1f;
+    if (s.aim_selection_mode < 0 || s.aim_selection_mode > 1) s.aim_selection_mode = 0;
+    if (s.aim_point_mode < 0 || s.aim_point_mode > 3) s.aim_point_mode = 1;
+    if (s.aim_bone_id < 0 || s.aim_bone_id >= 19) s.aim_bone_id = 10;
     return true;
 }
 
