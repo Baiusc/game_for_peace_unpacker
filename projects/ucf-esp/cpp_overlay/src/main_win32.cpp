@@ -1,8 +1,10 @@
-// UCF 透明叠加层（Windows）：Win32 分层窗口 + D3D11 + ImGui。
-// 窗口风格 WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_TOPMOST：
-//   - LAYERED + 透明 swap chain 清空色 (0,0,0,0) -> 只显示 ImGui 画的内容；
-//   - TRANSPARENT -> 整窗不吃鼠标（点击穿透到下面的游戏）；
-//   - TOPMOST -> 永远盖在游戏之上。
+// UCF 透明叠加层（Windows）：Win32 + D3D11 + ImGui。
+// 透明机制（二选一，按交换链能力自动切换）：
+//   - FLIP 模型（默认）：WS_EX_TOPMOST | WS_EX_TRANSPARENT | WS_EX_NOACTIVATE，
+//     交换链用 FLIP_DISCARD + PREMULTIPLIED，靠 swap chain 自身的 alpha 透出。
+//     【注意】flip 交换链禁止与 WS_EX_LAYERED 同用，否则 CreateSwapChain 报 0x887A0001。
+//   - BLT 回退（虚拟机不支持 flip 时）：补加 WS_EX_LAYERED + 黑色 colorkey，纯黑=透明。
+//   - TRANSPARENT -> 整窗不吃鼠标（点击穿透到下面的游戏）；TOPMOST -> 永远盖在游戏之上。
 // 数据来自 SharedTransport（Python 宿主写入）；没有共享内存时退回 SyntheticSource 自演。
 //
 // 仅在 WIN32 下编译/运行。Linux 上这个文件不参与构建（见 CMakeLists.txt）。
@@ -38,6 +40,7 @@ static bool                     g_show_menu = true;
 static ucf::SyntheticSource     g_synth{};
 static ucf::ScreenMark          g_marks[ucf::MAX_PLAYERS + 1]{};
 static bool                     g_flip_used = false;   // 交换链实际用的模型（诊断 HUD 用）
+static bool                     g_clear_transparent = true;  // 清屏是否透明(alpha=0)；BLT colorkey 时为不透明黑
 
 // ImGui_ImplWin32_WndProcHandler 已在 <imgui_impl_win32.h> 中声明，直接调用即可。
 static LRESULT CALLBACK wndproc(HWND h, UINT m, WPARAM w, LPARAM l) {
@@ -112,15 +115,19 @@ static bool init_d3d11(HWND hwnd) {
         if (FAILED(hr)) { ucf_show_hr("D3D11CreateDevice(WARP)", hr); factory->Release(); return false; }
     }
 
-    // 3) 交换链：先试 FLIP_DISCARD + PREMULTIPLIED（flip 模型才支持 alpha 透明），
-    //    虚拟机若不支持 flip，回退 DISCARD + UNSPECIFIED（透明靠 DWM 扩边）。
+    // 3) 交换链透明度方案
+    //    - 方案 A（默认）：FLIP_DISCARD + PREMULTIPLIED，原生逐像素透明。
+    //      关键：flip 模型交换链【禁止】与 WS_EX_LAYERED 同用（否则 0x887A0001），
+    //      因此窗口创建时未带 WS_EX_LAYERED，透明仅靠 swap chain 的 alpha。
+    //    - 方案 B（回退）：blt 模型 + WS_EX_LAYERED + 黑色 colorkey，纯黑像素透明
+    //      （兼容不支持 flip 的虚拟机）。
     DXGI_SWAP_CHAIN_DESC1 sd{};
     sd.Format     = DXGI_FORMAT_B8G8R8A8_UNORM;
     sd.SampleDesc.Count   = 1;
     sd.BufferUsage        = DXGI_USAGE_RENDER_TARGET_OUTPUT;
     sd.Flags              = 0;   // flip 模型不允许 ALLOW_MODE_SWITCH，否则 INVALID_CALL
 
-    // 方案 A：flip 模型 + 预乘 alpha，原生逐像素透明。
+    // 方案 A：flip 模型 + 预乘 alpha，逐像素透明。
     sd.BufferCount = 2;                       // flip 模型要求 >= 2
     sd.Scaling     = DXGI_SCALING_NONE;
     sd.SwapEffect  = DXGI_SWAP_EFFECT_FLIP_DISCARD;
@@ -130,7 +137,7 @@ static bool init_d3d11(HWND hwnd) {
 
     HRESULT blt_hr = flip_hr;
     if (FAILED(flip_hr)) {
-        // 方案 B 回退：blt 模型，兼容性最好；透明由 DwmExtendFrameIntoClientArea 实现。
+        // 方案 B 回退：blt 模型（UNSPECIFIED，缓冲不透明）+ 分层窗口黑色 colorkey 透明。
         sd.BufferCount = 1;
         sd.Scaling     = DXGI_SCALING_STRETCH;
         sd.SwapEffect  = DXGI_SWAP_EFFECT_DISCARD;
@@ -139,24 +146,39 @@ static bool init_d3d11(HWND hwnd) {
     }
     factory->Release();
 
-    // 启动日志（覆盖写）：记录交换链选择及失败原因，便于远程诊断。
-    {
-        FILE* lf = std::fopen("ucf_debug.log", "w");
-        if (lf) {
-            fprintf(lf, "init: flip_hr=0x%08X used=%d blt_hr=0x%08X\n",
-                    (unsigned long)flip_hr, g_flip_used ? 1 : 0, (unsigned long)blt_hr);
-            fclose(lf);
-        }
-    }
-
     if (FAILED(blt_hr)) { ucf_show_hr("CreateSwapChainForHwnd", blt_hr); return false; }
 
     RECT rc; GetClientRect(hwnd, &rc);
     create_render_target(rc.right - rc.left, rc.bottom - rc.top);
 
-    // 整窗客户区由含 alpha 的 D3D 表面透出，实现透明叠加。
-    MARGINS m{-1};
-    DwmExtendFrameIntoClientArea(hwnd, &m);
+    // 透明机制：
+    //   flip -> 靠 swap chain 预乘 alpha（配合 DwmExtend 把桌面透出）；清屏 (0,0,0,0)。
+    //   blt  -> 给窗口补 WS_EX_LAYERED + 黑色 colorkey（纯黑=透明）；清屏不透明黑 (0,0,0,255)。
+    //   注：未设分层属性的 WS_EX_LAYERED 窗口默认整体不可见，故 blt 路径必须显式 SetLayeredWindowAttributes。
+    HRESULT dwm_hr = S_OK;
+    if (g_flip_used) {
+        MARGINS m{-1};
+        dwm_hr = DwmExtendFrameIntoClientArea(hwnd, &m);
+        g_clear_transparent = true;
+    } else {
+        SetWindowLongPtrW(hwnd, GWL_EXSTYLE,
+                          GetWindowLongPtrW(hwnd, GWL_EXSTYLE) | WS_EX_LAYERED);
+        SetLayeredWindowAttributes(hwnd, RGB(0, 0, 0), 0, LWA_COLORKEY);
+        SetWindowPos(hwnd, nullptr, 0, 0, 0, 0,
+                     SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
+        g_clear_transparent = false;
+    }
+
+    // 启动日志（覆盖写）：记录交换链选择、DWM/分层结果，便于远程诊断。
+    {
+        FILE* lf = std::fopen("ucf_debug.log", "w");
+        if (lf) {
+            fprintf(lf, "init: flip_hr=0x%08X used=%d blt_hr=0x%08X dwm_hr=0x%08X clear=%s\n",
+                    (unsigned long)flip_hr, g_flip_used ? 1 : 0, (unsigned long)blt_hr,
+                    (unsigned long)dwm_hr, g_clear_transparent ? "transparent" : "black-colorkey");
+            fclose(lf);
+        }
+    }
     return true;
 }
 
@@ -196,16 +218,30 @@ static void frame() {
         std::snprintf(hud, sizeof(hud),
                      "UCF Overlay  mode:%s  menu:%s\n"
                      "win:%dx%d  frame:%dx%d\n"
-                     "players:%d  scale:%.2f  src:%s",
+                     "players:%d  scale:%.2f  src:%s  clear:%s",
                      g_flip_used ? "FLIP" : "BLT",
                      g_show_menu ? "ON" : "OFF",
                      int(cw), int(ch), f.width, f.height,
                      n, cw / fw,
-                     have_data ? "shm" : "synth");
+                     have_data ? "shm" : "synth",
+                     g_clear_transparent ? "transp" : "black");
         ImVec2 p(12, 12);
-        bdl->AddRectFilled(p, ImVec2(p.x + 330, p.y + 70), IM_COL32(0, 0, 0, 150));
-        bdl->AddText(ImVec2(p.x + 6, p.y + 6), IM_COL32(90, 255, 130, 255), hud);
+        bdl->AddRectFilled(p, ImVec2(p.x + 360, p.y + 72), IM_COL32(0, 0, 0, 230));   // 不透明黑底
+        bdl->AddText(ImVec2(p.x + 6, p.y + 6), IM_COL32(255, 255, 255, 255), hud);   // 白字高对比
     }
+
+    // 强制红框：验证渲染管线是否真的画到屏幕（诊断用，稳定后可删）。
+    bdl->AddRectFilled(ImVec2(100, 100), ImVec2(600, 500), IM_COL32(255, 0, 0, 255));
+
+    ucf::draw_menu(g_settings, g_show_menu);
+
+    ImGui::Render();
+    // flip 透明路径：清空 (0,0,0,0)；BLT colorkey 路径：清空不透明黑 (0,0,0,255)。
+    const float clear[4] = {0.0f, 0.0f, 0.0f, g_clear_transparent ? 0.0f : 1.0f};
+    g_ctx->OMSetRenderTargets(1, &g_rtv, nullptr);
+    g_ctx->ClearRenderTargetView(g_rtv, clear);
+    ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
+    HRESULT present_hr = g_swap->Present(1, 0);
 
     // 心跳日志（相对 exe 目录）：每 120 帧写一行，便于远程确认程序在跑。
     {
@@ -213,23 +249,16 @@ static void frame() {
         if ((dbg_frames++ % 120) == 0) {
             FILE* lf = std::fopen("ucf_debug.log", "a");
             if (lf) {
-                fprintf(lf, "[%ld] mode=%s menu=%d win=%dx%d frame=%dx%d players=%d scale=%.2f src=%s\n",
+                fprintf(lf, "[%ld] mode=%s menu=%d win=%dx%d frame=%dx%d players=%d scale=%.2f src=%s clear=%s present_hr=0x%08X\n",
                         dbg_frames, g_flip_used ? "FLIP" : "BLT",
                         g_show_menu ? 1 : 0, int(cw), int(ch), f.width, f.height,
-                        n, cw / fw, have_data ? "shm" : "synth");
+                        n, cw / fw, have_data ? "shm" : "synth",
+                        g_clear_transparent ? "transp" : "black",
+                        (unsigned long)present_hr);
                 fclose(lf);
             }
         }
     }
-
-    ucf::draw_menu(g_settings, g_show_menu);
-
-    ImGui::Render();
-    const float clear[4] = {0, 0, 0, 0};      // 透明清空
-    g_ctx->OMSetRenderTargets(1, &g_rtv, nullptr);
-    g_ctx->ClearRenderTargetView(g_rtv, clear);
-    ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
-    g_swap->Present(1, 0);
 }
 
 int WINAPI WinMain(HINSTANCE hinst, HINSTANCE, LPSTR, int) {
@@ -240,9 +269,11 @@ int WINAPI WinMain(HINSTANCE hinst, HINSTANCE, LPSTR, int) {
     wc.lpszClassName = L"UcfOverlay";
     RegisterClassExW(&wc);
 
-    // 全屏、无边框、永远置顶、点击穿透
+    // 全屏、无边框、永远置顶、点击穿透。
+    // 注意：这里【不能】带 WS_EX_LAYERED —— flip 模型交换链与之互斥（会 0x887A0001）。
+    // 透明由 flip 交换链的 alpha 或 BLT 回退时的 colorkey 提供。
     g_hwnd = CreateWindowExW(
-        WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_TOPMOST | WS_EX_NOACTIVATE,
+        WS_EX_TRANSPARENT | WS_EX_TOPMOST | WS_EX_NOACTIVATE,
         wc.lpszClassName, L"UCF Overlay",
         WS_POPUP, 0, 0, GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN),
         nullptr, nullptr, hinst, nullptr);
