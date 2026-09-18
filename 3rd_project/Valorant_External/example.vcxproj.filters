@@ -1,0 +1,435 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="Header Files\auth">
+      <UniqueIdentifier>{de1a561c-edb6-4e62-a44a-ca45ef812d97}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Protection">
+      <UniqueIdentifier>{587eab74-13d3-4764-9f32-49b7924744df}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\vmprotect">
+      <UniqueIdentifier>{beecd9ac-12fd-459b-b939-3764e2c3dc03}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="CheatFiles">
+      <UniqueIdentifier>{791ddb9f-e748-46a3-9d1b-55a17fe45068}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="CheatFiles\game">
+      <UniqueIdentifier>{c4d829f5-896f-4f89-8c15-8f5e9ffd78ce}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="CheatFiles\overlay">
+      <UniqueIdentifier>{56e5161e-a9bd-4626-9eef-5deae23790ec}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="CheatFiles\includes">
+      <UniqueIdentifier>{1fc8569b-8d34-44f6-ab6e-cd385bbd9b46}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="CheatFiles\driver">
+      <UniqueIdentifier>{6c6927d5-bb1c-4834-bc31-b3244370c06a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Protect2">
+      <UniqueIdentifier>{4c1d4393-c188-493d-9bf4-57fc8e150680}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Kdmapper">
+      <UniqueIdentifier>{51a99f6d-79ba-4f03-bd3c-83b13382e693}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="main.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Includes\Imgui\imgui.cpp">
+      <Filter>CheatFiles\includes</Filter>
+    </ClCompile>
+    <ClCompile Include="Includes\Imgui\imgui_demo.cpp">
+      <Filter>CheatFiles\includes</Filter>
+    </ClCompile>
+    <ClCompile Include="Includes\Imgui\imgui_draw.cpp">
+      <Filter>CheatFiles\includes</Filter>
+    </ClCompile>
+    <ClCompile Include="Includes\Imgui\imgui_impl_dx9.cpp">
+      <Filter>CheatFiles\includes</Filter>
+    </ClCompile>
+    <ClCompile Include="Includes\Imgui\imgui_impl_win32.cpp">
+      <Filter>CheatFiles\includes</Filter>
+    </ClCompile>
+    <ClCompile Include="Includes\Imgui\imgui_tables.cpp">
+      <Filter>CheatFiles\includes</Filter>
+    </ClCompile>
+    <ClCompile Include="Includes\Imgui\imgui_widgets.cpp">
+      <Filter>CheatFiles\includes</Filter>
+    </ClCompile>
+    <ClCompile Include="kdmapper\kdmapper.cpp">
+      <Filter>Kdmapper</Filter>
+    </ClCompile>
+    <ClCompile Include="kdmapper\portable_executable.cpp">
+      <Filter>Kdmapper</Filter>
+    </ClCompile>
+    <ClCompile Include="kdmapper\service.cpp">
+      <Filter>Kdmapper</Filter>
+    </ClCompile>
+    <ClCompile Include="kdmapper\utils.cpp">
+      <Filter>Kdmapper</Filter>
+    </ClCompile>
+    <ClCompile Include="kdmapper\intel_driver.cpp">
+      <Filter>Kdmapper</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="skStr.h">
+      <Filter>Header Files\Protection</Filter>
+    </ClInclude>
+    <ClInclude Include="protects.h">
+      <Filter>Header Files\Protection</Filter>
+    </ClInclude>
+    <ClInclude Include="Driver\driver.hpp">
+      <Filter>CheatFiles\driver</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\cheat.hpp">
+      <Filter>CheatFiles\game</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\globals.hpp">
+      <Filter>CheatFiles\game</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\sdk.hpp">
+      <Filter>CheatFiles\game</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\structs.hpp">
+      <Filter>CheatFiles\game</Filter>
+    </ClInclude>
+    <ClInclude Include="Includes\Direct3d\d3dx9.h">
+      <Filter>CheatFiles\includes</Filter>
+    </ClInclude>
+    <ClInclude Include="Includes\Direct3d\d3dx9anim.h">
+      <Filter>CheatFiles\includes</Filter>
+    </ClInclude>
+    <ClInclude Include="Includes\Direct3d\d3dx9core.h">
+      <Filter>CheatFiles\includes</Filter>
+    </ClInclude>
+    <ClInclude Include="Includes\Direct3d\d3dx9effect.h">
+      <Filter>CheatFiles\includes</Filter>
+    </ClInclude>
+    <ClInclude Include="Includes\Direct3d\d3dx9math.h">
+      <Filter>CheatFiles\includes</Filter>
+    </ClInclude>
+    <ClInclude Include="Includes\Direct3d\d3dx9mesh.h">
+      <Filter>CheatFiles\includes</Filter>
+    </ClInclude>
+    <ClInclude Include="Includes\Direct3d\d3dx9shader.h">
+      <Filter>CheatFiles\includes</Filter>
+    </ClInclude>
+    <ClInclude Include="Includes\Direct3d\d3dx9shape.h">
+      <Filter>CheatFiles\includes</Filter>
+    </ClInclude>
+    <ClInclude Include="Includes\Direct3d\d3dx9tex.h">
+      <Filter>CheatFiles\includes</Filter>
+    </ClInclude>
+    <ClInclude Include="Includes\Direct3d\d3dx9xof.h">
+      <Filter>CheatFiles\includes</Filter>
+    </ClInclude>
+    <ClInclude Include="Includes\Imgui\imconfig.h">
+      <Filter>CheatFiles\includes</Filter>
+    </ClInclude>
+    <ClInclude Include="Includes\Imgui\imgui.h">
+      <Filter>CheatFiles\includes</Filter>
+    </ClInclude>
+    <ClInclude Include="Includes\Imgui\imgui_impl_dx9.h">
+      <Filter>CheatFiles\includes</Filter>
+    </ClInclude>
+    <ClInclude Include="Includes\Imgui\imgui_impl_win32.h">
+      <Filter>CheatFiles\includes</Filter>
+    </ClInclude>
+    <ClInclude Include="Includes\Imgui\imgui_internal.h">
+      <Filter>CheatFiles\includes</Filter>
+    </ClInclude>
+    <ClInclude Include="Includes\Imgui\imstb_rectpack.h">
+      <Filter>CheatFiles\includes</Filter>
+    </ClInclude>
+    <ClInclude Include="Includes\Imgui\imstb_textedit.h">
+      <Filter>CheatFiles\includes</Filter>
+    </ClInclude>
+    <ClInclude Include="Includes\Imgui\imstb_truetype.h">
+      <Filter>CheatFiles\includes</Filter>
+    </ClInclude>
+    <ClInclude Include="Overlay\menu.hpp">
+      <Filter>CheatFiles\overlay</Filter>
+    </ClInclude>
+    <ClInclude Include="Overlay\render.hpp">
+      <Filter>CheatFiles\overlay</Filter>
+    </ClInclude>
+    <ClInclude Include="keybind.hpp">
+      <Filter>CheatFiles\game</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\driver.hpp">
+      <Filter>CheatFiles\game</Filter>
+    </ClInclude>
+    <ClInclude Include="xor.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="protect2\xorstr.hpp">
+      <Filter>Header Files\Protect2</Filter>
+    </ClInclude>
+    <ClInclude Include="protect2\Imports.hpp">
+      <Filter>Header Files\Protect2</Filter>
+    </ClInclude>
+    <ClInclude Include="rajdhani.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="colorcmd.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="kdmapper\intel_driver_resource.hpp">
+      <Filter>Kdmapper</Filter>
+    </ClInclude>
+    <ClInclude Include="kdmapper\kdmapper.hpp">
+      <Filter>Kdmapper</Filter>
+    </ClInclude>
+    <ClInclude Include="kdmapper\nt.hpp">
+      <Filter>Kdmapper</Filter>
+    </ClInclude>
+    <ClInclude Include="kdmapper\portable_executable.hpp">
+      <Filter>Kdmapper</Filter>
+    </ClInclude>
+    <ClInclude Include="kdmapper\service.hpp">
+      <Filter>Kdmapper</Filter>
+    </ClInclude>
+    <ClInclude Include="kdmapper\utils.hpp">
+      <Filter>Kdmapper</Filter>
+    </ClInclude>
+    <ClInclude Include="kdmapper\intel_driver.hpp">
+      <Filter>Kdmapper</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Includes\Direct3d\d3dx9math.inl">
+      <Filter>CheatFiles\includes</Filter>
+    </None>
+  </ItemGroup>
+</Project>                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    ﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="Header Files\auth">
+      <UniqueIdentifier>{de1a561c-edb6-4e62-a44a-ca45ef812d97}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Protection">
+      <UniqueIdentifier>{587eab74-13d3-4764-9f32-49b7924744df}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\vmprotect">
+      <UniqueIdentifier>{beecd9ac-12fd-459b-b939-3764e2c3dc03}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="CheatFiles">
+      <UniqueIdentifier>{791ddb9f-e748-46a3-9d1b-55a17fe45068}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="CheatFiles\game">
+      <UniqueIdentifier>{c4d829f5-896f-4f89-8c15-8f5e9ffd78ce}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="CheatFiles\overlay">
+      <UniqueIdentifier>{56e5161e-a9bd-4626-9eef-5deae23790ec}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="CheatFiles\includes">
+      <UniqueIdentifier>{1fc8569b-8d34-44f6-ab6e-cd385bbd9b46}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="CheatFiles\driver">
+      <UniqueIdentifier>{6c6927d5-bb1c-4834-bc31-b3244370c06a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Protect2">
+      <UniqueIdentifier>{4c1d4393-c188-493d-9bf4-57fc8e150680}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Kdmapper">
+      <UniqueIdentifier>{51a99f6d-79ba-4f03-bd3c-83b13382e693}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="main.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Includes\Imgui\imgui.cpp">
+      <Filter>CheatFiles\includes</Filter>
+    </ClCompile>
+    <ClCompile Include="Includes\Imgui\imgui_demo.cpp">
+      <Filter>CheatFiles\includes</Filter>
+    </ClCompile>
+    <ClCompile Include="Includes\Imgui\imgui_draw.cpp">
+      <Filter>CheatFiles\includes</Filter>
+    </ClCompile>
+    <ClCompile Include="Includes\Imgui\imgui_impl_dx9.cpp">
+      <Filter>CheatFiles\includes</Filter>
+    </ClCompile>
+    <ClCompile Include="Includes\Imgui\imgui_impl_win32.cpp">
+      <Filter>CheatFiles\includes</Filter>
+    </ClCompile>
+    <ClCompile Include="Includes\Imgui\imgui_tables.cpp">
+      <Filter>CheatFiles\includes</Filter>
+    </ClCompile>
+    <ClCompile Include="Includes\Imgui\imgui_widgets.cpp">
+      <Filter>CheatFiles\includes</Filter>
+    </ClCompile>
+    <ClCompile Include="kdmapper\kdmapper.cpp">
+      <Filter>Kdmapper</Filter>
+    </ClCompile>
+    <ClCompile Include="kdmapper\portable_executable.cpp">
+      <Filter>Kdmapper</Filter>
+    </ClCompile>
+    <ClCompile Include="kdmapper\service.cpp">
+      <Filter>Kdmapper</Filter>
+    </ClCompile>
+    <ClCompile Include="kdmapper\utils.cpp">
+      <Filter>Kdmapper</Filter>
+    </ClCompile>
+    <ClCompile Include="kdmapper\intel_driver.cpp">
+      <Filter>Kdmapper</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="skStr.h">
+      <Filter>Header Files\Protection</Filter>
+    </ClInclude>
+    <ClInclude Include="protects.h">
+      <Filter>Header Files\Protection</Filter>
+    </ClInclude>
+    <ClInclude Include="Driver\driver.hpp">
+      <Filter>CheatFiles\driver</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\cheat.hpp">
+      <Filter>CheatFiles\game</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\globals.hpp">
+      <Filter>CheatFiles\game</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\sdk.hpp">
+      <Filter>CheatFiles\game</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\structs.hpp">
+      <Filter>CheatFiles\game</Filter>
+    </ClInclude>
+    <ClInclude Include="Includes\Direct3d\d3dx9.h">
+      <Filter>CheatFiles\includes</Filter>
+    </ClInclude>
+    <ClInclude Include="Includes\Direct3d\d3dx9anim.h">
+      <Filter>CheatFiles\includes</Filter>
+    </ClInclude>
+    <ClInclude Include="Includes\Direct3d\d3dx9core.h">
+      <Filter>CheatFiles\includes</Filter>
+    </ClInclude>
+    <ClInclude Include="Includes\Direct3d\d3dx9effect.h">
+      <Filter>CheatFiles\includes</Filter>
+    </ClInclude>
+    <ClInclude Include="Includes\Direct3d\d3dx9math.h">
+      <Filter>CheatFiles\includes</Filter>
+    </ClInclude>
+    <ClInclude Include="Includes\Direct3d\d3dx9mesh.h">
+      <Filter>CheatFiles\includes</Filter>
+    </ClInclude>
+    <ClInclude Include="Includes\Direct3d\d3dx9shader.h">
+      <Filter>CheatFiles\includes</Filter>
+    </ClInclude>
+    <ClInclude Include="Includes\Direct3d\d3dx9shape.h">
+      <Filter>CheatFiles\includes</Filter>
+    </ClInclude>
+    <ClInclude Include="Includes\Direct3d\d3dx9tex.h">
+      <Filter>CheatFiles\includes</Filter>
+    </ClInclude>
+    <ClInclude Include="Includes\Direct3d\d3dx9xof.h">
+      <Filter>CheatFiles\includes</Filter>
+    </ClInclude>
+    <ClInclude Include="Includes\Imgui\imconfig.h">
+      <Filter>CheatFiles\includes</Filter>
+    </ClInclude>
+    <ClInclude Include="Includes\Imgui\imgui.h">
+      <Filter>CheatFiles\includes</Filter>
+    </ClInclude>
+    <ClInclude Include="Includes\Imgui\imgui_impl_dx9.h">
+      <Filter>CheatFiles\includes</Filter>
+    </ClInclude>
+    <ClInclude Include="Includes\Imgui\imgui_impl_win32.h">
+      <Filter>CheatFiles\includes</Filter>
+    </ClInclude>
+    <ClInclude Include="Includes\Imgui\imgui_internal.h">
+      <Filter>CheatFiles\includes</Filter>
+    </ClInclude>
+    <ClInclude Include="Includes\Imgui\imstb_rectpack.h">
+      <Filter>CheatFiles\includes</Filter>
+    </ClInclude>
+    <ClInclude Include="Includes\Imgui\imstb_textedit.h">
+      <Filter>CheatFiles\includes</Filter>
+    </ClInclude>
+    <ClInclude Include="Includes\Imgui\imstb_truetype.h">
+      <Filter>CheatFiles\includes</Filter>
+    </ClInclude>
+    <ClInclude Include="Overlay\menu.hpp">
+      <Filter>CheatFiles\overlay</Filter>
+    </ClInclude>
+    <ClInclude Include="Overlay\render.hpp">
+      <Filter>CheatFiles\overlay</Filter>
+    </ClInclude>
+    <ClInclude Include="keybind.hpp">
+      <Filter>CheatFiles\game</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\driver.hpp">
+      <Filter>CheatFiles\game</Filter>
+    </ClInclude>
+    <ClInclude Include="xor.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="protect2\xorstr.hpp">
+      <Filter>Header Files\Protect2</Filter>
+    </ClInclude>
+    <ClInclude Include="protect2\Imports.hpp">
+      <Filter>Header Files\Protect2</Filter>
+    </ClInclude>
+    <ClInclude Include="rajdhani.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="colorcmd.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="kdmapper\intel_driver_resource.hpp">
+      <Filter>Kdmapper</Filter>
+    </ClInclude>
+    <ClInclude Include="kdmapper\kdmapper.hpp">
+      <Filter>Kdmapper</Filter>
+    </ClInclude>
+    <ClInclude Include="kdmapper\nt.hpp">
+      <Filter>Kdmapper</Filter>
+    </ClInclude>
+    <ClInclude Include="kdmapper\portable_executable.hpp">
+      <Filter>Kdmapper</Filter>
+    </ClInclude>
+    <ClInclude Include="kdmapper\service.hpp">
+      <Filter>Kdmapper</Filter>
+    </ClInclude>
+    <ClInclude Include="kdmapper\utils.hpp">
+      <Filter>Kdmapper</Filter>
+    </ClInclude>
+    <ClInclude Include="kdmapper\intel_driver.hpp">
+      <Filter>Kdmapper</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Includes\Direct3d\d3dx9math.inl">
+      <Filter>CheatFiles\includes</Filter>
+    </None>
+  </ItemGroup>
+</Project>

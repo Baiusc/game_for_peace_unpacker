@@ -85,8 +85,13 @@ SWP_SHOWWINDOW = 0x0040
 # 隐藏加迟滞：短暂失焦不立刻藏，避免"藏-显-藏"高频抖动
 HIDE_DELAY_S = 0.35
 
-# Tk 主线程定时器：帧断流清屏 + 定期重申置顶
-TICK_MS = 100
+# Tk 主线程定时器：消费帧队列 + 帧断流清屏 + 定期重申置顶。
+# 旧值是 100ms（≈10Hz）——这是“框跟不住游戏”的头号原因：游戏跑 60fps，
+# 叠加层却每 100ms 才重绘一次。改成 16ms（≈60Hz）即可与游戏同步；
+# 真机若还嫌不够可再降到 8，但 itemconfigure/coords 的 Tcl 往返会随之变多。
+# 注意：这只是“重绘上限”。真正的数据来自 frida 的 --interval（默认 50ms=20Hz），
+# 想让叠加层真的到 60fps，也要把宿主的采样间隔一起调小（会增加游戏读内存开销）。
+TICK_MS = 16
 STALE_CLEAR_S = 1.2
 
 _DPI_CTX_PER_MONITOR_V2 = -4
@@ -374,7 +379,15 @@ class OverlayWindow:
         self._warned = {}
         self._pool = []
         self._sig = None
+        # 样式缓存：canvas item 的 id 稳定，按 id 存上一次 itemconfigure 的参数。
+        # 位置每帧都在变（必须 coords），但颜色/线宽/字号常常不变 —— 跳过无变化的
+        # itemconfigure 能省掉大量 Tcl 往返，这是 tkinter 叠加层的主要开销来源。
+        self._style_cache = {}
         self._status_printed = False
+        # 叠加层主循环帧率（仅诊断用，便于确认 TICK_MS 改动确实生效）
+        self._frames = 0
+        self._fps_t = time.time()
+        self._fps = 0.0
 
         enable_dpi_awareness()          # 必须在 tk.Tk() 之前
         self.root = tk.Tk()
@@ -480,10 +493,20 @@ class OverlayWindow:
             for it in ids:
                 self.canvas.itemconfigure(it, state="hidden")
         self._sig = ()
+        self._style_cache.clear()      # 下次重画时强制重新 itemconfigure
         try:
             self.root.update_idletasks()
         except Exception:
             pass
+
+    def _cfg(self, item, **kw):
+        """带缓存的 itemconfigure：参数和上次一样就跳过，省 Tcl 往返。"""
+        iid = int(item)
+        prev = self._style_cache.get(iid)
+        if prev == kw:
+            return
+        self._style_cache[iid] = dict(kw)
+        self.canvas.itemconfigure(item, **kw)
 
     def _draw(self, marks):
         vp = self.vp
@@ -504,39 +527,38 @@ class OverlayWindow:
         lw = max(1, min(6, int(round(2 * scale))))
         bar_h = max(2.0, 4 * sy)
         fsz = int(max(7, min(40, round(BASE_FONT * scale))))
-        colors = []
 
         for idx, mk in enumerate(drawable):
             cxp, cyp = map_point(vp, mk.screen[0], mk.screen[1])
             color = COLOR.get(mk.kind, "#ffffff")
             bx, by = cxp - bw / 2.0, cyp - bh / 2.0
             box, hpbg, hpbar, txt = self._slot(idx)
-            self.canvas.itemconfigure(box, state="normal", outline=color, width=lw)
+            # 位置每帧都变 -> coords 必调；样式常不变 -> _cfg 会跳过无变化的 itemconfigure
+            self._cfg(box, state="normal", outline=color, width=lw)
             self.canvas.coords(box, bx, by, bx + bw, by + bh)
 
             if mk.hp is not None and mk.max_hp:
                 ratio = max(0.0, min(1.0, float(mk.hp) / float(mk.max_hp)))
-                self.canvas.itemconfigure(hpbg, state="normal")
+                self._cfg(hpbg, state="normal")
                 self.canvas.coords(hpbg, bx, by - bar_h * 2, bx + bw, by - bar_h)
-                self.canvas.itemconfigure(hpbar, state="normal", fill=color)
+                self._cfg(hpbar, state="normal", fill=color)
                 self.canvas.coords(hpbar, bx, by - bar_h * 2, bx + bw * ratio, by - bar_h)
             else:
-                self.canvas.itemconfigure(hpbg, state="hidden")
-                self.canvas.itemconfigure(hpbar, state="hidden")
+                self._cfg(hpbg, state="hidden")
+                self._cfg(hpbar, state="hidden")
 
             label = f"{mk.kind} t{mk.team}"
             if mk.hp is not None:
                 label += f" {mk.hp}/{mk.max_hp}"
             if mk.dist is not None:
                 label += f" {mk.dist:.0f}m"
-            self.canvas.itemconfigure(txt, state="normal", fill=color,
-                                      font=("monospace", fsz), text=label)
+            self._cfg(txt, state="normal", fill=color,
+                      font=("monospace", fsz), text=label)
             self.canvas.coords(txt, cxp, by - bar_h * 2.6)
-            colors.append(mk.kind)
 
         for idx in range(len(drawable), len(self._pool)):
             for it in self._pool[idx]:
-                self.canvas.itemconfigure(it, state="hidden")
+                self._cfg(it, state="hidden")
 
         try:
             self.root.update_idletasks()
@@ -632,6 +654,11 @@ class OverlayWindow:
         别的线程上，跨线程碰 canvas 不是线程安全的（以前确实这么干过）。
         """
         now = time.time()
+        self._frames += 1
+        if now - self._fps_t >= 1.0:
+            self._fps = self._frames / (now - self._fps_t)
+            self._frames = 0
+            self._fps_t = now
         self._drain()
         if self._last_draw and now - self._last_draw > STALE_CLEAR_S:
             self.clear()        # 帧断流（回菜单 / agent 卡住）-> 抹掉残影
@@ -648,8 +675,9 @@ class OverlayWindow:
             pass
 
     def status(self):
-        return viewport_text(self.vp, self.frame[0], self.frame[1],
-                             self.client, _dpi_state or "未设置")
+        return (viewport_text(self.vp, self.frame[0], self.frame[1],
+                              self.client, _dpi_state or "未设置")
+                + f" | 重绘 {self._fps:.0f}Hz")
 
     def mainloop(self):
         self._tick()            # 起来就跑，负责帧断流清屏 + 定期重申置顶

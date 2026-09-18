@@ -1,0 +1,4 @@
+#include "resource.h"
+
+// Embed Inter font as binary resource
+IDR_INTER_FONT RCDATA "Inter-Regular.ttf"
