@@ -50,17 +50,26 @@ ctest --test-dir build --output-on-failure     # 可视化/平滑/目标选择/�
 
 ## 构建与运行（Windows：完整叠加层）
 
-1. 把 imgui 源码（含 `imgui_impl_win32.cpp` / `imgui_impl_dx11.cpp`）放到
-   `cpp_overlay/third_party/imgui/`；
-2. 取消 `CMakeLists.txt` 中 `if(WIN32)` 块里 `add_library(imgui ...)` 与
-   `add_executable(ucf_overlay_win32 ...)` 的注释；
-3. 构建并运行 `ucf_overlay_win32`：
-   - 默认：无共享内存时退回 `SyntheticSource` 自演（绕相机旋转的虚拟玩家）；
-   - 接真实数据：先运行 `python tools/shm_writer.py`（或把你的
-     `frida_host.py` 输出打包进共享内存），C++ 端 `SharedTransport("UcfFrame")` 自动读取；
-   - 按 **INSERT** 显隐菜单，菜单里调开关 / 颜色 / FOV / 平滑系数 / 目标选择。
+ImGui 源码已随仓库 vendored 在 `cpp_overlay/ext/imgui/`（取自 3rd_project 的
+CS2 Internal，版本 1.92.5；与骨架用的标准 API 完全一致，无需改动）。
 
-需要 `d3d11.lib / dxgi.lib / d3dcompiler.lib`（Windows SDK 自带）与 C++20。
+```powershell
+cd projects\ucf-esp\cpp_overlay
+cmake -S . -B build
+cmake --build build --config Release
+build\Release\ucf_overlay_win32.exe
+```
+
+- 默认：无共享内存时退回 `SyntheticSource` 自演（绕相机旋转的虚拟玩家），
+  用来验证透明窗口 + ImGui 菜单是否出来；
+- 接真实数据：先运行 `python tools/shm_writer.py`（或把你的 `frida_host.py`
+  输出打包进共享内存），C++ 端 `SharedTransport("UcfFrame")` 自动读取；
+- 按 **INSERT** 显隐菜单，菜单里调开关 / 颜色 / FOV / 平滑系数 / 目标选择。
+
+需要 `d3d11.lib / dxgi.lib / d3dcompiler.lib / dwmapi.lib / user32.lib / gdi32.lib`
+（Windows SDK 自带）与 C++20（MSVC 或 MinGW-w64）。链接库已在 CMakeLists 里列好。
+若以后替换 ImGui 版本，只需按 `ext/imgui` 实际文件调整 `CMakeLists.txt` 中
+`imgui` 库的源文件列表（老版本可能没有 `imgui_tables.cpp`）。
 
 ## 数据契约（与 frida_host.py 对齐）
 

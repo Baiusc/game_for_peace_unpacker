@@ -31,8 +31,7 @@ static bool                     g_show_menu = true;
 static ucf::SyntheticSource     g_synth{};
 static ucf::ScreenMark          g_marks[ucf::MAX_PLAYERS + 1]{};
 
-extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND, UINT, WPARAM, LPARAM);
-
+// ImGui_ImplWin32_WndProcHandler 已在 <imgui_impl_win32.h> 中声明，直接调用即可。
 static LRESULT CALLBACK wndproc(HWND h, UINT m, WPARAM w, LPARAM l) {
     if (ImGui_ImplWin32_WndProcHandler(h, m, w, l)) return TRUE;
     return DefWindowProcW(h, m, w, l);
