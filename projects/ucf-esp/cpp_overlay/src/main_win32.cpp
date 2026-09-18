@@ -55,34 +55,83 @@ static bool create_render_target(int w, int h) {
     return SUCCEEDED(hr);
 }
 
+// 把 HRESULT 错误弹窗显示，方便在虚拟机里看到具体失败原因。
+static void ucf_show_hr(const char* stage, HRESULT hr) {
+    wchar_t buf[256];
+    swprintf(buf, 256, L"%hs 失败: 0x%08X", stage, (unsigned long)hr);
+    MessageBoxW(nullptr, buf, L"UCF Overlay", MB_OK | MB_ICONERROR);
+}
+
 static bool init_d3d11(HWND hwnd) {
-    DXGI_SWAP_CHAIN_DESC1 sd{};
-    sd.Width = 0; sd.Height = 0;
-    sd.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
-    sd.SampleDesc.Count = 1;
-    sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-    sd.BufferCount = 2;
-    sd.Scaling = DXGI_SCALING_NONE;                 // 1:1 物理像素
-    sd.AlphaMode = DXGI_ALPHA_MODE_PREMULTIPLIED;   // 透明叠加层关键
-    sd.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
+    HRESULT hr;
 
-    D3D_FEATURE_LEVEL fl;
-    const D3D_FEATURE_LEVEL levels[] = { D3D_FEATURE_LEVEL_11_0 };
-    if (FAILED(D3D11CreateDevice(nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, 0,
-                                 levels, 1, D3D11_SDK_VERSION, &g_device, &fl, &g_ctx)))
-        return false;
-
+    // 1) 枚举适配器：跳过 GameViewer（Status=Error 也可能排第一），
+    //    优先选 VMware SVGA；都没有则回退默认硬件。
     IDXGIFactory2* factory = nullptr;
-    if (FAILED(CreateDXGIFactory2(0, IID_PPV_ARGS(&factory)))) return false;
-    if (FAILED(factory->CreateSwapChainForComposition(g_device, &sd, nullptr, &g_swap))) {
-        factory->Release(); return false;
+    hr = CreateDXGIFactory2(0, IID_PPV_ARGS(&factory));
+    if (FAILED(hr)) { ucf_show_hr("CreateDXGIFactory2", hr); return false; }
+
+    IDXGIAdapter1* chosen = nullptr;
+    IDXGIAdapter1* adapter = nullptr;
+    for (UINT i = 0; factory->EnumAdapters1(i, &adapter) != DXGI_ERROR_NOT_FOUND; ++i) {
+        DXGI_ADAPTER_DESC1 desc;
+        adapter->GetDesc1(&desc);
+        if (wcsstr(desc.Description, L"GameViewer") != nullptr) {
+            adapter->Release(); adapter = nullptr; continue;
+        }
+        if (wcsstr(desc.Description, L"VMware") != nullptr) {
+            if (chosen) chosen->Release();
+            chosen = adapter; adapter = nullptr;
+            break;                               // 命中 VMware，直接用
+        }
+        if (!chosen) { chosen = adapter; adapter = nullptr; }
+        else         { adapter->Release(); adapter = nullptr; }
     }
+
+    // 2) 创建设备：优先选中适配器，否则默认硬件，最后 WARP 软件降级。
+    const D3D_FEATURE_LEVEL levels[] = {
+        D3D_FEATURE_LEVEL_11_0, D3D_FEATURE_LEVEL_10_1, D3D_FEATURE_LEVEL_10_0 };
+    D3D_FEATURE_LEVEL got = D3D_FEATURE_LEVEL_11_0;
+
+    if (chosen) {
+        hr = D3D11CreateDevice(chosen, D3D_DRIVER_TYPE_UNKNOWN, nullptr, 0,
+                               levels, 3, D3D11_SDK_VERSION, &g_device, &got, &g_ctx);
+    } else {
+        hr = D3D11CreateDevice(nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, 0,
+                               levels, 3, D3D11_SDK_VERSION, &g_device, &got, &g_ctx);
+    }
+    if (chosen) { chosen->Release(); chosen = nullptr; }
+
+    if (FAILED(hr)) {
+        ucf_show_hr("D3D11CreateDevice(HARDWARE)", hr);
+        hr = D3D11CreateDevice(nullptr, D3D_DRIVER_TYPE_WARP, nullptr, 0,
+                               levels, 3, D3D11_SDK_VERSION, &g_device, &got, &g_ctx);
+        if (FAILED(hr)) { ucf_show_hr("D3D11CreateDevice(WARP)", hr); factory->Release(); return false; }
+    }
+
+    // 3) 交换链：HWND 模式 + DISCARD（虚拟机对 FLIP 支持差），透明靠 DwmExtendFrameIntoClientArea。
+    DXGI_SWAP_CHAIN_DESC sd{};
+    sd.BufferDesc.Width  = 0;
+    sd.BufferDesc.Height = 0;
+    sd.BufferDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+    sd.BufferDesc.RefreshRate.Numerator   = 1;
+    sd.BufferDesc.RefreshRate.Denominator = 60;
+    sd.SampleDesc.Count   = 1;
+    sd.BufferUsage        = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+    sd.BufferCount        = 1;
+    sd.OutputWindow       = hwnd;
+    sd.Windowed           = TRUE;
+    sd.SwapEffect         = DXGI_SWAP_EFFECT_DISCARD;
+    sd.Flags              = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
+
+    hr = factory->CreateSwapChainForHwnd(g_device, hwnd, &sd, nullptr, nullptr, &g_swap);
     factory->Release();
+    if (FAILED(hr)) { ucf_show_hr("CreateSwapChainForHwnd", hr); return false; }
 
     RECT rc; GetClientRect(hwnd, &rc);
     create_render_target(rc.right - rc.left, rc.bottom - rc.top);
 
-    // 让窗口客户区由 D3D 表面（含 alpha）透出
+    // 整窗客户区由含 alpha 的 D3D 表面透出，实现透明叠加。
     MARGINS m{-1};
     DwmExtendFrameIntoClientArea(hwnd, &m);
     return true;
