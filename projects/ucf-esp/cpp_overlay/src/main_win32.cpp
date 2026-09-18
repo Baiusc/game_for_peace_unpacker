@@ -125,19 +125,31 @@ static bool init_d3d11(HWND hwnd) {
     sd.Scaling     = DXGI_SCALING_NONE;
     sd.SwapEffect  = DXGI_SWAP_EFFECT_FLIP_DISCARD;
     sd.AlphaMode   = DXGI_ALPHA_MODE_PREMULTIPLIED;
-    hr = factory->CreateSwapChainForHwnd(g_device, hwnd, &sd, nullptr, nullptr, &g_swap);
-    g_flip_used = SUCCEEDED(hr);
+    HRESULT flip_hr = factory->CreateSwapChainForHwnd(g_device, hwnd, &sd, nullptr, nullptr, &g_swap);
+    g_flip_used = SUCCEEDED(flip_hr);
 
-    if (FAILED(hr)) {
+    HRESULT blt_hr = flip_hr;
+    if (FAILED(flip_hr)) {
         // 方案 B 回退：blt 模型，兼容性最好；透明由 DwmExtendFrameIntoClientArea 实现。
         sd.BufferCount = 1;
         sd.Scaling     = DXGI_SCALING_STRETCH;
         sd.SwapEffect  = DXGI_SWAP_EFFECT_DISCARD;
         sd.AlphaMode   = DXGI_ALPHA_MODE_UNSPECIFIED;
-        hr = factory->CreateSwapChainForHwnd(g_device, hwnd, &sd, nullptr, nullptr, &g_swap);
+        blt_hr = factory->CreateSwapChainForHwnd(g_device, hwnd, &sd, nullptr, nullptr, &g_swap);
     }
     factory->Release();
-    if (FAILED(hr)) { ucf_show_hr("CreateSwapChainForHwnd", hr); return false; }
+
+    // 启动日志（覆盖写）：记录交换链选择及失败原因，便于远程诊断。
+    {
+        FILE* lf = std::fopen("ucf_debug.log", "w");
+        if (lf) {
+            fprintf(lf, "init: flip_hr=0x%08X used=%d blt_hr=0x%08X\n",
+                    (unsigned long)flip_hr, g_flip_used ? 1 : 0, (unsigned long)blt_hr);
+            fclose(lf);
+        }
+    }
+
+    if (FAILED(blt_hr)) { ucf_show_hr("CreateSwapChainForHwnd", blt_hr); return false; }
 
     RECT rc; GetClientRect(hwnd, &rc);
     create_render_target(rc.right - rc.left, rc.bottom - rc.top);
@@ -155,15 +167,22 @@ static void frame() {
 
     ucf::Frame f{};
     ucf::SharedTransport shm("UcfFrame");
-    if (shm.ok()) shm.read(f);
-    else          g_synth.update(f);          // 无共享内存：自演
+    bool have_data = shm.ok();
+    if (have_data) {
+        shm.read(f);
+        // 共享内存可能已存在但尚无生产者写入（全零 Frame）-> 尺寸非法，回退自演
+        have_data = (f.width > 0 && f.height > 0);
+    }
+    if (!have_data) g_synth.update(f);          // 无有效共享内存：自演
 
     int n = 0;
     ucf::project_frame(f, g_marks, n);
 
     RECT rc; GetClientRect(g_hwnd, &rc);
     float cw = float(rc.right - rc.left), ch = float(rc.bottom - rc.top);
-    ucf::Viewport vp{0, 0, cw, ch, cw / float(f.width), ch / float(f.height)};
+    float fw = (f.width  > 0) ? float(f.width)  : 1280.0f;   // 分母兜底，避免 scale=inf
+    float fh = (f.height > 0) ? float(f.height) : 720.0f;
+    ucf::Viewport vp{0, 0, cw, ch, cw / fw, ch / fh};
 
     ucf::DrawList dl{};
     if (g_settings.esp_enabled) ucf::build_draw_list(vp, g_marks, n, dl);
@@ -176,13 +195,15 @@ static void frame() {
         char hud[256];
         std::snprintf(hud, sizeof(hud),
                      "UCF Overlay  mode:%s  menu:%s\n"
-                     "players:%d  scale:%.2f  shm:%s",
+                     "win:%dx%d  frame:%dx%d\n"
+                     "players:%d  scale:%.2f  src:%s",
                      g_flip_used ? "FLIP" : "BLT",
                      g_show_menu ? "ON" : "OFF",
-                     n, cw / float(f.width),
-                     shm.ok() ? "yes" : "no(synth)");
+                     int(cw), int(ch), f.width, f.height,
+                     n, cw / fw,
+                     have_data ? "shm" : "synth");
         ImVec2 p(12, 12);
-        bdl->AddRectFilled(p, ImVec2(p.x + 300, p.y + 54), IM_COL32(0, 0, 0, 150));
+        bdl->AddRectFilled(p, ImVec2(p.x + 330, p.y + 70), IM_COL32(0, 0, 0, 150));
         bdl->AddText(ImVec2(p.x + 6, p.y + 6), IM_COL32(90, 255, 130, 255), hud);
     }
 
@@ -192,9 +213,10 @@ static void frame() {
         if ((dbg_frames++ % 120) == 0) {
             FILE* lf = std::fopen("ucf_debug.log", "a");
             if (lf) {
-                fprintf(lf, "[%ld] mode=%s menu=%d players=%d scale=%.2f\n",
+                fprintf(lf, "[%ld] mode=%s menu=%d win=%dx%d frame=%dx%d players=%d scale=%.2f src=%s\n",
                         dbg_frames, g_flip_used ? "FLIP" : "BLT",
-                        g_show_menu ? 1 : 0, n, cw / float(f.width));
+                        g_show_menu ? 1 : 0, int(cw), int(ch), f.width, f.height,
+                        n, cw / fw, have_data ? "shm" : "synth");
                 fclose(lf);
             }
         }
