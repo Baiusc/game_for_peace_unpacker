@@ -108,7 +108,7 @@ import "frida-il2cpp-bridge";
 // ---------------------------------------------------------------------------
 const CFG = (typeof UCFG !== "undefined" && UCFG && typeof UCFG === "object") ? UCFG : {};
 const LEVEL = Number.isFinite(CFG.level) ? CFG.level : 4;
-const INTERVAL_MS = Number.isFinite(CFG.interval) ? CFG.interval : 16;
+const INTERVAL_MS = Number.isFinite(CFG.interval) ? CFG.interval : 8;
 const DISCOVER = CFG.discover === true;
 const PROBE = CFG.probe === true;
 // 默认不调用泛型基类上的静态泛型方法（见顶部约束 5），--allow-get-instance 才开
@@ -175,6 +175,7 @@ Il2Cpp.perform(() => {
 
   const Camera = camImage.class("UnityEngine.Camera");
   const Screen = camImage.class("UnityEngine.Screen");
+  const Physics = camImage.class("UnityEngine.Physics");
   const GameManager = asmImage.class("GameManager");
   discover(Camera, "Camera");
   discover(GameManager, "GameManager");
@@ -284,9 +285,41 @@ Il2Cpp.perform(() => {
       (ok ? "（out 指针，32 位下最稳）" : "（回退：按值返回的公开 getter）"));
   };
 
+  let visibilityOrigin = null;
+  let visibilityWarned = false;
+  const readVisibilityOf = (targetTransform) => {
+    if (!visibilityOrigin || !targetTransform) return null;
+    try {
+      const end = callMethod(targetTransform, "get_position", 0);
+      const hit = Memory.alloc(0x30);
+      const hitAny = callStatic(Physics, "Linecast", 5,
+                                visibilityOrigin, end, hit, -5, 0);
+      if (!hitAny) return true;
+      const hitDistance = hit.add(0x1c).readFloat();
+      const sx = visibilityOrigin.field("x").value;
+      const sy = visibilityOrigin.field("y").value;
+      const sz = visibilityOrigin.field("z").value;
+      const ex = end.field("x").value;
+      const ey = end.field("y").value;
+      const ez = end.field("z").value;
+      const total = Math.sqrt((ex-sx)*(ex-sx) + (ey-sy)*(ey-sy) + (ez-sz)*(ez-sz));
+      return !(Number.isFinite(hitDistance) && hitDistance < total - 0.75);
+    } catch (e) {
+      if (!visibilityWarned) {
+        visibilityWarned = true;
+        console.log("[!] Physics.Linecast 不可用，visible 回退为 true:", e.message || e);
+      }
+      return null;
+    }
+  };
+
   const grabMatrices = () => {
     const cam = callStatic(Camera, "get_main", 0); // 静态、无参
     if (!cam) return null;
+    try {
+      const ct = callMethod(cam, "get_transform", 0);
+      visibilityOrigin = callMethod(ct, "get_position", 0);
+    } catch (e) { visibilityOrigin = null; }
     if (matMode === null) pickMatrixMode(cam);
 
     if (matMode === "injected") {
@@ -381,24 +414,69 @@ Il2Cpp.perform(() => {
   // -> Transform.get_position_Injected(out Vector3)。调用发生在 Unity 主线程，
   // 缺失骨骼只标记 valid=false，不让单个模型影响整帧。
   let boneWarned = false;
+  const BONE_NAME_ALIASES = [
+    ["Hips", "Bip01 Pelvis", "mixamorig:Hips"],
+    ["LeftUpLeg", "Left thigh", "Bip01 L Thigh", "mixamorig:LeftUpLeg"],
+    ["RightUpLeg", "Right thigh", "Bip01 R Thigh", "mixamorig:RightUpLeg"],
+    ["LeftLeg", "Left calf", "Bip01 L Calf", "mixamorig:LeftLeg"],
+    ["RightLeg", "Right calf", "Bip01 R Calf", "mixamorig:RightLeg"],
+    ["LeftFoot", "Bip01 L Foot", "mixamorig:LeftFoot"],
+    ["RightFoot", "Bip01 R Foot", "mixamorig:RightFoot"],
+    ["Spine", "Bip01 Spine", "mixamorig:Spine"],
+    ["Chest", "Bip01 Spine1", "mixamorig:Spine1"],
+    ["UpperChest", "Bip01 Spine2", "mixamorig:Spine2"],
+    ["Neck", "Bip01 Neck", "mixamorig:Neck"],
+    ["Head", "Bip01 Head", "mixamorig:Head"],
+    ["LeftShoulder", "Bip01 L Clavicle", "mixamorig:LeftShoulder"],
+    ["RightShoulder", "Bip01 R Clavicle", "mixamorig:RightShoulder"],
+    ["LeftArm", "Bip01 L UpperArm", "mixamorig:LeftArm"],
+    ["RightArm", "Bip01 R UpperArm", "mixamorig:RightArm"],
+    ["LeftForeArm", "Bip01 L Forearm", "mixamorig:LeftForeArm"],
+    ["RightForeArm", "Bip01 R Forearm", "mixamorig:RightForeArm"],
+    ["LeftHand", "Bip01 L Hand", "mixamorig:LeftHand"],
+  ];
+  const findNamedBone = (container, names) => {
+    if (!alive(container) || !container.tryMethod("Find", 1)) return null;
+    for (const name of names) {
+      try { const t = callMethod(container, "Find", 1, name); if (alive(t)) return t; }
+      catch (e) { /* 当前模型没有该别名 */ }
+    }
+    return null;
+  };
   const readBonesOf = (p) => {
     const bones = Array.from({ length: MAX_BONES }, () => ({ pos: [0, 0, 0], valid: false }));
+    let validCount = 0;
     try {
       const animator = callMethod(p, "get_characterAnimator", 0);
-      if (!alive(animator) || !animator.tryMethod("GetBoneTransform", 1)) return bones;
-      for (let i = 0; i < BONE_IDS.length; i++) {
-        try {
-          const t = callMethod(animator, "GetBoneTransform", 1, BONE_IDS[i]);
-          if (!alive(t)) continue;
-          const v = readPosOf(t);
-          if (![v.x, v.y, v.z].every(Number.isFinite)) continue;
-          bones[i] = { pos: [v.x, v.y, v.z], valid: true };
-        } catch (e) { /* 单根骨骼缺失，继续读取其余骨骼 */ }
+      if (alive(animator) && animator.tryMethod("GetBoneTransform", 1)) {
+        for (let i = 0; i < BONE_IDS.length; i++) {
+          try {
+            const t = callMethod(animator, "GetBoneTransform", 1, BONE_IDS[i]);
+            if (!alive(t)) continue;
+            const v = readPosOf(t);
+            if (![v.x, v.y, v.z].every(Number.isFinite)) continue;
+            bones[i] = { pos: [v.x, v.y, v.z], valid: true };
+            validCount++;
+          } catch (e) { /* 单根骨骼缺失，继续读取其余骨骼 */ }
+        }
+      }
+      if (validCount === 0) {
+        // 非 Humanoid 模型常使 GetBoneTransform 全部返回 null，改用公开 Transform.Find 兜底。
+        const container = callMethod(p, "get_characterContainer", 0);
+        for (let i = 0; i < BONE_NAME_ALIASES.length; i++) {
+          try {
+            const t = findNamedBone(container, BONE_NAME_ALIASES[i]);
+            if (!alive(t)) continue;
+            const v = readPosOf(t);
+            if (![v.x, v.y, v.z].every(Number.isFinite)) continue;
+            bones[i] = { pos: [v.x, v.y, v.z], valid: true };
+          } catch (e) { /* 当前模型无该别名 */ }
+        }
       }
     } catch (e) {
       if (!boneWarned) {
         boneWarned = true;
-        console.log("[!] 真实骨骼读取不可用（后续帧保留 valid=false）:", e.message || e);
+        console.log("[!] 真实骨骼读取失败，将尝试 characterContainer.Find:", e.message || e);
       }
     }
     return bones;
@@ -473,6 +551,7 @@ Il2Cpp.perform(() => {
     try {
       const t = callMethod(p, "get_transform", 0);
       out.pos = t ? readPosOf(t) : null;
+      out.visible = t ? readVisibilityOf(t) : null;
     } catch (e) { out.pos = null; }
     out.team = readTeamOf(p);
     try { out.isMyPlayer = callMethod(p, "get_isMyPlayer", 0); } catch (e) { out.isMyPlayer = null; }

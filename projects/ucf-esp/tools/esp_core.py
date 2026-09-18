@@ -82,10 +82,10 @@ def _same_position(a, b, eps=1e-4):
 class Mark:
     """一个玩家在屏幕上的投影结果。"""
     __slots__ = ("kind", "screen", "world", "team", "hp", "max_hp",
-                 "is_dead", "on_screen", "name", "dist", "clipped", "bones")
+                 "is_dead", "visible", "on_screen", "name", "dist", "clipped", "bones")
 
     def __init__(self, kind, screen, world, team, hp, max_hp, is_dead,
-                 on_screen, name="", dist=None, clipped=False, bones=None):
+                 on_screen, name="", dist=None, clipped=False, bones=None, visible=True):
         self.kind = kind            # 'local' | 'teammate' | 'enemy'
         self.screen = screen        # (sx, sy) 或 None
         self.world = world          # (x, y, z) 或 None
@@ -93,6 +93,7 @@ class Mark:
         self.hp = hp
         self.max_hp = max_hp
         self.is_dead = is_dead
+        self.visible = visible
         self.on_screen = on_screen
         self.name = name
         self.dist = dist            # 到相机的距离（米），None 表示未知
@@ -108,6 +109,7 @@ class Mark:
             "hp": self.hp,
             "max_hp": self.max_hp,
             "is_dead": self.is_dead,
+            "visible": self.visible,
             "on_screen": self.on_screen,
             "name": self.name,
             "dist": self.dist,
@@ -157,7 +159,8 @@ def _make(role, p, local_team, forced_local, w, h, VP, cam_pos, ndc_clip):
         bones.append((bs[0], bs[1], True) if bvalid else (0.0, 0.0, False))
     return Mark(kind, screen, world, team,
                 p.get("hp"), p.get("maxHp"), bool(p.get("isDead")),
-                on_screen, dist=dist, clipped=clipped, bones=bones)
+                on_screen, dist=dist, clipped=clipped, bones=bones,
+                visible=(p.get("visible") is not False))
 
 
 def project_frame(frame, w=None, h=None, ndc_clip=NDC_CLIP):

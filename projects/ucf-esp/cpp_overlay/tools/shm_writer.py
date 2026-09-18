@@ -19,7 +19,7 @@ import sys
 N_PLAYERS = 64
 N_BONES = 19
 BONE_FMT = "3f?3x"                              # pos(12)+valid+pad = 16
-PS_FMT = struct.Struct("<3fiii?32s3x" + BONE_FMT * N_BONES)
+PS_FMT = struct.Struct("<3fiii??32s2x" + BONE_FMT * N_BONES)
 FRAME_FMT = struct.Struct(
     "<16f16f"          # w2c[16], proj[16]
     "ii"               # width, height
@@ -50,7 +50,8 @@ def _ps_items(p):
     pos = _vec3(p.get("pos"))
     items = [pos[0], pos[1], pos[2],
             int(p.get("team", 0)), int(p.get("hp", 100)),
-            int(p.get("maxHp", 100)), bool(p.get("isDead", False)), name]
+            int(p.get("maxHp", 100)), bool(p.get("isDead", False)),
+            True if p.get("visible") is None else bool(p.get("visible")), name]
     bones = p.get("bones", []) or []
     for i in range(N_BONES):
         b = bones[i] if i < len(bones) else {}

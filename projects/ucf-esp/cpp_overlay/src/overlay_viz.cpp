@@ -30,9 +30,11 @@ Viewport compute_viewport(float client_x, float client_y, float client_w, float 
 }
 
 static constexpr int BONE_PAIRS[][2] = {
-    {0, 7}, {7, 8}, {8, 9}, {9, 10},
-    {8, 11}, {11, 13}, {13, 15}, {15, 17},
+    // HumanBodyBones: 0 hips, 7 spine, 8 chest, 9 upperChest,
+    // 10 neck, 11 head; arms and legs use the standard enum slots.
+    {0, 7}, {7, 8}, {8, 9}, {9, 10}, {10, 11},
     {8, 12}, {12, 14}, {14, 16}, {16, 18},
+    {8, 13}, {13, 15}, {15, 17},
     {0, 1}, {1, 3}, {3, 5},
     {0, 2}, {2, 4}, {4, 6},
 };

@@ -1,0 +1,248 @@
+diff --git a/projects/ucf-esp/cpp_overlay/src/input_sim/input_sim.cpp b/projects/ucf-esp/cpp_overlay/src/input_sim/input_sim.cpp
+index 219465d..223eae5 100644
+--- a/projects/ucf-esp/cpp_overlay/src/input_sim/input_sim.cpp
++++ b/projects/ucf-esp/cpp_overlay/src/input_sim/input_sim.cpp
+@@ -2,6 +2,7 @@
+ 
+ #include <cmath>
+ #include <cstdlib>
++#include <algorithm>
+ 
+ #ifdef _WIN32
+ #include <windows.h>
+@@ -61,11 +62,33 @@ void LocalInputSim::set_config(const Config& config) {
+     cfg_ = config;
+     if (cfg_.align_tolerance_px < 0.0f) cfg_.align_tolerance_px = 0.0f;
+     if (cfg_.jitter_px < 0) cfg_.jitter_px = 0;
++    cfg_.smooth_factor = std::max(0.05f, std::min(1.0f, cfg_.smooth_factor));
++    if (cfg_.max_step_px < 1) cfg_.max_step_px = 1;
+ }
+ 
+ void LocalInputSim::move_to(const ScreenPoint& target, const ScreenPoint& crosshair) {
+-    const int dx = static_cast<int>(std::lround(target.x - crosshair.x));
+-    const int dy = static_cast<int>(std::lround(target.y - crosshair.y));
++    const float ex = target.x - crosshair.x;
++    const float ey = target.y - crosshair.y;
++    const float distance = std::sqrt(ex * ex + ey * ey);
++    if (distance <= cfg_.align_tolerance_px) return;
++    const float step_len = std::min(distance * cfg_.smooth_factor,
++                                    static_cast<float>(cfg_.max_step_px));
++    const float ux = ex / distance;
++    const float uy = ey / distance;
++    float jx = 0.0f, jy = 0.0f;
++    if (cfg_.jitter_px > 0) {
++        const int span = cfg_.jitter_px * 2 + 1;
++        jx = static_cast<float>((std::rand() % span) - cfg_.jitter_px) * 0.5f;
++        jy = static_cast<float>((std::rand() % span) - cfg_.jitter_px) * 0.5f;
++    }
++    int dx = static_cast<int>(std::lround(ux * step_len + jx));
++    int dy = static_cast<int>(std::lround(uy * step_len + jy));
++    if (dx == 0 && std::fabs(ex) > cfg_.align_tolerance_px) dx = ex > 0 ? 1 : -1;
++    if (dy == 0 && std::fabs(ey) > cfg_.align_tolerance_px) dy = ey > 0 ? 1 : -1;
++    if (std::fabs(static_cast<float>(dx)) > std::fabs(ex) + 1.0f)
++        dx = static_cast<int>(std::lround(ex));
++    if (std::fabs(static_cast<float>(dy)) > std::fabs(ey) + 1.0f)
++        dy = static_cast<int>(std::lround(ey));
+     if (dx != 0 || dy != 0) sender_->move(dx, dy);
+ }
+ 
+@@ -87,10 +110,12 @@ void LocalInputSim::on_hold_trace(const ScreenPoint& target_screen) {
+ void LocalInputSim::on_tap_move_and_fire(const ScreenPoint& target_screen,
+                                          const ScreenPoint& crosshair) {
+     if (!cfg_.enabled) return;
+-    move_to(target_screen, crosshair);
+     if (aligned(target_screen, crosshair)) {
+         sender_->button_down(cfg_.fire_key);
+         sender_->button_up(cfg_.fire_key);
++        fire_pending_ = false;
++    } else {
++        move_to(target_screen, crosshair);
+     }
+ }
+ 
+@@ -104,17 +129,20 @@ void LocalInputSim::update(bool aim_key_down, bool fire_key_down,
+     if (state != TargetState::Normal) {
+         // 阻挡/死亡/无效目标不产生输入；同步边沿状态，避免目标恢复时误触发。
+         was_fire_down_ = fire_key_down;
++        fire_pending_ = false;
+         return;
+     }
+     crosshair_ = crosshair;
+     if (aim_key_down) on_hold_trace(target_screen);
+-    if (fire_key_down && !was_fire_down_)
+-        on_tap_move_and_fire(target_screen, crosshair);
++    if (fire_key_down && !was_fire_down_) fire_pending_ = true;
++    if (fire_key_down && fire_pending_) on_tap_move_and_fire(target_screen, crosshair);
++    if (!fire_key_down) fire_pending_ = false;
+     was_fire_down_ = fire_key_down;
+ }
+ 
+ void LocalInputSim::reset_lock() {
+     was_fire_down_ = false;
++    fire_pending_ = false;
+ }
+ 
+ } // namespace ucf::input_sim
+diff --git a/projects/ucf-esp/cpp_overlay/src/shared_state.hpp b/projects/ucf-esp/cpp_overlay/src/shared_state.hpp
+index bef31bf..673c8b8 100644
+--- a/projects/ucf-esp/cpp_overlay/src/shared_state.hpp
++++ b/projects/ucf-esp/cpp_overlay/src/shared_state.hpp
+@@ -27,6 +27,7 @@ struct PlayerState {
+     int   hp     = 100;
+     int   maxHp  = 100;
+     bool  isDead = false;
++    bool  visible = true;
+     char  name[32] = {};
+     BoneState bones[MAX_BONES]{};
+ };
+diff --git a/projects/ucf-esp/tools/frida_dump.js b/projects/ucf-esp/tools/frida_dump.js
+index d86f94d..959afc0 100644
+--- a/projects/ucf-esp/tools/frida_dump.js
++++ b/projects/ucf-esp/tools/frida_dump.js
+@@ -108,7 +108,7 @@ import "frida-il2cpp-bridge";
+ // ---------------------------------------------------------------------------
+ const CFG = (typeof UCFG !== "undefined" && UCFG && typeof UCFG === "object") ? UCFG : {};
+ const LEVEL = Number.isFinite(CFG.level) ? CFG.level : 4;
+-const INTERVAL_MS = Number.isFinite(CFG.interval) ? CFG.interval : 16;
++const INTERVAL_MS = Number.isFinite(CFG.interval) ? CFG.interval : 8;
+ const DISCOVER = CFG.discover === true;
+ const PROBE = CFG.probe === true;
+ // 默认不调用泛型基类上的静态泛型方法（见顶部约束 5），--allow-get-instance 才开
+@@ -175,6 +175,7 @@ Il2Cpp.perform(() => {
+ 
+   const Camera = camImage.class("UnityEngine.Camera");
+   const Screen = camImage.class("UnityEngine.Screen");
++  const Physics = camImage.class("UnityEngine.Physics");
+   const GameManager = asmImage.class("GameManager");
+   discover(Camera, "Camera");
+   discover(GameManager, "GameManager");
+@@ -284,9 +285,41 @@ Il2Cpp.perform(() => {
+       (ok ? "（out 指针，32 位下最稳）" : "（回退：按值返回的公开 getter）"));
+   };
+ 
++  let visibilityOrigin = null;
++  let visibilityWarned = false;
++  const readVisibilityOf = (targetTransform) => {
++    if (!visibilityOrigin || !targetTransform) return null;
++    try {
++      const end = callMethod(targetTransform, "get_position", 0);
++      const hit = Memory.alloc(0x30);
++      const hitAny = callStatic(Physics, "Linecast", 5,
++                                visibilityOrigin, end, hit, -5, 0);
++      if (!hitAny) return true;
++      const hitDistance = hit.add(0x1c).readFloat();
++      const sx = visibilityOrigin.field("x").value;
++      const sy = visibilityOrigin.field("y").value;
++      const sz = visibilityOrigin.field("z").value;
++      const ex = end.field("x").value;
++      const ey = end.field("y").value;
++      const ez = end.field("z").value;
++      const total = Math.sqrt((ex-sx)*(ex-sx) + (ey-sy)*(ey-sy) + (ez-sz)*(ez-sz));
++      return !(Number.isFinite(hitDistance) && hitDistance < total - 0.75);
++    } catch (e) {
++      if (!visibilityWarned) {
++        visibilityWarned = true;
++        console.log("[!] Physics.Linecast 不可用，visible 回退为 true:", e.message || e);
++      }
++      return null;
++    }
++  };
++
+   const grabMatrices = () => {
+     const cam = callStatic(Camera, "get_main", 0); // 静态、无参
+     if (!cam) return null;
++    try {
++      const ct = callMethod(cam, "get_transform", 0);
++      visibilityOrigin = callMethod(ct, "get_position", 0);
++    } catch (e) { visibilityOrigin = null; }
+     if (matMode === null) pickMatrixMode(cam);
+ 
+     if (matMode === "injected") {
+@@ -381,24 +414,69 @@ Il2Cpp.perform(() => {
+   // -> Transform.get_position_Injected(out Vector3)。调用发生在 Unity 主线程，
+   // 缺失骨骼只标记 valid=false，不让单个模型影响整帧。
+   let boneWarned = false;
++  const BONE_NAME_ALIASES = [
++    ["Hips", "Bip01 Pelvis", "mixamorig:Hips"],
++    ["LeftUpLeg", "Left thigh", "Bip01 L Thigh", "mixamorig:LeftUpLeg"],
++    ["RightUpLeg", "Right thigh", "Bip01 R Thigh", "mixamorig:RightUpLeg"],
++    ["LeftLeg", "Left calf", "Bip01 L Calf", "mixamorig:LeftLeg"],
++    ["RightLeg", "Right calf", "Bip01 R Calf", "mixamorig:RightLeg"],
++    ["LeftFoot", "Bip01 L Foot", "mixamorig:LeftFoot"],
++    ["RightFoot", "Bip01 R Foot", "mixamorig:RightFoot"],
++    ["Spine", "Bip01 Spine", "mixamorig:Spine"],
++    ["Chest", "Bip01 Spine1", "mixamorig:Spine1"],
++    ["UpperChest", "Bip01 Spine2", "mixamorig:Spine2"],
++    ["Neck", "Bip01 Neck", "mixamorig:Neck"],
++    ["Head", "Bip01 Head", "mixamorig:Head"],
++    ["LeftShoulder", "Bip01 L Clavicle", "mixamorig:LeftShoulder"],
++    ["RightShoulder", "Bip01 R Clavicle", "mixamorig:RightShoulder"],
++    ["LeftArm", "Bip01 L UpperArm", "mixamorig:LeftArm"],
++    ["RightArm", "Bip01 R UpperArm", "mixamorig:RightArm"],
++    ["LeftForeArm", "Bip01 L Forearm", "mixamorig:LeftForeArm"],
++    ["RightForeArm", "Bip01 R Forearm", "mixamorig:RightForeArm"],
++    ["LeftHand", "Bip01 L Hand", "mixamorig:LeftHand"],
++  ];
++  const findNamedBone = (container, names) => {
++    if (!alive(container) || !container.tryMethod("Find", 1)) return null;
++    for (const name of names) {
++      try { const t = callMethod(container, "Find", 1, name); if (alive(t)) return t; }
++      catch (e) { /* 当前模型没有该别名 */ }
++    }
++    return null;
++  };
+   const readBonesOf = (p) => {
+     const bones = Array.from({ length: MAX_BONES }, () => ({ pos: [0, 0, 0], valid: false }));
++    let validCount = 0;
+     try {
+       const animator = callMethod(p, "get_characterAnimator", 0);
+-      if (!alive(animator) || !animator.tryMethod("GetBoneTransform", 1)) return bones;
+-      for (let i = 0; i < BONE_IDS.length; i++) {
+-        try {
+-          const t = callMethod(animator, "GetBoneTransform", 1, BONE_IDS[i]);
+-          if (!alive(t)) continue;
+-          const v = readPosOf(t);
+-          if (![v.x, v.y, v.z].every(Number.isFinite)) continue;
+-          bones[i] = { pos: [v.x, v.y, v.z], valid: true };
+-        } catch (e) { /* 单根骨骼缺失，继续读取其余骨骼 */ }
++      if (alive(animator) && animator.tryMethod("GetBoneTransform", 1)) {
++        for (let i = 0; i < BONE_IDS.length; i++) {
++          try {
++            const t = callMethod(animator, "GetBoneTransform", 1, BONE_IDS[i]);
++            if (!alive(t)) continue;
++            const v = readPosOf(t);
++            if (![v.x, v.y, v.z].every(Number.isFinite)) continue;
++            bones[i] = { pos: [v.x, v.y, v.z], valid: true };
++            validCount++;
++          } catch (e) { /* 单根骨骼缺失，继续读取其余骨骼 */ }
++        }
++      }
++      if (validCount === 0) {
++        // 非 Humanoid 模型常使 GetBoneTransform 全部返回 null，改用公开 Transform.Find 兜底。
++        const container = callMethod(p, "get_characterContainer", 0);
++        for (let i = 0; i < BONE_NAME_ALIASES.length; i++) {
++          try {
++            const t = findNamedBone(container, BONE_NAME_ALIASES[i]);
++            if (!alive(t)) continue;
++            const v = readPosOf(t);
++            if (![v.x, v.y, v.z].every(Number.isFinite)) continue;
++            bones[i] = { pos: [v.x, v.y, v.z], valid: true };
++          } catch (e) { /* 当前模型无该别名 */ }
++        }
+       }
+     } catch (e) {
+       if (!boneWarned) {
+         boneWarned = true;
+-        console.log("[!] 真实骨骼读取不可用（后续帧保留 valid=false）:", e.message || e);
++        console.log("[!] 真实骨骼读取失败，将尝试 characterContainer.Find:", e.message || e);
+       }
+     }
+     return bones;
+@@ -473,6 +551,7 @@ Il2Cpp.perform(() => {
+     try {
+       const t = callMethod(p, "get_transform", 0);
+       out.pos = t ? readPosOf(t) : null;
++      out.visible = t ? readVisibilityOf(t) : null;
+     } catch (e) { out.pos = null; }
+     out.team = readTeamOf(p);
+     try { out.isMyPlayer = callMethod(p, "get_isMyPlayer", 0); } catch (e) { out.isMyPlayer = null; }

@@ -27,6 +27,7 @@ struct PlayerState {
     int   hp     = 100;
     int   maxHp  = 100;
     bool  isDead = false;
+    bool  visible = true;
     char  name[32] = {};
     BoneState bones[MAX_BONES]{};
 };

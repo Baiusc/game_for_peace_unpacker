@@ -200,3 +200,15 @@
 - **修法**：选定骨骼不可用时回退到玩家根位置；瞄准侧键只执行持续 trace，触发侧键上升沿执行一次 move+fire；输入点先从 Frame 坐标转换到游戏客户区物理像素。
 - **跟手性**：宿主默认采样间隔从 50ms 调整为 16ms（约 60Hz），减少视角晃动时的 50ms 数据延迟。
 - **验证**：本地核心 ctest、SHM 编码测试、投影校准测试全部通过；Windows 输入与 Win32 链路需用 Actions/实机确认。
+### 2026-09-18：骨骼槽位与本地输入平滑
+
+- Unity `HumanBodyBones.Head` 的枚举槽位是 11，不是 10；10 是 Neck。读取和绘制骨骼必须使用同一槽位表。
+- `Animator.GetBoneTransform` 对非 Humanoid 模型可能全部返回空。读取失败时用 `Player.characterContainer.Find` 的公开 Transform 路径别名兜底，并保持 `valid=false` 语义，不用合成点冒充真实骨骼。
+- 本地输入模拟的每帧位移使用误差比例 + 最大步长 + 1~2 像素扰动；触发键保持按下期间保留 pending 状态，只有误差进入容差才发一次左键，避免单次边沿只移动一小步后永不射击。
+- 当前 `Frame/PlayerState` 契约没有遮挡/LOS 字段，投影有效不等于“没有墙”。C++ 不再把它推断成真实可见性；要实现墙体检测，必须由 Unity 主线程的游戏侧 Raycast 产出显式字段后再同步共享内存契约。
+
+### 2026-09-18：可见性契约与 Linecast
+
+- `PlayerState.visible` 由 Unity 主线程 `Physics.Linecast` 产生；C++ 投影不能从 NDC 推断墙体遮挡。
+- Linecast 命中距离接近目标端点时视为命中目标自身，不标记为墙；明显提前命中才标记 BLOCKED。
+- 若运行时打印 `Physics.Linecast 不可用`，未知状态按 `true` 兼容旧帧，不能把该日志解释为已完成遮挡检测。

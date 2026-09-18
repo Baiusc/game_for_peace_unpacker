@@ -1,0 +1,21 @@
+changed branch/field: master / ESP runtime sampling interval, PlayerState.visible LOS field, HumanBodyBones.Head slot 11, fallback bone lookup, input_sim smooth_factor/fire_pending
+
+four artifacts:
+MODIFIED_FILE=projects/ucf-esp/verification/runtime_bugfix_20260918/MODIFIED_FILE
+DIFF_FILE=projects/ucf-esp/verification/runtime_bugfix_20260918/DIFF_FILE
+VERIFICATION.txt=projects/ucf-esp/verification/runtime_bugfix_20260918/VERIFICATION.txt
+ROLLBACK.sh=projects/ucf-esp/verification/runtime_bugfix_20260918/ROLLBACK.sh
+
+BASELINE exact command:
+git archive fa9d356 | tar -x -C /tmp/ucf-baseline-20260918-17688; cmake -S /tmp/ucf-baseline-20260918-17688/projects/ucf-esp/cpp_overlay -B /tmp/ucf-baseline-20260918-17688/build; cmake --build /tmp/ucf-baseline-20260918-17688/build -j2; ctest --test-dir /tmp/ucf-baseline-20260918-17688/build --output-on-failure
+BASELINE literal result: 2/2 tests passed, exit status 0
+
+MODIFIED exact command:
+python3 projects/ucf-esp/tests/test_shm_bridge.py && python3 projects/ucf-esp/tests/test_frame_dump.py && python3 projects/ucf-esp/tests/test_projection_parity.py && cmake --build projects/ucf-esp/cpp_overlay/build -j2 && ctest --test-dir projects/ucf-esp/cpp_overlay/build --output-on-failure && python3 projects/ucf-esp/tests/test_dump_contract.py && python3 projects/ucf-esp/tests/test_script_config.py
+MODIFIED literal result: shm bridge PASS; frame dump PASS; projection parity PASS; 2/2 ctest tests passed; dump contract PASS; script config PASS; exit status 0
+
+ROLLBACK exact command/input:
+projects/ucf-esp/verification/runtime_bugfix_20260918/ROLLBACK.sh projects/ucf-esp/verification/runtime_bugfix_20260918/rollback_test_copy/input_sim.cpp projects/ucf-esp/verification/runtime_bugfix_20260918/rollback_test_copy/original_input_sim.cpp
+ROLLBACK literal result: rollback: restored original input_sim.cpp; cmp passed; exit status 0
+
+restored behavior/status: rollback_test_copy/input_sim.cpp byte-identical to rollback_test_copy/original_input_sim.cpp; working-tree MODIFIED_FILE remains changed and was not rolled back.

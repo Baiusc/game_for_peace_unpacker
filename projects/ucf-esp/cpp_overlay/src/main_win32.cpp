@@ -200,8 +200,9 @@ static void write_bones_json(FILE* f, const ucf::PlayerState& p, bool include_bo
 }
 
 static void write_player_json(FILE* f, const ucf::PlayerState& p, bool include_bones, bool include_name) {
-    std::fprintf(f, "{\"pos\":[%.6g,%.6g,%.6g],\"team\":%d,\"hp\":%d,\"maxHp\":%d,\"isDead\":%s",
-                 p.pos[0], p.pos[1], p.pos[2], p.team, p.hp, p.maxHp, p.isDead ? "true" : "false");
+    std::fprintf(f, "{\"pos\":[%.6g,%.6g,%.6g],\"team\":%d,\"hp\":%d,\"maxHp\":%d,\"isDead\":%s,\"visible\":%s",
+                 p.pos[0], p.pos[1], p.pos[2], p.team, p.hp, p.maxHp,
+                 p.isDead ? "true" : "false", p.visible ? "true" : "false");
     if (include_name) { std::fputs(",\"name\":", f); json_text(f, p.name); }
     std::fputs(",\"bones\":", f); write_bones_json(f, p, include_bones);
     std::fputc('}', f);
@@ -286,7 +287,7 @@ static void record_frame(const ucf::Frame& f) {
 }
 
 static int aim_bone_index(const ucf::Settings& settings) {
-    if (settings.aim_point_mode == 1) return 10; // Head
+    if (settings.aim_point_mode == 1) return 11; // HumanBodyBones.Head (0-based enum)
     if (settings.aim_point_mode == 2) return 8;  // Chest
     if (settings.aim_point_mode == 3) return settings.aim_bone_id;
     return -1;
@@ -638,7 +639,8 @@ static void frame() {
         input_cfg.aim_key = g_settings.input_sim_aim_key;
         input_cfg.fire_key = g_settings.input_sim_fire_key;
         input_cfg.align_tolerance_px = g_settings.input_sim_tolerance_px;
-        input_cfg.jitter_px = g_settings.input_sim_jitter_px;
+        input_cfg.jitter_px = std::min(g_settings.input_sim_jitter_px, 2);
+        input_cfg.smooth_factor = g_settings.responsiveness;
         g_input_sim.set_config(input_cfg);
         const bool aim_key_down = (GetAsyncKeyState(input_cfg.aim_key) & 0x8000) != 0;
         const bool fire_key_down = (GetAsyncKeyState(input_cfg.fire_key) & 0x8000) != 0;

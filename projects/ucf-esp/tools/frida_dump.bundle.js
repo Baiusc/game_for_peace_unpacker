@@ -3462,7 +3462,7 @@ ${this.isEnum ? `enum` : this.isStruct ? `struct` : this.isInterface ? `interfac
   // frida_dump.js
   var CFG = typeof UCFG !== "undefined" && UCFG && typeof UCFG === "object" ? UCFG : {};
   var LEVEL = Number.isFinite(CFG.level) ? CFG.level : 4;
-  var INTERVAL_MS = Number.isFinite(CFG.interval) ? CFG.interval : 16;
+  var INTERVAL_MS = Number.isFinite(CFG.interval) ? CFG.interval : 8;
   var DISCOVER = CFG.discover === true;
   var PROBE = CFG.probe === true;
   var ALLOW_GET_INSTANCE = CFG.allowGetInstance === true;
@@ -3525,6 +3525,7 @@ ${this.isEnum ? `enum` : this.isStruct ? `struct` : this.isInterface ? `interfac
       const camImage = Il2Cpp.domain.assembly(UASM).image;
       const Camera = camImage.class("UnityEngine.Camera");
       const Screen = camImage.class("UnityEngine.Screen");
+      const Physics = camImage.class("UnityEngine.Physics");
       const GameManager = asmImage.class("GameManager");
       discover(Camera, "Camera");
       discover(GameManager, "GameManager");
@@ -3595,6 +3596,32 @@ ${this.isEnum ? `enum` : this.isStruct ? `struct` : this.isInterface ? `interfac
           for (let r = 0; r < 4; r++) a.push(vt.field("m" + r + c).value);
         return a;
       };
+      let visibilityOrigin = null;
+      let visibilityWarned = false;
+      const readVisibilityOf = (targetTransform) => {
+        if (!visibilityOrigin || !targetTransform) return null;
+        try {
+          const end = callMethod(targetTransform, "get_position", 0);
+          const hit = Memory.alloc(48);
+          const hitAny = callStatic(Physics, "Linecast", 5, visibilityOrigin, end, hit, -5, 0);
+          if (!hitAny) return true;
+          const hitDistance = hit.add(28).readFloat();
+          const sx = visibilityOrigin.field("x").value;
+          const sy = visibilityOrigin.field("y").value;
+          const sz = visibilityOrigin.field("z").value;
+          const ex = end.field("x").value;
+          const ey = end.field("y").value;
+          const ez = end.field("z").value;
+          const total = Math.sqrt((ex-sx)*(ex-sx) + (ey-sy)*(ey-sy) + (ez-sz)*(ez-sz));
+          return !(Number.isFinite(hitDistance) && hitDistance < total - 0.75);
+        } catch (e) {
+          if (!visibilityWarned) {
+            visibilityWarned = true;
+            console.log("[!] Physics.Linecast 不可用，visible 回退为 true:", e.message || e);
+          }
+          return null;
+        }
+      };
       let matMode = null;
       const pickMatrixMode = (cam) => {
         const ok = !!cam.tryMethod("get_worldToCameraMatrix_Injected", 1) && !!cam.tryMethod("get_projectionMatrix_Injected", 1);
@@ -3604,6 +3631,10 @@ ${this.isEnum ? `enum` : this.isStruct ? `struct` : this.isInterface ? `interfac
       const grabMatrices = () => {
         const cam = callStatic(Camera, "get_main", 0);
         if (!cam) return null;
+        try {
+          const ct = callMethod(cam, "get_transform", 0);
+          visibilityOrigin = callMethod(ct, "get_position", 0);
+        } catch (e) { visibilityOrigin = null; }
         if (matMode === null) pickMatrixMode(cam);
         if (matMode === "injected") {
           callMethod(cam, "get_worldToCameraMatrix_Injected", 1, w2cBuf);
@@ -3691,25 +3722,73 @@ ${this.isEnum ? `enum` : this.isStruct ? `struct` : this.isInterface ? `interfac
         return { x: v.field("x").value, y: v.field("y").value, z: v.field("z").value };
       };
       let boneWarned = false;
+      const BONE_NAME_ALIASES = [
+        ["Hips", "Bip01 Pelvis", "mixamorig:Hips"],
+        ["LeftUpLeg", "Left thigh", "Bip01 L Thigh", "mixamorig:LeftUpLeg"],
+        ["RightUpLeg", "Right thigh", "Bip01 R Thigh", "mixamorig:RightUpLeg"],
+        ["LeftLeg", "Left calf", "Bip01 L Calf", "mixamorig:LeftLeg"],
+        ["RightLeg", "Right calf", "Bip01 R Calf", "mixamorig:RightLeg"],
+        ["LeftFoot", "Bip01 L Foot", "mixamorig:LeftFoot"],
+        ["RightFoot", "Bip01 R Foot", "mixamorig:RightFoot"],
+        ["Spine", "Bip01 Spine", "mixamorig:Spine"],
+        ["Chest", "Bip01 Spine1", "mixamorig:Spine1"],
+        ["UpperChest", "Bip01 Spine2", "mixamorig:Spine2"],
+        ["Neck", "Bip01 Neck", "mixamorig:Neck"],
+        ["Head", "Bip01 Head", "mixamorig:Head"],
+        ["LeftShoulder", "Bip01 L Clavicle", "mixamorig:LeftShoulder"],
+        ["RightShoulder", "Bip01 R Clavicle", "mixamorig:RightShoulder"],
+        ["LeftArm", "Bip01 L UpperArm", "mixamorig:LeftArm"],
+        ["RightArm", "Bip01 R UpperArm", "mixamorig:RightArm"],
+        ["LeftForeArm", "Bip01 L Forearm", "mixamorig:LeftForeArm"],
+        ["RightForeArm", "Bip01 R Forearm", "mixamorig:RightForeArm"],
+        ["LeftHand", "Bip01 L Hand", "mixamorig:LeftHand"]
+      ];
+      const findNamedBone = (container, names) => {
+        if (!alive(container) || !container.tryMethod("Find", 1)) return null;
+        for (const name of names) {
+          try {
+            const t = callMethod(container, "Find", 1, name);
+            if (alive(t)) return t;
+          } catch (e) {
+          }
+        }
+        return null;
+      };
       const readBonesOf = (p) => {
         const bones = Array.from({ length: MAX_BONES }, () => ({ pos: [0, 0, 0], valid: false }));
+        let validCount = 0;
         try {
           const animator = callMethod(p, "get_characterAnimator", 0);
-          if (!alive(animator) || !animator.tryMethod("GetBoneTransform", 1)) return bones;
-          for (let i = 0; i < BONE_IDS.length; i++) {
-            try {
-              const t = callMethod(animator, "GetBoneTransform", 1, BONE_IDS[i]);
-              if (!alive(t)) continue;
-              const v = readPosOf(t);
-              if (![v.x, v.y, v.z].every(Number.isFinite)) continue;
-              bones[i] = { pos: [v.x, v.y, v.z], valid: true };
-            } catch (e) {
+          if (alive(animator) && animator.tryMethod("GetBoneTransform", 1)) {
+            for (let i = 0; i < BONE_IDS.length; i++) {
+              try {
+                const t = callMethod(animator, "GetBoneTransform", 1, BONE_IDS[i]);
+                if (!alive(t)) continue;
+                const v = readPosOf(t);
+                if (![v.x, v.y, v.z].every(Number.isFinite)) continue;
+                bones[i] = { pos: [v.x, v.y, v.z], valid: true };
+                validCount++;
+              } catch (e) {
+              }
+            }
+          }
+          if (validCount === 0) {
+            const container = callMethod(p, "get_characterContainer", 0);
+            for (let i = 0; i < BONE_NAME_ALIASES.length; i++) {
+              try {
+                const t = findNamedBone(container, BONE_NAME_ALIASES[i]);
+                if (!alive(t)) continue;
+                const v = readPosOf(t);
+                if (![v.x, v.y, v.z].every(Number.isFinite)) continue;
+                bones[i] = { pos: [v.x, v.y, v.z], valid: true };
+              } catch (e) {
+              }
             }
           }
         } catch (e) {
           if (!boneWarned) {
             boneWarned = true;
-            console.log("[!] 真实骨骼读取不可用（后续帧保留 valid=false）:", e.message || e);
+            console.log("[!] 真实骨骼读取失败，将尝试 characterContainer.Find:", e.message || e);
           }
         }
         return bones;
@@ -3755,6 +3834,7 @@ ${this.isEnum ? `enum` : this.isStruct ? `struct` : this.isInterface ? `interfac
         try {
           const t = callMethod(p, "get_transform", 0);
           out.pos = t ? readPosOf(t) : null;
+          out.visible = t ? readVisibilityOf(t) : null;
         } catch (e) {
           out.pos = null;
         }

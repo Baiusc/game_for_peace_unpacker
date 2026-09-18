@@ -28,9 +28,7 @@ struct Candidate {
     bool  valid = true;
 };
 
-// 当前契约没有 LOS/遮挡字段；此谓词只检查 PlayerState 是否具备可用的
-// 基础位置数据。屏幕投影有效性仍由 overlay_win32 在生成 Candidate 时补充。
-// TODO: Frame 增加 visible 字段后，在这里合并真实可见性状态。
+// visible 由 Unity 主线程 Linecast 写入；这里同时检查字段与基础位置数据。
 bool is_target_visible(const PlayerState& player);
 
 // 在候选敌人里，挑出“落在 fov_deg 视锥内”的，再按 mode 选一个：
@@ -47,8 +45,7 @@ struct ScreenCandidate {
     bool valid = true;
 };
 
-// 目标状态只描述本地 Frame 中已知的信息；当前契约没有遮挡字段，
-// visible=false 只代表上游没有提供可用投影/可见性标记，不推断游戏内 LOS。
+// 目标状态只描述 Frame 中已知的信息；visible=false 表示上游 Linecast 命中遮挡。
 enum class TargetState { Normal, Blocked, Dead, Invalid };
 TargetState target_state(const Candidate& candidate);
 

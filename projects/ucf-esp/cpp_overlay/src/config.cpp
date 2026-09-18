@@ -152,7 +152,7 @@ bool load_settings(Settings& s, const char* path) {
     if (s.dev_replay_speed < 0.1f) s.dev_replay_speed = 0.1f;
     if (s.aim_selection_mode < 0 || s.aim_selection_mode > 1) s.aim_selection_mode = 0;
     if (s.aim_point_mode < 0 || s.aim_point_mode > 3) s.aim_point_mode = 1;
-    if (s.aim_bone_id < 0 || s.aim_bone_id >= 19) s.aim_bone_id = 10;
+    if (s.aim_bone_id < 0 || s.aim_bone_id >= 19) s.aim_bone_id = 11;
     return true;
 }
 

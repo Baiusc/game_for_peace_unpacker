@@ -18,6 +18,8 @@ struct Config {
     int fire_key = kXButton1;
     float align_tolerance_px = 4.0f;
     int jitter_px = 2;
+    float smooth_factor = 0.35f;
+    int max_step_px = 96;
 };
 
 class Sender {
@@ -53,6 +55,7 @@ private:
     Config cfg_{};
     Sender* sender_ = nullptr;
     bool was_fire_down_ = false;
+    bool fire_pending_ = false;
     ScreenPoint crosshair_{};
 };
 

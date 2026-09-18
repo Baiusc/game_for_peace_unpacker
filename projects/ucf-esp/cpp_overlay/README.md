@@ -99,3 +99,5 @@ LeftHand, RightHand`。缺失骨骼使用 `valid=false`；ESP 子菜单中的“
   并加了 `itemconfigure` 缓存。它仍是 Windows 上的可行方案。
 - C++ 版把绘制从软件（Tk canvas）换成 GPU（D3D11 + ImGui），并补齐菜单 / 配置 /
   共享内存链路，适合进一步做功能完整性。两者共用同一份数据契约。
+
+`PlayerState.visible` 是上游 Unity 主线程 Linecast 的结果，不由 C++ 投影推断；旧帧或未知值按可见处理，避免缺失字段误判为遮挡。

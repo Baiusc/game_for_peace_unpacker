@@ -44,6 +44,7 @@ static float dot(const Vec3& a, const Vec3& b) {
 }
 
 bool is_target_visible(const PlayerState& player) {
+    if (!player.visible) return false;
     const bool finite = std::isfinite(player.pos[0]) &&
                         std::isfinite(player.pos[1]) &&
                         std::isfinite(player.pos[2]);

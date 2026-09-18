@@ -602,3 +602,9 @@ ucf_overlay_win32.exe
 只用于进程选择诊断，正常路线 B 不需要单独运行；遇到同名进程或缺少
 `GameAssembly.dll` 时再用 `--list`/`--probe` 排查。共享内存桥不新增契约字段，
 宿主退出时关闭映射句柄；没有写端时 C++ 仍回退到合成数据源。
+
+### 2026-09-18：遮挡可见性
+
+真实帧的 `visible` 由 Unity 主线程 `Physics.Linecast` 产生。若日志出现
+`Physics.Linecast 不可用`，共享内存写端会把未知状态按 `true` 传递；这表示当前版本没有遮挡证据，
+不是确认可见。
