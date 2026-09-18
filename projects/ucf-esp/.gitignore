@@ -3,3 +3,15 @@
 /build-debug/
 /build-baseline/
 /config.toml
+
+
+sdk/
+SDK/
+
+CMakeFiles/
+# 二进制修改/校验临时产物
+ORIGINAL_FILE
+MODIFIED_FILE
+DIFF_FILE
+ROLLBACK_TEST_COPY
+VERIFICATION.txt

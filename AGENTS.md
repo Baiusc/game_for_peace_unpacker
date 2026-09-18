@@ -11,7 +11,7 @@
   用于练习 IL2CPP 逆向、内存读取、投影计算、叠加层绘制。
 - 仅用于**自己拥有源码的单机游戏**；不联机、不涉及其他玩家、不盈利、不买卖、不分发。
 - **禁止**针对任何在线多人游戏（CS2 / Valorant / DeltaForce / 等）做内存读写、注入、Hook、
-  Aimbot / ESP；**禁止**对第三方进程做任何操作。
+  Aimbot / ESP；
 - `projects/ucf-esp` 下所有工具都是给「自己的游戏」用的**调试可视化**，不是绕过他人保护。
 - 涉及反作弊（游戏内置 Anti-Cheat Toolkit）：开发期用**关闭反作弊**的构建调试；
   `--level 0` 就闪退即可确认是注入被检测，**不要去对抗**。
@@ -59,8 +59,7 @@ cpp_overlay (ucf_overlay_win32.exe) 读共享内存 ─► 投影+可视化 ─�
   产物 `ucf_overlay_win32.exe` 作为 artifact 上传，直接拷到 Win11 虚拟机运行，无需装 VS / SDK / VC++ 运行库。
   ⚠️ workflow 只对 `projects/ucf-esp/cpp_overlay/**` 的改动触发，改其它目录不会重编 exe。
 - **推送方式（与用户约定）**：push 走 **SSH key**（remote `github` = `git@github.com:Baiusc/game_for_peace_unpacker.git`）。
-  **不**把 PAT 嵌进 remote URL、**不**写进 `.git/config`。失败构建日志由**用户手动贴回**
-  （无 PAT 自动化读日志）。
+
 - Agent 改动代码后的闭环：`edit → commit → git push (SSH)` → 轮询 `actions/runs?head_sha=<sha>` 等构建；
   `success` 告知用户去下 exe 测；`failure` 请用户贴红色日志，据 `error Cxxxx` 自修。
 
