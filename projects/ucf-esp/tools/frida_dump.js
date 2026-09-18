@@ -175,7 +175,25 @@ Il2Cpp.perform(() => {
 
   const Camera = camImage.class("UnityEngine.Camera");
   const Screen = camImage.class("UnityEngine.Screen");
-  const Physics = camImage.class("UnityEngine.Physics");
+  // UnityEngine.Physics 在多数 Unity 版本里位于 UnityEngine.PhysicsModule 程序集，
+  // 而非 UnityEngine.CoreModule。直接 camImage.class("UnityEngine.Physics") 会抛
+  // "couldn't find class" 异常，进而中断整个 Il2Cpp.perform 回调 —— startFrameLoop
+  // 永不执行，帧从不发送，C++ 收不到帧退回 synth 自演（就是“真实帧变转圈数据”的真凶）。
+  // 改为多程序集容错查找：找不到就降级（遮挡检测关闭、visible 回退 true），绝不中断初始化。
+  const findPhysicsClass = () => {
+    const names = ["UnityEngine.PhysicsModule", "UnityEngine.CoreModule", "UnityEngine"];
+    for (const nm of names) {
+      try {
+        const cls = Il2Cpp.domain.assembly(nm).image.class("UnityEngine.Physics");
+        if (cls) return cls;
+      } catch (e) { /* 试下一个程序集 */ }
+    }
+    return null;
+  };
+  const Physics = findPhysicsClass();
+  if (!Physics) console.log("[!] UnityEngine.Physics 未找到：遮挡检测关闭（visible 回退 true）");
+  else console.log("[*] 遮挡检测 Physics 类已定位（" +
+                   (Physics.image ? Physics.image.name : "assembly") + "）");
   const GameManager = asmImage.class("GameManager");
   discover(Camera, "Camera");
   discover(GameManager, "GameManager");
@@ -293,9 +311,9 @@ Il2Cpp.perform(() => {
       const end = callMethod(targetTransform, "get_position", 0);
       const hit = Memory.alloc(0x30);
       const hitAny = callStatic(Physics, "Linecast", 5,
-                                visibilityOrigin, end, hit, -5, 0);
+                                visibilityOrigin, end, hit, -1, 0);
       if (!hitAny) return true;
-      const hitDistance = hit.add(0x1c).readFloat();
+      const hitDistance = hit.add(0x18).readFloat();
       const sx = visibilityOrigin.field("x").value;
       const sy = visibilityOrigin.field("y").value;
       const sz = visibilityOrigin.field("z").value;

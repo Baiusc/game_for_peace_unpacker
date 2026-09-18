@@ -1309,12 +1309,12 @@ ${this.#state.buffer.join("\n")}
         Interceptor.attach(method.virtualAddress, {
           onEnter() {
             if (this.threadId == threadId) {
-              state.buffer.push(`\x1B[2m0x${paddedVirtualAddress}\x1B[0m ${`│ `.repeat(state.depth++)}┌─\x1B[35m${method.class.type.name}::\x1B[1m${method.name}\x1B[0m\x1B[0m`);
+              state.buffer.push(`\x1B[2m0x${paddedVirtualAddress}\x1B[0m ${`\u2502 `.repeat(state.depth++)}\u250C\u2500\x1B[35m${method.class.type.name}::\x1B[1m${method.name}\x1B[0m\x1B[0m`);
             }
           },
           onLeave() {
             if (this.threadId == threadId) {
-              state.buffer.push(`\x1B[2m0x${paddedVirtualAddress}\x1B[0m ${`│ `.repeat(--state.depth)}└─\x1B[33m${method.class.type.name}::\x1B[1m${method.name}\x1B[0m\x1B[0m`);
+              state.buffer.push(`\x1B[2m0x${paddedVirtualAddress}\x1B[0m ${`\u2502 `.repeat(--state.depth)}\u2514\u2500\x1B[33m${method.class.type.name}::\x1B[1m${method.name}\x1B[0m\x1B[0m`);
               state.flush();
             }
           }
@@ -1327,11 +1327,11 @@ ${this.#state.buffer.join("\n")}
           if (this.threadId == threadId) {
             const thisParameter = method.isStatic ? void 0 : new Il2Cpp3.Parameter("this", -1, method.class.type);
             const parameters2 = thisParameter ? [thisParameter].concat(method.parameters) : method.parameters;
-            state.buffer.push(`\x1B[2m0x${paddedVirtualAddress}\x1B[0m ${`│ `.repeat(state.depth++)}┌─\x1B[35m${method.class.type.name}::\x1B[1m${method.name}\x1B[0m\x1B[0m(${parameters2.map((e) => `\x1B[32m${e.name}\x1B[0m = \x1B[31m${Il2Cpp3.fromFridaValue(args[e.position + parameterStartIndex], e.type)}\x1B[0m`).join(", ")})`);
+            state.buffer.push(`\x1B[2m0x${paddedVirtualAddress}\x1B[0m ${`\u2502 `.repeat(state.depth++)}\u250C\u2500\x1B[35m${method.class.type.name}::\x1B[1m${method.name}\x1B[0m\x1B[0m(${parameters2.map((e) => `\x1B[32m${e.name}\x1B[0m = \x1B[31m${Il2Cpp3.fromFridaValue(args[e.position + parameterStartIndex], e.type)}\x1B[0m`).join(", ")})`);
           }
           const returnValue = method.nativeFunction(...args);
           if (this.threadId == threadId) {
-            state.buffer.push(`\x1B[2m0x${paddedVirtualAddress}\x1B[0m ${`│ `.repeat(--state.depth)}└─\x1B[33m${method.class.type.name}::\x1B[1m${method.name}\x1B[0m\x1B[0m${returnValue == void 0 ? "" : ` = \x1B[36m${Il2Cpp3.fromFridaValue(returnValue, method.returnType)}`}\x1B[0m`);
+            state.buffer.push(`\x1B[2m0x${paddedVirtualAddress}\x1B[0m ${`\u2502 `.repeat(--state.depth)}\u2514\u2500\x1B[33m${method.class.type.name}::\x1B[1m${method.name}\x1B[0m\x1B[0m${returnValue == void 0 ? "" : ` = \x1B[36m${Il2Cpp3.fromFridaValue(returnValue, method.returnType)}`}\x1B[0m`);
             state.flush();
           }
           return returnValue;
@@ -3498,11 +3498,11 @@ ${this.isEnum ? `enum` : this.isStruct ? `struct` : this.isInterface ? `interfac
   var MAT_BYTES = MAT_FLOATS * 4;
   var VEC3_BYTES = 3 * 4;
   var LEVEL_DESC = {
-    0: "不初始化 IL2CPP，只打心跳（测：frida 注入本身是否被检测）",
-    1: "初始化 IL2CPP + 查类，不 invoke 任何方法（测：bridge 初始化）",
-    2: "只读相机矩阵 *_Injected（测：矩阵调用）",
-    3: "+ GameManager / 玩家坐标队伍，不读血量（测：实体遍历）",
-    4: "全量：含 ObscuredInt 血量裸读（默认）"
+    0: "\u4E0D\u521D\u59CB\u5316 IL2CPP\uFF0C\u53EA\u6253\u5FC3\u8DF3\uFF08\u6D4B\uFF1Afrida \u6CE8\u5165\u672C\u8EAB\u662F\u5426\u88AB\u68C0\u6D4B\uFF09",
+    1: "\u521D\u59CB\u5316 IL2CPP + \u67E5\u7C7B\uFF0C\u4E0D invoke \u4EFB\u4F55\u65B9\u6CD5\uFF08\u6D4B\uFF1Abridge \u521D\u59CB\u5316\uFF09",
+    2: "\u53EA\u8BFB\u76F8\u673A\u77E9\u9635 *_Injected\uFF08\u6D4B\uFF1A\u77E9\u9635\u8C03\u7528\uFF09",
+    3: "+ GameManager / \u73A9\u5BB6\u5750\u6807\u961F\u4F0D\uFF0C\u4E0D\u8BFB\u8840\u91CF\uFF08\u6D4B\uFF1A\u5B9E\u4F53\u904D\u5386\uFF09",
+    4: "\u5168\u91CF\uFF1A\u542B ObscuredInt \u8840\u91CF\u88F8\u8BFB\uFF08\u9ED8\u8BA4\uFF09"
   };
   function discover(klass, label) {
     if (!DISCOVER) return;
@@ -3516,7 +3516,7 @@ ${this.isEnum ? `enum` : this.isStruct ? `struct` : this.isInterface ? `interfac
     let alive = 0;
     setInterval(() => {
       alive++;
-      console.log(`[*] level0 心跳 ${alive}：agent 存活，未调用任何 IL2CPP API`);
+      console.log(`[*] level0 \u5FC3\u8DF3 ${alive}\uFF1Aagent \u5B58\u6D3B\uFF0C\u672A\u8C03\u7528\u4EFB\u4F55 IL2CPP API`);
     }, 2e3);
   } else {
     Il2Cpp.perform(() => {
@@ -3525,7 +3525,20 @@ ${this.isEnum ? `enum` : this.isStruct ? `struct` : this.isInterface ? `interfac
       const camImage = Il2Cpp.domain.assembly(UASM).image;
       const Camera = camImage.class("UnityEngine.Camera");
       const Screen = camImage.class("UnityEngine.Screen");
-      const Physics = camImage.class("UnityEngine.Physics");
+      const findPhysicsClass = () => {
+        const names = ["UnityEngine.PhysicsModule", "UnityEngine.CoreModule", "UnityEngine"];
+        for (const nm of names) {
+          try {
+            const cls = Il2Cpp.domain.assembly(nm).image.class("UnityEngine.Physics");
+            if (cls) return cls;
+          } catch (e) {
+          }
+        }
+        return null;
+      };
+      const Physics = findPhysicsClass();
+      if (!Physics) console.log("[!] UnityEngine.Physics \u672A\u627E\u5230\uFF1A\u906E\u6321\u68C0\u6D4B\u5173\u95ED\uFF08visible \u56DE\u9000 true\uFF09");
+      else console.log("[*] \u906E\u6321\u68C0\u6D4B Physics \u7C7B\u5DF2\u5B9A\u4F4D\uFF08" + (Physics.image ? Physics.image.name : "assembly") + "\uFF09");
       const GameManager = asmImage.class("GameManager");
       discover(Camera, "Camera");
       discover(GameManager, "GameManager");
@@ -3542,7 +3555,7 @@ ${this.isEnum ? `enum` : this.isStruct ? `struct` : this.isInterface ? `interfac
         let m = obj.tryMethod(name, argc);
         if (!m) {
           const klass = findDeclaringClass(obj, name, argc);
-          if (!klass) throw new Error(`找不到实例方法 ${name}/${argc}（含继承链）`);
+          if (!klass) throw new Error(`\u627E\u4E0D\u5230\u5B9E\u4F8B\u65B9\u6CD5 ${name}/${argc}\uFF08\u542B\u7EE7\u627F\u94FE\uFF09`);
           m = klass.method(name, argc).bind(obj);
         }
         return m.invoke(...args);
@@ -3554,16 +3567,16 @@ ${this.isEnum ? `enum` : this.isStruct ? `struct` : this.isInterface ? `interfac
         if (!MAIN_THREAD) return fn();
         try {
           const t = Il2Cpp.mainThread;
-          if (!t || typeof t.schedule !== "function") throw new Error("mainThread.schedule 不可用");
+          if (!t || typeof t.schedule !== "function") throw new Error("mainThread.schedule \u4E0D\u53EF\u7528");
           if (MT.ok !== true) {
             MT.ok = true;
-            console.log("[*] 取帧调度：Unity 主线程");
+            console.log("[*] \u53D6\u5E27\u8C03\u5EA6\uFF1AUnity \u4E3B\u7EBF\u7A0B");
           }
           return t.schedule(fn);
         } catch (e) {
           if (MT.ok !== false) {
             MT.ok = false;
-            console.log("[!] 主线程调度不可用，回退到 frida 线程:", describeErr(e));
+            console.log("[!] \u4E3B\u7EBF\u7A0B\u8C03\u5EA6\u4E0D\u53EF\u7528\uFF0C\u56DE\u9000\u5230 frida \u7EBF\u7A0B:", describeErr(e));
           }
           return fn();
         }
@@ -3596,6 +3609,12 @@ ${this.isEnum ? `enum` : this.isStruct ? `struct` : this.isInterface ? `interfac
           for (let r = 0; r < 4; r++) a.push(vt.field("m" + r + c).value);
         return a;
       };
+      let matMode = null;
+      const pickMatrixMode = (cam) => {
+        const ok = !!cam.tryMethod("get_worldToCameraMatrix_Injected", 1) && !!cam.tryMethod("get_projectionMatrix_Injected", 1);
+        matMode = ok ? "injected" : "getter";
+        console.log(`[*] \u77E9\u9635\u8BFB\u53D6\u6A21\u5F0F: ${matMode}` + (ok ? "\uFF08out \u6307\u9488\uFF0C32 \u4F4D\u4E0B\u6700\u7A33\uFF09" : "\uFF08\u56DE\u9000\uFF1A\u6309\u503C\u8FD4\u56DE\u7684\u516C\u5F00 getter\uFF09"));
+      };
       let visibilityOrigin = null;
       let visibilityWarned = false;
       const readVisibilityOf = (targetTransform) => {
@@ -3603,30 +3622,33 @@ ${this.isEnum ? `enum` : this.isStruct ? `struct` : this.isInterface ? `interfac
         try {
           const end = callMethod(targetTransform, "get_position", 0);
           const hit = Memory.alloc(48);
-          const hitAny = callStatic(Physics, "Linecast", 5, visibilityOrigin, end, hit, -5, 0);
+          const hitAny = callStatic(
+            Physics,
+            "Linecast",
+            5,
+            visibilityOrigin,
+            end,
+            hit,
+            -1,
+            0
+          );
           if (!hitAny) return true;
-          const hitDistance = hit.add(28).readFloat();
+          const hitDistance = hit.add(24).readFloat();
           const sx = visibilityOrigin.field("x").value;
           const sy = visibilityOrigin.field("y").value;
           const sz = visibilityOrigin.field("z").value;
           const ex = end.field("x").value;
           const ey = end.field("y").value;
           const ez = end.field("z").value;
-          const total = Math.sqrt((ex-sx)*(ex-sx) + (ey-sy)*(ey-sy) + (ez-sz)*(ez-sz));
+          const total = Math.sqrt((ex - sx) * (ex - sx) + (ey - sy) * (ey - sy) + (ez - sz) * (ez - sz));
           return !(Number.isFinite(hitDistance) && hitDistance < total - 0.75);
         } catch (e) {
           if (!visibilityWarned) {
             visibilityWarned = true;
-            console.log("[!] Physics.Linecast 不可用，visible 回退为 true:", e.message || e);
+            console.log("[!] Physics.Linecast \u4E0D\u53EF\u7528\uFF0Cvisible \u56DE\u9000\u4E3A true:", e.message || e);
           }
           return null;
         }
-      };
-      let matMode = null;
-      const pickMatrixMode = (cam) => {
-        const ok = !!cam.tryMethod("get_worldToCameraMatrix_Injected", 1) && !!cam.tryMethod("get_projectionMatrix_Injected", 1);
-        matMode = ok ? "injected" : "getter";
-        console.log(`[*] 矩阵读取模式: ${matMode}` + (ok ? "（out 指针，32 位下最稳）" : "（回退：按值返回的公开 getter）"));
       };
       const grabMatrices = () => {
         const cam = callStatic(Camera, "get_main", 0);
@@ -3634,7 +3656,9 @@ ${this.isEnum ? `enum` : this.isStruct ? `struct` : this.isInterface ? `interfac
         try {
           const ct = callMethod(cam, "get_transform", 0);
           visibilityOrigin = callMethod(ct, "get_position", 0);
-        } catch (e) { visibilityOrigin = null; }
+        } catch (e) {
+          visibilityOrigin = null;
+        }
         if (matMode === null) pickMatrixMode(cam);
         if (matMode === "injected") {
           callMethod(cam, "get_worldToCameraMatrix_Injected", 1, w2cBuf);
@@ -3647,21 +3671,21 @@ ${this.isEnum ? `enum` : this.isStruct ? `struct` : this.isInterface ? `interfac
         };
       };
       const logMatrix = (name, a) => {
-        let s = `${name} (列主序 m[col*4+row]):
+        let s = `${name} (\u5217\u4E3B\u5E8F m[col*4+row]):
 `;
         for (let c = 0; c < 4; c++)
           s += "  col" + c + ": " + [0, 1, 2, 3].map((r) => a[c * 4 + r].toFixed(4).padStart(9)).join(" ") + "\n";
         console.log(s);
       };
       try {
-        console.log("[*] 找到 Singleton.get_instance:", !!GameManager.method("get_instance", 0));
+        console.log("[*] \u627E\u5230 Singleton.get_instance:", !!GameManager.method("get_instance", 0));
       } catch (e) {
-        console.log("[!] 找不到 get_instance:", e.message);
+        console.log("[!] \u627E\u4E0D\u5230 get_instance:", e.message);
       }
       try {
-        console.log("[*] 找到静态字段 myPlayer:", !!GameManager.field("myPlayer"));
+        console.log("[*] \u627E\u5230\u9759\u6001\u5B57\u6BB5 myPlayer:", !!GameManager.field("myPlayer"));
       } catch (e) {
-        console.log("[!] 找不到 myPlayer:", e.message);
+        console.log("[!] \u627E\u4E0D\u5230 myPlayer:", e.message);
       }
       let gmFromHeap = null;
       let gmHeapTs = 0;
@@ -3788,7 +3812,7 @@ ${this.isEnum ? `enum` : this.isStruct ? `struct` : this.isInterface ? `interfac
         } catch (e) {
           if (!boneWarned) {
             boneWarned = true;
-            console.log("[!] 真实骨骼读取失败，将尝试 characterContainer.Find:", e.message || e);
+            console.log("[!] \u771F\u5B9E\u9AA8\u9ABC\u8BFB\u53D6\u5931\u8D25\uFF0C\u5C06\u5C1D\u8BD5 characterContainer.Find:", e.message || e);
           }
         }
         return bones;
@@ -3806,7 +3830,7 @@ ${this.isEnum ? `enum` : this.isStruct ? `struct` : this.isInterface ? `interfac
           const decrypted = hidden ^ key | 0;
           if (hpChecked < 2) {
             hpChecked++;
-            console.log(`[*] ObscuredInt 自检 ${fieldName}: hidden=0x${(hidden >>> 0).toString(16)} key=0x${(key >>> 0).toString(16)} -> ${decrypted}` + (fakeActive ? `（fakeValue=${fake} ${fake === decrypted ? "✓一致" : "✗不一致！"}）` : "（fakeValue 未启用）"));
+            console.log(`[*] ObscuredInt \u81EA\u68C0 ${fieldName}: hidden=0x${(hidden >>> 0).toString(16)} key=0x${(key >>> 0).toString(16)} -> ${decrypted}` + (fakeActive ? `\uFF08fakeValue=${fake} ${fake === decrypted ? "\u2713\u4E00\u81F4" : "\u2717\u4E0D\u4E00\u81F4\uFF01"}\uFF09` : "\uFF08fakeValue \u672A\u542F\u7528\uFF09"));
           }
           if (decrypted < 0 || decrypted > 1e5) return null;
           return decrypted;
@@ -3871,7 +3895,7 @@ ${this.isEnum ? `enum` : this.isStruct ? `struct` : this.isInterface ? `interfac
         let hb = 0;
         setInterval(() => {
           hb++;
-          console.log(`[*] level1 心跳 ${hb}：IL2CPP 已初始化，未调用任何实例方法`);
+          console.log(`[*] level1 \u5FC3\u8DF3 ${hb}\uFF1AIL2CPP \u5DF2\u521D\u59CB\u5316\uFF0C\u672A\u8C03\u7528\u4EFB\u4F55\u5B9E\u4F8B\u65B9\u6CD5`);
         }, 2e3);
         return;
       }
@@ -3909,14 +3933,14 @@ ${this.isEnum ? `enum` : this.isStruct ? `struct` : this.isInterface ? `interfac
         } catch (e) {
           if (now - lastErr > WARN_MS) {
             lastErr = now;
-            console.log("[!] 读矩阵失败:", e.message || e);
+            console.log("[!] \u8BFB\u77E9\u9635\u5931\u8D25:", e.message || e);
           }
           sendStatus("matrix-error");
           return;
         }
         if (!M) {
           if (now - lastWarn > WARN_MS) {
-            console.log("[!] 等待主相机 Camera.main ...");
+            console.log("[!] \u7B49\u5F85\u4E3B\u76F8\u673A Camera.main ...");
             lastWarn = now;
           }
           sendStatus("no-camera");
@@ -3941,14 +3965,14 @@ ${this.isEnum ? `enum` : this.isStruct ? `struct` : this.isInterface ? `interfac
             console.log("[frame/level2]", JSON.stringify({ w2c: M.w2c, proj: M.proj }));
           } else if (now - lastReport > REPORT_MS) {
             lastReport = now;
-            console.log(`[*] level2 已发送 ${sent} 帧（只读矩阵）`);
+            console.log(`[*] level2 \u5DF2\u53D1\u9001 ${sent} \u5E27\uFF08\u53EA\u8BFB\u77E9\u9635\uFF09`);
           }
           return;
         }
         const gm = getGameManager();
         if (!gm) {
           if (now - lastWarn > WARN_MS) {
-            console.log(everHadGm ? "[*] 不在对局中（GameManager 实例已销毁，进对局后自动恢复）..." : "[*] 等待 GameManager 实例（尚未创建，进对局后再按 INS 注入更省事）...");
+            console.log(everHadGm ? "[*] \u4E0D\u5728\u5BF9\u5C40\u4E2D\uFF08GameManager \u5B9E\u4F8B\u5DF2\u9500\u6BC1\uFF0C\u8FDB\u5BF9\u5C40\u540E\u81EA\u52A8\u6062\u590D\uFF09..." : "[*] \u7B49\u5F85 GameManager \u5B9E\u4F8B\uFF08\u5C1A\u672A\u521B\u5EFA\uFF0C\u8FDB\u5BF9\u5C40\u540E\u518D\u6309 INS \u6CE8\u5165\u66F4\u7701\u4E8B\uFF09...");
             lastWarn = now;
           }
           sendStatus(everHadGm ? "left-match" : "no-game-manager");
@@ -3979,7 +4003,7 @@ ${this.isEnum ? `enum` : this.isStruct ? `struct` : this.isInterface ? `interfac
           if (n > MAX_PLAYERS) {
             if (now - lastWarn > WARN_MS) {
               lastWarn = now;
-              console.log(`[!] allPlayers.length=${n} 异常，截断为 ${MAX_PLAYERS}`);
+              console.log(`[!] allPlayers.length=${n} \u5F02\u5E38\uFF0C\u622A\u65AD\u4E3A ${MAX_PLAYERS}`);
             }
             n = MAX_PLAYERS;
           }
@@ -3993,7 +4017,7 @@ ${this.isEnum ? `enum` : this.isStruct ? `struct` : this.isInterface ? `interfac
             if (alive(p)) frame.players.push(readPlayer(p, LEVEL >= 4));
           }
           if (tick <= 3) {
-            console.log(`[*] allPlayers length=${n} 有效=${frame.players.length}（null 槽位 ${n - frame.players.length}）取元素=${useGet ? ".get(i)" : "下标"}`);
+            console.log(`[*] allPlayers length=${n} \u6709\u6548=${frame.players.length}\uFF08null \u69FD\u4F4D ${n - frame.players.length}\uFF09\u53D6\u5143\u7D20=${useGet ? ".get(i)" : "\u4E0B\u6807"}`);
           }
         }
         send(frame);
@@ -4004,7 +4028,7 @@ ${this.isEnum ? `enum` : this.isStruct ? `struct` : this.isInterface ? `interfac
           console.log("[frame]", JSON.stringify(frame));
         } else if (now - lastReport > REPORT_MS) {
           lastReport = now;
-          console.log(`[*] 已发送 ${sent} 帧 (level=${LEVEL}, players=${frame.players.length}, screen=${scr.width}x${scr.height})`);
+          console.log(`[*] \u5DF2\u53D1\u9001 ${sent} \u5E27 (level=${LEVEL}, players=${frame.players.length}, screen=${scr.width}x${scr.height})`);
         }
       };
       const startFrameLoop = () => setInterval(() => {
@@ -4017,12 +4041,12 @@ ${this.isEnum ? `enum` : this.isStruct ? `struct` : this.isInterface ? `interfac
           const r = callOnMainThread(frameTick);
           if (r && typeof r.then === "function") r.then(release, (e) => {
             release();
-            console.log("[!] 主线程取帧失败:", describeErr(e));
+            console.log("[!] \u4E3B\u7EBF\u7A0B\u53D6\u5E27\u5931\u8D25:", describeErr(e));
           });
           else release();
         } catch (e) {
           release();
-          console.log("[!] 取帧异常:", describeErr(e));
+          console.log("[!] \u53D6\u5E27\u5F02\u5E38:", describeErr(e));
         }
       }, INTERVAL_MS);
       const buildProbeSteps = () => {
@@ -4033,8 +4057,8 @@ ${this.isEnum ? `enum` : this.isStruct ? `struct` : this.isInterface ? `interfac
             P.cam = callStatic(Camera, "get_main", 0);
             return hp(P.cam);
           }],
-          ["矩阵 *_Injected(out)", () => {
-            if (!alive(P.cam)) return "跳过（无相机）";
+          ["\u77E9\u9635 *_Injected(out)", () => {
+            if (!alive(P.cam)) return "\u8DF3\u8FC7\uFF08\u65E0\u76F8\u673A\uFF09";
             callMethod(P.cam, "get_worldToCameraMatrix_Injected", 1, w2cBuf);
             callMethod(P.cam, "get_projectionMatrix_Injected", 1, projBuf);
             return "w2c[0..3]=" + readFloats(w2cBuf, 16).slice(0, 4).map((v) => v.toFixed(2)).join(",");
@@ -4043,71 +4067,71 @@ ${this.isEnum ? `enum` : this.isStruct ? `struct` : this.isInterface ? `interfac
             const s = screenSize();
             return `${s.width}x${s.height}`;
           }],
-          ["静态字段 GameManager.myPlayer", () => {
+          ["\u9759\u6001\u5B57\u6BB5 GameManager.myPlayer", () => {
             P.my = getMyPlayer();
             return hp(P.my);
           }],
-          [`静态字段 Singleton<T>.${GM_INSTANCE_FIELD}`, () => {
+          [`\u9759\u6001\u5B57\u6BB5 Singleton<T>.${GM_INSTANCE_FIELD}`, () => {
             P.f1 = gmFromStaticField();
             return hp(P.f1);
           }],
-          ["堆扫描 Il2Cpp.gc.choose(GameManager)", () => {
+          ["\u5806\u626B\u63CF Il2Cpp.gc.choose(GameManager)", () => {
             const a = Il2Cpp.gc.choose(GameManager);
             P.f2 = gmFromHeapScan();
-            return `找到 ${a ? a.length : 0} 个 → ${hp(P.f2)}`;
+            return `\u627E\u5230 ${a ? a.length : 0} \u4E2A \u2192 ${hp(P.f2)}`;
           }],
-          ["实例字段 gm.allPlayers", () => {
+          ["\u5B9E\u4F8B\u5B57\u6BB5 gm.allPlayers", () => {
             P.gm = P.f1 || P.f2;
-            if (!alive(P.gm)) return "跳过（没有 GameManager 实例）";
+            if (!alive(P.gm)) return "\u8DF3\u8FC7\uFF08\u6CA1\u6709 GameManager \u5B9E\u4F8B\uFF09";
             P.arr = getAllPlayers(P.gm);
             return alive(P.arr) ? `${P.arr.class ? P.arr.class.name : "?"} @${hp(P.arr)}` : "null";
           }],
-          ["allPlayers.length", () => alive(P.arr) ? String(P.arr.length || 0) : "跳过"],
+          ["allPlayers.length", () => alive(P.arr) ? String(P.arr.length || 0) : "\u8DF3\u8FC7"],
           ["allPlayers.get(0)", () => {
-            if (!alive(P.arr) || !(P.arr.length > 0)) return "跳过（空数组）";
+            if (!alive(P.arr) || !(P.arr.length > 0)) return "\u8DF3\u8FC7\uFF08\u7A7A\u6570\u7EC4\uFF09";
             P.p0 = P.arr.get(0);
             return hp(P.p0);
           }],
           ["player.get_transform()", () => {
-            if (!alive(P.p0)) return "跳过";
+            if (!alive(P.p0)) return "\u8DF3\u8FC7";
             P.t0 = callMethod(P.p0, "get_transform", 0);
             return hp(P.t0);
           }],
           ["transform.get_position_Injected(out)", () => {
-            if (!alive(P.t0)) return "跳过";
+            if (!alive(P.t0)) return "\u8DF3\u8FC7";
             const v = readPosOf(P.t0);
             return `(${v.x.toFixed(2)}, ${v.y.toFixed(2)}, ${v.z.toFixed(2)})`;
           }],
-          ["player 队伍：裸读 int vs get_team()", () => {
-            if (!alive(P.p0)) return "跳过（无玩家对象）";
+          ["player \u961F\u4F0D\uFF1A\u88F8\u8BFB int vs get_team()", () => {
+            if (!alive(P.p0)) return "\u8DF3\u8FC7\uFF08\u65E0\u73A9\u5BB6\u5BF9\u8C61\uFF09";
             const raw = readTeamOf(P.p0);
             let obj = null;
             try {
               obj = callMethod(P.p0, "get_team", 0);
             } catch (e) {
-              obj = `抛异常: ${e && e.message || e}`;
+              obj = `\u629B\u5F02\u5E38: ${e && e.message || e}`;
             }
-            const shown = obj && typeof obj === "object" ? `对象(handle=${obj.handle}) ← bridge 不解包 enum，宿主无法比较` : String(obj);
-            return `裸读=${raw} [0=BlackList 1=GlobalRisk 2=Neutral] / get_team()=${shown}`;
+            const shown = obj && typeof obj === "object" ? `\u5BF9\u8C61(handle=${obj.handle}) \u2190 bridge \u4E0D\u89E3\u5305 enum\uFF0C\u5BBF\u4E3B\u65E0\u6CD5\u6BD4\u8F83` : String(obj);
+            return `\u88F8\u8BFB=${raw} [0=BlackList 1=GlobalRisk 2=Neutral] / get_team()=${shown}`;
           }],
-          ["player.get_isMyPlayer()", () => alive(P.p0) ? String(callMethod(P.p0, "get_isMyPlayer", 0)) : "跳过"],
-          ["get_healthData() + ObscuredInt 裸读", () => {
-            if (LEVEL < 4) return "跳过（level<4，本次不读血量）";
-            if (!alive(P.p0)) return "跳过（无玩家对象）";
+          ["player.get_isMyPlayer()", () => alive(P.p0) ? String(callMethod(P.p0, "get_isMyPlayer", 0)) : "\u8DF3\u8FC7"],
+          ["get_healthData() + ObscuredInt \u88F8\u8BFB", () => {
+            if (LEVEL < 4) return "\u8DF3\u8FC7\uFF08level<4\uFF0C\u672C\u6B21\u4E0D\u8BFB\u8840\u91CF\uFF09";
+            if (!alive(P.p0)) return "\u8DF3\u8FC7\uFF08\u65E0\u73A9\u5BB6\u5BF9\u8C61\uFF09";
             const hd = callMethod(P.p0, "get_healthData", 0);
             if (!alive(hd)) return "healthData=null";
             return `hp=${readObscuredInt(hd, "currentHealth")} / max=${readObscuredInt(hd, "maxHealth")}`;
           }],
           // get_isDead 是“有真实方法体”的非 trivial getter（约束 6），level3 就崩在它身上。
           // 默认跳过，--allow-is-dead 才真的调一次（此时已调度到主线程，理论上安全）。
-          ["【高危·默认跳过】player.get_isDead()", () => {
-            if (!ALLOW_IS_DEAD) return "跳过（--allow-is-dead 才测；默认改由 hp<=0 推导）";
-            if (!alive(P.p0)) return "跳过（无玩家对象）";
+          ["\u3010\u9AD8\u5371\xB7\u9ED8\u8BA4\u8DF3\u8FC7\u3011player.get_isDead()", () => {
+            if (!ALLOW_IS_DEAD) return "\u8DF3\u8FC7\uFF08--allow-is-dead \u624D\u6D4B\uFF1B\u9ED8\u8BA4\u6539\u7531 hp<=0 \u63A8\u5BFC\uFF09";
+            if (!alive(P.p0)) return "\u8DF3\u8FC7\uFF08\u65E0\u73A9\u5BB6\u5BF9\u8C61\uFF09";
             return String(callMethod(P.p0, "get_isDead", 0));
           }],
-          ["【最后·高危】GameManager.get_instance()", () => {
+          ["\u3010\u6700\u540E\xB7\u9AD8\u5371\u3011GameManager.get_instance()", () => {
             P.f3 = gmFromGetInstance();
-            return hp(P.f3) + (ALLOW_GET_INSTANCE ? "" : "（默认路径不会调它）");
+            return hp(P.f3) + (ALLOW_GET_INSTANCE ? "" : "\uFF08\u9ED8\u8BA4\u8DEF\u5F84\u4E0D\u4F1A\u8C03\u5B83\uFF09");
           }]
         ];
       };
@@ -4118,47 +4142,47 @@ ${this.isEnum ? `enum` : this.isStruct ? `struct` : this.isInterface ? `interfac
         let i = 0;
         let pending = false;
         let stepTs = 0;
-        console.log(`[*] 单步探测开始：共 ${total} 步，每步间隔 250ms（崩了看最后一行 ▶）`);
+        console.log(`[*] \u5355\u6B65\u63A2\u6D4B\u5F00\u59CB\uFF1A\u5171 ${total} \u6B65\uFF0C\u6BCF\u6B65\u95F4\u9694 250ms\uFF08\u5D29\u4E86\u770B\u6700\u540E\u4E00\u884C \u25B6\uFF09`);
         const t = setInterval(() => {
           if (pending) {
             if (Date.now() - stepTs > STEP_TIMEOUT_MS) {
-              console.log(`   ⚠ 上一步超过 ${STEP_TIMEOUT_MS}ms 未返回（主线程可能没在泵消息），继续`);
+              console.log(`   \u26A0 \u4E0A\u4E00\u6B65\u8D85\u8FC7 ${STEP_TIMEOUT_MS}ms \u672A\u8FD4\u56DE\uFF08\u4E3B\u7EBF\u7A0B\u53EF\u80FD\u6CA1\u5728\u6CF5\u6D88\u606F\uFF09\uFF0C\u7EE7\u7EED`);
               pending = false;
             }
             return;
           }
           if (i >= total) {
             clearInterval(t);
-            console.log("[*] 单步探测全部完成，开始正常取帧");
+            console.log("[*] \u5355\u6B65\u63A2\u6D4B\u5168\u90E8\u5B8C\u6210\uFF0C\u5F00\u59CB\u6B63\u5E38\u53D6\u5E27");
             done();
             return;
           }
           const name = steps[i][0];
           const fn = steps[i][1];
           i++;
-          console.log(`▶ [${i}/${total}] ${name} ...`);
+          console.log(`\u25B6 [${i}/${total}] ${name} ...`);
           stepTs = Date.now();
           let r;
           try {
             r = callOnMainThread(fn);
           } catch (e) {
-            console.log(`   ✗ ${name} 抛异常: ${describeErr(e)}`);
+            console.log(`   \u2717 ${name} \u629B\u5F02\u5E38: ${describeErr(e)}`);
             return;
           }
           if (r && typeof r.then === "function") {
             pending = true;
             r.then(
               (v) => {
-                console.log(`   ✓ ${name} → ${v}`);
+                console.log(`   \u2713 ${name} \u2192 ${v}`);
                 pending = false;
               },
               (e) => {
-                console.log(`   ✗ ${name} 失败: ${describeErr(e)}`);
+                console.log(`   \u2717 ${name} \u5931\u8D25: ${describeErr(e)}`);
                 pending = false;
               }
             );
           } else {
-            console.log(`   ✓ ${name} → ${r}`);
+            console.log(`   \u2713 ${name} \u2192 ${r}`);
           }
         }, 250);
       };

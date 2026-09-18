@@ -52,6 +52,7 @@ void project_frame(const Frame& f, ScreenMark* marks, int& n) {
         m.sx = sx; m.sy = sy;
         m.hp = p.hp; m.max_hp = p.maxHp;
         m.is_dead = p.isDead || p.hp <= 0;
+        m.visible = p.visible;
         m.on_screen = f.inGame && (!clipped && sx >= 0 && sx <= f.width && sy >= 0 && sy <= f.height);
         if (isLocal[i]) {
             m.kind = Kind::Local;
@@ -164,7 +165,15 @@ void render_draw_list(ImDrawList* dl, const DrawList& d) {
     for (int i = 0; i < d.boxCount; ++i) {
         const BoxPrim& b = d.boxes[i];
         const ImU32 color = rgb(b.r, b.g, b.b);
-        if (b.selected) {
+        if (b.blocked) {
+            // 被墙体遮挡：橙色虚线框，明确区别于“可见实线框”
+            const ImU32 c = IM_COL32(255, 217, 26, 255);
+            const float t = b.thickness;
+            add_dashed_line(dl, {b.x, b.y}, {b.x + b.w, b.y}, c, t);
+            add_dashed_line(dl, {b.x + b.w, b.y}, {b.x + b.w, b.y + b.h}, c, t);
+            add_dashed_line(dl, {b.x + b.w, b.y + b.h}, {b.x, b.y + b.h}, c, t);
+            add_dashed_line(dl, {b.x, b.y + b.h}, {b.x, b.y}, c, t);
+        } else if (b.selected) {
             dl->AddRectFilled(ImVec2(b.x, b.y), ImVec2(b.x + b.w, b.y + b.h), IM_COL32(0, 0, 0, 24));
             dl->AddRect(ImVec2(b.x, b.y), ImVec2(b.x + b.w, b.y + b.h), IM_COL32(0, 0, 0, 230), 0, 0, b.thickness + 2.0f);
             dl->AddRect(ImVec2(b.x, b.y), ImVec2(b.x + b.w, b.y + b.h), color, 0, 0, b.thickness);

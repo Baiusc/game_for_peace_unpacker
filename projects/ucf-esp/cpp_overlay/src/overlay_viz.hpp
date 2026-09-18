@@ -17,6 +17,7 @@ struct ScreenMark {
     float  dist = 0;         // 到相机距离（米）
     bool   on_screen = false;
     bool   is_dead = false;
+    bool   visible = true;   // 遮挡检测结果：false = 被墙体阻挡（frida Linecast 写入）
     struct BoneScreen {
         float sx = 0, sy = 0;
         bool valid = false;
@@ -36,7 +37,7 @@ enum class FitMode { Auto, Stretch, Letterbox };
 Viewport compute_viewport(float client_x, float client_y, float client_w, float client_h,
                           float frame_w, float frame_h, FitMode mode = FitMode::Auto);
 
-struct BoxPrim   { float x, y, w, h; float r, g, b; float thickness = 2.0f; bool selected = false; };
+struct BoxPrim   { float x, y, w, h; float r, g, b; float thickness = 2.0f; bool selected = false; bool blocked = false; };
 struct BarPrim   { float x, y, w, h; float ratio; float r, g, b; };
 struct LabelPrim { float x, y; float r, g, b; char text[64]; };
 struct BoneLinePrim {

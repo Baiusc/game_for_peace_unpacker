@@ -108,15 +108,19 @@ void LocalInputSim::on_hold_trace(const ScreenPoint& target_screen) {
     move_to(target_screen, crosshair_);
 }
 
-void LocalInputSim::on_tap_move_and_fire(const ScreenPoint& target_screen,
-                                         const ScreenPoint& crosshair) {
+void LocalInputSim::release_fire() {
+    if (firing_) { sender_->button_up(0); firing_ = false; }
+}
+
+void LocalInputSim::on_flick(const ScreenPoint& target_screen) {
     if (!cfg_.enabled) return;
-    if (aligned(target_screen, crosshair)) {
-        sender_->button_down(cfg_.fire_key);
-        sender_->button_up(cfg_.fire_key);
-        fire_pending_ = false;
-    } else {
-        move_to(target_screen, crosshair);
+    // 持续平滑（含 move_to 内的小幅随机扰动）移向目标，模拟人手非线性移动；
+    // 进入容差后保持按住左键 -> 自动开火（自动武器即持续射击），不再只点一下就停。
+    move_to(target_screen, crosshair_);
+    if (aligned(target_screen, crosshair_)) {
+        if (!firing_) { sender_->button_down(0); firing_ = true; }
+    } else if (firing_) {
+        sender_->button_up(0); firing_ = false;   // 没对准先松开，避免打偏时一直喷
     }
 }
 
@@ -128,22 +132,21 @@ void LocalInputSim::update(bool aim_key_down, bool fire_key_down,
         return;
     }
     if (state != TargetState::Normal) {
-        // 阻挡/死亡/无效目标不产生输入；同步边沿状态，避免目标恢复时误触发。
+        // 阻挡/死亡/无效目标：不产生输入，并松开可能按住的左键。
+        release_fire();
         was_fire_down_ = fire_key_down;
-        fire_pending_ = false;
         return;
     }
     crosshair_ = crosshair;
-    if (aim_key_down) on_hold_trace(target_screen);
-    if (fire_key_down && !was_fire_down_) fire_pending_ = true;
-    if (fire_key_down && fire_pending_) on_tap_move_and_fire(target_screen, crosshair);
-    if (!fire_key_down) fire_pending_ = false;
+    if (aim_key_down) on_hold_trace(target_screen);   // 侧键6：纯跟随
+    if (fire_key_down) on_flick(target_screen);        // 侧键5：甩枪 + 对齐自动开火
+    else release_fire();                                // 没按住侧键5：松开左键
     was_fire_down_ = fire_key_down;
 }
 
 void LocalInputSim::reset_lock() {
     was_fire_down_ = false;
-    fire_pending_ = false;
+    release_fire();
 }
 
 } // namespace ucf::input_sim

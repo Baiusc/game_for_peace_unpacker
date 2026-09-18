@@ -212,3 +212,11 @@
 - `PlayerState.visible` 由 Unity 主线程 `Physics.Linecast` 产生；C++ 投影不能从 NDC 推断墙体遮挡。
 - Linecast 命中距离接近目标端点时视为命中目标自身，不标记为墙；明显提前命中才标记 BLOCKED。
 - 若运行时打印 `Physics.Linecast 不可用`，未知状态按 `true` 兼容旧帧，不能把该日志解释为已完成遮挡检测。
+
+### 2026-09-19：frida `Physics` 初始化抛错会中断整条取帧链（真实帧变 synth 自演）
+
+- **现象**：某次提交后 C++ 叠加层整段 `src=synth`（`ucf_debug.log` 里 `frame=1280x720 players=13` 而非真实 `frame=800x600 players=10`），ESP 画的是绕相机转圈的虚拟玩家；宿主日志有 `couldn't find class UnityEngine.Physics in assembly UnityEngine.CoreModule.dll`。
+- **根因**：`frida_dump.js` 在 `Il2Cpp.perform` 回调内、`startFrameLoop()` 之前调用 `camImage.class("UnityEngine.Physics")`。`UnityEngine.Physics` 多数版本位于 `UnityEngine.PhysicsModule.dll` 而非 `UnityEngine.CoreModule.dll`，`Image.class` 抛 `Il2CppError` 中断整个 perform 回调 → `startFrameLoop()` 永不执行 → 帧从不 `send` → C++ 读到的 Frame `width==0` → 退回 `SyntheticSource` 自演。**这是“ESP 画转圈而不是真实帧”的真凶**。
+- **修法**：用 `findPhysicsClass()` 多程序集容错查找（`UnityEngine.PhysicsModule`→`UnityEngine.CoreModule`→`UnityEngine`），找不到只降级（`visible` 回退 true），**绝不中断初始化**；`readVisibilityOf` 开头加 `if (!Physics) return null;` 守卫；`Linecast` 的 layerMask 用 `-1`(Everything)，命中距离偏移用 `0x18`(RaycastHit.m_Distance)。改源码后**必须重打包 bundle**（`esbuild --bundle --format=iife --platform=neutral`），运行加载的是 bundle 不是源码。
+- **判读**：宿主日志 `[*] 遮挡检测 Physics 类已定位` = 遮挡链路通；`[!] UnityEngine.Physics 未找到` = 该游戏不含 Physics 模块，遮挡关闭（仍按可见处理，不崩溃）。
+- **验证**：bundle 重打包后 `node --check` 通过、旧抛错行消失、新查找存在；C++ 侧 `is_target_visible(player)` 早已正确读 `PlayerState.visible`，遮挡对自动瞄准（排除 BLOCKED）与橙色虚线框生效。

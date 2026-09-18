@@ -39,10 +39,9 @@ public:
 
     // 按住状态的后续帧：只移动，不执行开火。
     void on_hold_trace(const ScreenPoint& target_screen);
-    // 触发键点按边沿：先执行一次移动；原准星已在容差内才开火。
-    void on_tap_move_and_fire(const ScreenPoint& target_screen,
-                              const ScreenPoint& crosshair);
-    // 瞄准键按住只 trace；触发键上升沿执行一次 move+fire。
+    // 触发键（侧键5）按住：平滑移动；进入容差后保持按住左键自动开火。
+    void on_flick(const ScreenPoint& target_screen);
+    // 瞄准键按住只 trace；触发键按住做甩枪+自动开火。
     void update(bool aim_key_down, bool fire_key_down,
                 const ScreenPoint& target_screen,
                 const ScreenPoint& crosshair, TargetState state);
@@ -51,11 +50,12 @@ public:
 private:
     void move_to(const ScreenPoint& target, const ScreenPoint& crosshair);
     bool aligned(const ScreenPoint& target, const ScreenPoint& crosshair) const;
+    void release_fire();
 
     Config cfg_{};
     Sender* sender_ = nullptr;
     bool was_fire_down_ = false;
-    bool fire_pending_ = false;
+    bool firing_ = false;   // 左键是否正按住（自动开火期间保持）
     ScreenPoint crosshair_{};
 };
 

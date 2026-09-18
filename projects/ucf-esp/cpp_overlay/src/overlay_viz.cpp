@@ -99,6 +99,7 @@ void build_draw_list(const Viewport& vp, const ScreenMark* marks, int n,
             b.r = col[0]; b.g = col[1]; b.b = col[2];
             b.thickness = style.line_thickness;
             b.selected = selected;
+            b.blocked = !m.visible;   // 被墙体遮挡 -> 渲染层画橙色虚线框
         }
         if (style.show_health && out.barCount < 64) {
             BarPrim& bar = out.bars[out.barCount++];
