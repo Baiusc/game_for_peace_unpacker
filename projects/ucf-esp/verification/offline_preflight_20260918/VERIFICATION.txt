@@ -1,0 +1,39 @@
+Offline preflight verification
+==============================
+Changed branch/field: Frame raw dump (--dump-frame) and Python/C++ projection parity (test_projection_parity)
+Artifacts:
+- /media/baiusc/DATA1/Repositories/ReposMyself/my_hack/game_for_peace_unpacker/projects/ucf-esp/verification/offline_preflight_20260918/MODIFIED_FILE
+- /media/baiusc/DATA1/Repositories/ReposMyself/my_hack/game_for_peace_unpacker/projects/ucf-esp/verification/offline_preflight_20260918/DIFF_FILE
+- /media/baiusc/DATA1/Repositories/ReposMyself/my_hack/game_for_peace_unpacker/projects/ucf-esp/verification/offline_preflight_20260918/VERIFICATION.txt
+- /media/baiusc/DATA1/Repositories/ReposMyself/my_hack/game_for_peace_unpacker/projects/ucf-esp/verification/offline_preflight_20260918/ROLLBACK.sh
+
+BASELINE
+Command: git show HEAD:projects/ucf-esp/tools/frida_host.py > ORIGINAL_FILE; PYTHONDONTWRITEBYTECODE=1 python3 -m py_compile ORIGINAL_FILE
+Literal output: (empty)
+Result: baseline host syntax passed
+Exit status: 0
+
+MODIFIED
+Command: PYTHONDONTWRITEBYTECODE=1 python3 projects/ucf-esp/tests/test_frame_dump.py
+Literal output:
+frame dump: PASS
+files=2 fields=type,w2c,proj,local,players,playerCount
+Command: PYTHONDONTWRITEBYTECODE=1 python3 projects/ucf-esp/tests/test_projection_parity.py
+Literal output:
+projection parity: PASS
+fixture=real_frame_level3.json points=6 max_error<=1e-4
+Command: ctest --test-dir projects/ucf-esp/cpp_overlay/build --output-on-failure
+Literal output:
+100% tests passed, 0 tests failed out of 2
+Result: modified branch passed dump, parity, shared-memory codec, replay, dump contract and C++ tests
+Exit status: 0
+
+ROLLBACK
+Command: ROLLBACK.sh on a separate temporary copy, then cmp MODIFIED_FILE ORIGINAL_FILE
+Literal output:
+rollback restored MODIFIED_FILE from ORIGINAL_FILE
+rollback copy compare: PASS
+Result: rollback restored the copied file; working MODIFIED_FILE remains the modified branch
+Exit status: 0
+
+Restored behavior/status: rollback copy equals ORIGINAL_FILE; working source remains modified for offline preflight and real-frame collection.

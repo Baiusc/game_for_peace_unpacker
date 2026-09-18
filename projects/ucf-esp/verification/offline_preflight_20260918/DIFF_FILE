@@ -1,0 +1,139 @@
+--- projects/ucf-esp/verification/offline_preflight_20260918/ORIGINAL_FILE	2026-09-18 17:27:10.958830400 +0800
++++ projects/ucf-esp/verification/offline_preflight_20260918/MODIFIED_FILE	2026-09-18 17:27:11.318582800 +0800
+@@ -8,6 +8,7 @@
+ #   python tools/frida_host.py                      # 先清残留同名进程 -> 启动游戏 -> 按 [INS] 注入
+ #   python tools/frida_host.py --no-overlay         # 只打印，不画窗口
+ #   python tools/frida_host.py --shm                # 真实帧写入 UcfFrame，供 C++ 叠加层读取
++#   python tools/frida_host.py --dump-frame DIR     # 原始帧按 JSON 落盘（默认最多 500 份）
+ #   python tools/frida_host.py --game "C:\aG\U3DCF单机版30人生化UCF新年版本\UnityCrossFire.exe"
+ #   python tools/frida_host.py --no-launch          # 不启动游戏（也不清理），附加到已运行的进程
+ #   python tools/frida_host.py --no-launch --kill-stale   # 只清掉没加载 GameAssembly 的空壳，保留真游戏
+@@ -70,6 +71,7 @@
+ WARNED_ONCE = {}  # 同类错误只报一次，避免 20Hz 刷屏
+ RECORDER = None
+ SHM_WRITER = None
++DUMPER = None
+ DEFAULT_WAIT_MODULE = 20.0  # 等 GameAssembly.dll 载入的最长秒数
+ DEFAULT_GAME_NAME = "UnityCrossFire.exe"
+ DEFAULT_LEVEL = 4  # 默认全量档（见 frida_dump.js 顶部的 LEVEL 说明）
+@@ -188,6 +190,41 @@
+             self.shm.close()
+
+
++class FrameDumpWriter:
++    """把原始 Frame 限量落盘为独立 JSON 文件，供回归测试使用。"""
++
++    def __init__(self, directory, every=1, max_frames=500):
++        self.directory = os.path.abspath(os.path.expanduser(directory))
++        os.makedirs(self.directory, exist_ok=True)
++        self.every = max(1, int(every))
++        self.max_frames = max(0, int(max_frames))
++        self.seen = 0
++        self.count = 0
++        self.active = True
++
++    def write(self, frame):
++        if not self.active:
++            return
++        self.seen += 1
++        if self.seen % self.every != 0:
++            return
++        if self.max_frames and self.count >= self.max_frames:
++            self.active = False
++            return
++        stamp = time.strftime("%Y%m%d_%H%M%S")
++        name = f"real_frame_{stamp}_{self.count:06d}.json"
++        path = os.path.join(self.directory, name)
++        tmp = path + ".tmp"
++        with open(tmp, "w", encoding="utf-8") as f:
++            json.dump(frame, f, ensure_ascii=False, separators=(",", ":"))
++            f.write("\n")
++        os.replace(tmp, path)
++        self.count += 1
++
++    def close(self):
++        self.active = False
++
++
+ def close_recorder():
+     if RECORDER is not None:
+         RECORDER.close()
+@@ -198,8 +235,14 @@
+         SHM_WRITER.close()
+
+
++def close_dumper():
++    if DUMPER is not None:
++        DUMPER.close()
++
++
+ atexit.register(close_recorder)
+ atexit.register(close_shm_writer)
++atexit.register(close_dumper)
+
+
+ def build_script_source(js, level=DEFAULT_LEVEL, interval_ms=50, discover=False,
+@@ -367,7 +410,7 @@
+
+
+ def on_message(message, data):
+-    global LAST_MSG_TS, LAST_PRINT_TS, SHM_WRITER
++    global LAST_MSG_TS, LAST_PRINT_TS, SHM_WRITER, DUMPER
+     if message.get("type") != "send":
+         print("[frida]", message)
+         return
+@@ -383,6 +426,15 @@
+         return
+     if RECORDER is not None:
+         RECORDER.write(frame)
++    if DUMPER is not None:
++        try:
++            DUMPER.write(frame)
++        except Exception as exc:
++            if not WARNED_ONCE.get("dump_frame"):
++                WARNED_ONCE["dump_frame"] = True
++                print(f"[dump-frame] 写入失败，已停止落盘: {exc}")
++            DUMPER.close()
++            DUMPER = None
+     if SHM_WRITER is not None:
+         try:
+             SHM_WRITER.write(frame)
+@@ -724,7 +776,7 @@
+
+
+ def main():
+-    global RECORDER, SHM_WRITER
++    global RECORDER, SHM_WRITER, DUMPER
+     ap = argparse.ArgumentParser(description="UCF-ESP frida 宿主（按 INS 触发注入）")
+     ap.add_argument("--game", default=DEFAULT_GAME_NAME,
+                     help="游戏 exe：完整路径 / 裸文件名均可（默认 UnityCrossFire.exe，"
+@@ -740,6 +792,12 @@
+                     help="把原始 Frame 写入 Windows 命名共享内存 UcfFrame，供 C++ 叠加层读取")
+     ap.add_argument("--shm-name", default="UcfFrame",
+                     help="共享内存名称（默认 UcfFrame，必须与 C++ 端一致）")
++    ap.add_argument("--dump-frame", default=None, metavar="DIR",
++                    help="把原始 Frame 逐帧保存到目录（默认最多 500 份）")
++    ap.add_argument("--dump-every", type=int, default=1,
++                    help="每隔 N 个原始帧保存一份，默认 1")
++    ap.add_argument("--dump-max-frames", type=int, default=500,
++                    help="最多保存多少份，0 不限制，默认 500")
+     ap.add_argument("--no-overlay", action="store_true", help="不创建叠加窗口，仅打印")
+     ap.add_argument("--auto", action="store_true", help="启动即注入，不等待 INS（旧行为）")
+     ap.add_argument("--no-launch", action="store_true", help="不启动游戏，附加到已手动运行的进程")
+@@ -797,6 +855,16 @@
+             print(f"[record] 打开失败: {exc}")
+             return
+
++    if args.dump_frame:
++        try:
++            DUMPER = FrameDumpWriter(args.dump_frame, args.dump_every,
++                                     args.dump_max_frames)
++            print(f"[dump-frame] 写入 {DUMPER.directory}，每 {DUMPER.every} 帧，"
++                  f"上限 {DUMPER.max_frames or '不限制'}")
++        except Exception as exc:
++            print(f"[dump-frame] 打开失败: {exc}")
++            return
++
+     OVERLAY_CFG["fit"] = args.overlay_fit
+     OVERLAY_CFG["clip"] = not args.no_overlay_clip
+     if args.overlay_rect:

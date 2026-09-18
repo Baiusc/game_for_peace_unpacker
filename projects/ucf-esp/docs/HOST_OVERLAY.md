@@ -22,6 +22,11 @@
 | `tools/frida_dump.bundle.js` | **打包产物**（自包含，已内联 bridge）。`frida_host.py` 实际加载它，无需本机 `npm i frida-il2cpp-bridge`。若改了源码需重打包（见下）。 |
 | `tools/sample_session.json` | 与 `frida_dump.js` 同构的合成帧（identity VP，含三组黄金样本点），用于离线自测。 |
 
+`--dump-frame DIR` 可把原始 Frame 逐帧保存为独立 JSON，默认最多 500 份；
+可用 `--dump-every N` 降低采样频率，`--dump-max-frames 0` 取消上限。它与
+`--shm` 可同时使用，落盘发生在投影和共享内存写入之前，适合实机结束后直接
+把文件复制到 `tests/fixtures/` 做回归。
+
 ## 数据流
 
 ```
@@ -93,6 +98,9 @@ python tools/frida_host.py --list          # 只看进程：哪些同名进程�
 | `--silence <秒>` | 多少秒没收到帧就告警（默认 10） |
 | `--script <文件>` | 指定要加载的 JS（默认 `frida_dump.bundle.js`） |
 | `--no-overlay` | 不创建叠加窗口，仅控制台打印 |
+| `--shm` | 把原始 Frame 写入 `UcfFrame`，默认关闭 tkinter 层，供 C++ 叠加层读取 |
+| `--dump-frame DIR` | 原始 Frame JSON 落盘目录；默认最多 500 份 |
+| `--dump-every N` / `--dump-max-frames N` | 落盘间隔 / 数量上限；上限 0 表示不限制 |
 | `--overlay-fit {auto,stretch,letterbox}` | 帧坐标 → 屏幕的映射方式（默认 `auto`）。详见文末"框位置对不上" |
 | `--overlay-rect x,y,w,h` | 手动指定显示区（屏幕**物理**像素），跳过自动找游戏窗口 |
 | `--no-overlay-clip` | 不因游戏失焦/最小化而隐藏叠加层（默认会隐藏，避免画到别的窗口上） |
@@ -118,6 +126,13 @@ python tools/frida_host.py --list          # 只看进程：哪些同名进程�
 > ③ 不加 `--charset=utf8` 的话中文日志会被转义成 `\uXXXX`，排查时没法 grep。
 > 打包后跑 `python tests/test_script_config.py` 可校验产物与源码是否同步。
 > 校验产物：`grep -c '^import ' bundle.js` 应为 `0`（IIFE 自包含），且 `node --check` 通过。
+
+### 共享内存路线 B 排错
+
+- C++ 心跳中的 `src=synth` 表示没有读到有效的 `UcfFrame`；`src=shm` 表示已经切到宿主写入的真实帧。先启动 `python tools\\frida_host.py --shm`，再启动 C++ exe；也可以先用 `cpp_overlay\\tools\\shm_writer.py` 造帧验证纯共享内存链路。
+- 共享内存名必须严格为 `UcfFrame`，名称区分大小写。`--shm-name` 只有在 C++ 端同步修改名称时才使用；名称或大小不一致时，宿主会在打开/写入处报错，C++ 会继续显示 `src=synth`。
+- `frame_bytes=23804` 是单个 `Frame`，共享区 `slot_bytes=23808` 多出的 4 字节是双缓冲当前槽索引；写端先写后台槽，最后才翻转索引。
+- Ctrl+C 后宿主会关闭 Python 映射；若排查仍疑似有残留句柄，可用 Sysinternals `handle.exe UcfFrame` 查询持有者，或在任务管理器结束对应宿主进程后重试。
 
 > **运行前提**
 > - 这是 **32 位 IL2CPP** 游戏（`UnityCrashHandler32.exe` + `UnityPlayer.dll` + `GameAssembly.dll`）。

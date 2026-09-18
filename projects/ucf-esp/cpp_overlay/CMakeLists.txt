@@ -32,6 +32,9 @@ if(BUILD_TESTING)
   add_executable(ucf_overlay_tests tests/overlay_tests.cpp)
   target_link_libraries(ucf_overlay_tests PRIVATE ucf_overlay_core)
   add_test(NAME ucf_overlay_tests COMMAND ucf_overlay_tests)
+  add_executable(test_projection_parity tests/projection_parity.cpp)
+  target_link_libraries(test_projection_parity PRIVATE ucf_projection)
+  add_test(NAME projection_parity_self_test COMMAND test_projection_parity)
 endif()
 
 # ---------------------------------------------------------------------------

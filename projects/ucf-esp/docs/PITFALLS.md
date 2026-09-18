@@ -144,3 +144,10 @@
 - **修法**：新增 `--shm`，复用 `cpp_overlay/tools/shm_writer.py` 的布局编码器，按后台槽写入、翻转 `cur` 的双缓冲顺序写入 `UcfFrame`；共享内存写失败只报一次并停桥，避免回调刷屏。
 - **验证**：离线校验 `FRAME_FMT`/`SLOT_FMT` 与 `build_frame()` 长度；Windows 实机需分别启动 `frida_host.py --shm` 与 C++ exe 验证源切换。
 - **详见**：`tools/frida_host.py`、`tests/test_shm_bridge.py`、`docs/HOST_OVERLAY.md`。
+
+### 2026-09-18：真实帧落盘与投影一致性
+
+- **落盘**：`--dump-frame DIR` 保存原始 Frame，不保存投影后的 marks；默认每帧一份、最多 500 份，可用 `--dump-every` 与 `--dump-max-frames` 调整，写临时文件后原子替换，避免留下半个 JSON。
+- **双缓冲**：`frame_bytes=23804` 是一个 Frame，`slot_bytes=23808` 多出的 4 字节是当前槽索引；写端必须先写后台槽，最后翻转索引。名称 `UcfFrame` 区分大小写，退出必须关闭映射句柄。
+- **失败策略**：共享内存写失败只记录一次并停止桥接，避免每帧刷屏，也避免继续运行一个已经不可信的半死写端。
+- **一致性**：`tests/test_projection_parity.py` 从 `real_frame_level3.json` 生成同一组矩阵、世界点和 Python 期望值，交给 `test_projection_parity` 使用 C++ `world_to_screen` 校验，误差阈值为 `1e-5`。
