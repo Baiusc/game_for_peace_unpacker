@@ -16,10 +16,15 @@
 #include <windows.h>
 #include <d3d11.h>
 #include <dxgi1_2.h>
+#include <dxgi1_3.h>           // CreateDXGIFactory2
 #include <dwmapi.h>
 #include <imgui.h>
 #include <imgui_impl_win32.h>
 #include <imgui_impl_dx11.h>
+
+// imgui_impl_win32.h 把 ImGui_ImplWin32_WndProcHandler 的声明放在了 #if 0 中，
+// 按官方示例需在此自行前向声明后调用。
+extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 static ID3D11Device*            g_device = nullptr;
 static ID3D11DeviceContext*     g_ctx    = nullptr;
