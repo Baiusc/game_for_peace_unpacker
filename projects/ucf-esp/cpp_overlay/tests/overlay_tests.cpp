@@ -41,10 +41,15 @@ static void test_draw_list() {
     style.show_skeleton = true;
     style.show_health = false;
     style.show_distance = false;
+    for (int i = 0; i < ucf::MAX_BONES; ++i) {
+        marks[0].bones[i].sx = 400.0f + float(i % 3);
+        marks[0].bones[i].sy = 300.0f + float(i % 4);
+        marks[0].bones[i].valid = true;
+    }
     ucf::build_draw_list(vp, marks, 1, style, dl);
     CHECK(dl.boxCount == 0);
     CHECK(dl.barCount == 0);
-    CHECK(dl.skeletonCount == 1);
+    CHECK(dl.boneLineCount == 18);
 }
 
 static void test_smooth() {
@@ -83,6 +88,8 @@ static void test_transport_roundtrip() {
     f.width = 1280; f.height = 720; f.inGame = true;
     f.playerCount = 3;
     f.players[0].pos[0] = 1.5f; f.players[0].hp = 73; f.players[0].team = 2;
+    f.players[0].bones[10].pos[1] = 1.7f;
+    f.players[0].bones[10].valid = true;
     t.write(f);
     ucf::Frame out{};
     t.read(out);
@@ -90,13 +97,16 @@ static void test_transport_roundtrip() {
     CHECK(out.width == 1280);
     CHECK(approx(out.players[0].pos[0], 1.5f));
     CHECK(out.players[0].hp == 73);
+    CHECK(out.players[0].bones[10].valid && approx(out.players[0].bones[10].pos[1], 1.7f));
 }
 
 static void test_config_roundtrip() {
     ucf::Settings s{};
+    CHECK(!s.exit_delete_config && !s.exit_delete_log);
     s.esp_enabled = false; s.show_enemy = false; s.fov_deg = 110.0f; s.target_mode = 1;
     s.color_enemy[0] = 0.1f;
     s.show_skeleton = true; s.aimbot_enabled = true; s.aim_max_distance = 42.0f;
+    s.exit_delete_config = true;
     CHECK(ucf::save_settings(s, "settings_test.txt"));
     ucf::Settings r{};
     CHECK(ucf::load_settings(r, "settings_test.txt"));
@@ -106,6 +116,7 @@ static void test_config_roundtrip() {
     CHECK(r.target_mode == 1);
     CHECK(approx(r.color_enemy[0], 0.1f));
     CHECK(r.show_skeleton && r.aimbot_enabled && approx(r.aim_max_distance, 42.0f));
+    CHECK(r.exit_delete_config && !r.exit_delete_log);
     std::remove("settings_test.txt");
 }
 

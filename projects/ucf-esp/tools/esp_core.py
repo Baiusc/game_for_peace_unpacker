@@ -75,10 +75,10 @@ def _dist3(a, b):
 class Mark:
     """一个玩家在屏幕上的投影结果。"""
     __slots__ = ("kind", "screen", "world", "team", "hp", "max_hp",
-                 "is_dead", "on_screen", "name", "dist", "clipped")
+                 "is_dead", "on_screen", "name", "dist", "clipped", "bones")
 
     def __init__(self, kind, screen, world, team, hp, max_hp, is_dead,
-                 on_screen, name="", dist=None, clipped=False):
+                 on_screen, name="", dist=None, clipped=False, bones=None):
         self.kind = kind            # 'local' | 'teammate' | 'enemy'
         self.screen = screen        # (sx, sy) 或 None
         self.world = world          # (x, y, z) 或 None
@@ -90,6 +90,7 @@ class Mark:
         self.name = name
         self.dist = dist            # 到相机的距离（米），None 表示未知
         self.clipped = clipped      # True = 被近裁剪剔除（贴脸的点，画出来会爆炸）
+        self.bones = bones or []     # [(sx, sy, valid), ...]，与 C++ MAX_BONES 槽位一致
 
     def as_dict(self):
         return {
@@ -104,12 +105,15 @@ class Mark:
             "name": self.name,
             "dist": self.dist,
             "clipped": self.clipped,
+            "bones": self.bones,
         }
 
 
 def _vec(p):
     if not p:
         return None
+    if isinstance(p, (list, tuple)) and len(p) >= 3:
+        return (float(p[0]), float(p[1]), float(p[2]))
     return (float(p["x"]), float(p["y"]), float(p["z"]))
 
 
@@ -133,9 +137,20 @@ def _make(role, p, local_team, forced_local, w, h, VP, cam_pos, ndc_clip):
     else:
         # team 读不到时无法判断阵营，保守按敌人处理（宁可多画一个，别漏画）
         kind = "enemy"
+    bones = []
+    for b in (p.get("bones", []) or []):
+        bp = _vec(b.get("pos")) if b.get("valid", False) else None
+        bs = world_to_screen(bp, VP, w, h) if bp else None
+        if bp:
+            bnx, bny, _ = clip_of(bp, VP)
+            bvalid = (bs is not None and bnx is not None and abs(bnx) <= ndc_clip and
+                      abs(bny) <= ndc_clip and 0.0 <= bs[0] <= w and 0.0 <= bs[1] <= h)
+        else:
+            bvalid = False
+        bones.append((bs[0], bs[1], True) if bvalid else (0.0, 0.0, False))
     return Mark(kind, screen, world, team,
                 p.get("hp"), p.get("maxHp"), bool(p.get("isDead")),
-                on_screen, dist=dist, clipped=clipped)
+                on_screen, dist=dist, clipped=clipped, bones=bones)
 
 
 def project_frame(frame, w=None, h=None, ndc_clip=NDC_CLIP):

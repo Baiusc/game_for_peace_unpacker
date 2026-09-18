@@ -41,7 +41,8 @@ build\Release\ucf_overlay_win32.exe
 Frame { w2c[16], proj[16]（均列主序，m[col*4+row]）,
         width, height, inGame,
         local: PlayerState, players[64]: PlayerState, playerCount }
-PlayerState { pos[3], team, hp, maxHp, isDead, name[32] }
+PlayerState { pos[3], team, hp, maxHp, isDead, name[32], bones[19] }
+BoneState { pos[3], valid }
 ```
 投影约定与 `tools/esp_core.py` 的 `world_to_screen` / `combine_pv` 完全一致
 （列主序、`VP = P*V`、屏幕 y 轴向下、NDC 裁剪阈值 3.0）。详见 `STATIC_REFERENCE.md`。
@@ -176,4 +177,5 @@ init: flip_hr=0x887A0001 used=0 blt_hr=0x00000000 dwm_hr=0x00000000 clear=black-
 - `Settings` 仍使用兼容的 `key=value` 文件；菜单控件变化后即时写回 `ucf_overlay.ini`，HOME 切换菜单，DELETE 切换 ESP 绘制层。
 - 绘制设置通过 `DrawStyle` 传入 `build_draw_list()`，框、血条、距离、骨骼、颜色、最大距离和线宽不会散落在渲染层。
 - `smooth` 的目标选择支持距离、最低血量、准星角度三种模式；主循环只计算并显示 yaw/pitch，未调用任何鼠标或输入 API。
-- 由于当前 `Frame/PlayerState` 没有骨骼数组和独立可见性字段，本轮骨骼是调试框内的示意骨架，可见性使用投影后的屏幕内状态；新增真实骨骼数据时必须同步四处契约文件并补真实帧 fixture。
+- `PlayerState.bones[19]` 使用固定 Humanoid 槽位；无效骨骼用 `valid=false`，C++ 只连接两端都成功投影的骨骼。真实读取链是 `characterAnimator -> GetBoneTransform -> position_Injected`。
+- 退出路径默认保留 `ucf_overlay.ini` 和 `ucf_debug.log`；END/菜单按钮会保存配置、销毁窗口与 ImGui/D3D11，并让 `SharedTransport` 析构执行 `UnmapViewOfFile + CloseHandle`。只有用户勾选对应退出选项时才删除配置或日志。

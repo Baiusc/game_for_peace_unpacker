@@ -16,8 +16,10 @@ import time
 import sys
 
 # ---- 与 C++ Frame / PlayerState 严格对齐的二进制布局（小端 <）----------------
-PS_FMT = struct.Struct("<3fiii?32s3x")          # pos(12)+team+hp+maxHp+isDead+name+pad = 60
 N_PLAYERS = 64
+N_BONES = 19
+BONE_FMT = "3f?3x"                              # pos(12)+valid+pad = 16
+PS_FMT = struct.Struct("<3fiii?32s3x" + BONE_FMT * N_BONES)
 FRAME_FMT = struct.Struct(
     "<16f16f"          # w2c[16], proj[16]
     "ii"               # width, height
@@ -33,9 +35,15 @@ SHM_SIZE = SLOT_FMT.size            # 4 + Frame
 
 def _ps_items(p):
     name = (p.get("name", "")[:31].encode("utf-8", "replace") + b"\x00" * 32)[:32]
-    return (float(p["pos"][0]), float(p["pos"][1]), float(p["pos"][2]),
+    items = [float(p["pos"][0]), float(p["pos"][1]), float(p["pos"][2]),
             int(p.get("team", 0)), int(p.get("hp", 100)),
-            int(p.get("maxHp", 100)), bool(p.get("isDead", False)), name)
+            int(p.get("maxHp", 100)), bool(p.get("isDead", False)), name]
+    bones = p.get("bones", []) or []
+    for i in range(N_BONES):
+        b = bones[i] if i < len(bones) else {}
+        pos = b.get("pos", [0.0, 0.0, 0.0])
+        items.extend([float(pos[0]), float(pos[1]), float(pos[2]), bool(b.get("valid", False))])
+    return tuple(items)
 
 
 def build_frame(w2c, proj, width, height, in_game, local, players):
@@ -46,7 +54,7 @@ def build_frame(w2c, proj, width, height, in_game, local, players):
     players = players[:N_PLAYERS]
     for p in players:
         body += PS_FMT.pack(*_ps_items(p))
-    empty = PS_FMT.pack(0.0, 0.0, 0.0, 0, 100, 100, False, b"\x00" * 32)
+    empty = PS_FMT.pack(*_ps_items({"pos": [0.0, 0.0, 0.0]}))
     for _ in range(N_PLAYERS - len(players)):
         body += empty
     tail = struct.pack("<i", len(players))

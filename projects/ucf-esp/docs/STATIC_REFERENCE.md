@@ -106,6 +106,7 @@ RVA `0x4953F0`；而且 IL2CPP 的共享泛型方法还带一个**隐藏的 `Met
 | Entity | `team` | 0x1C | `Team` | `get_team()` |
 | Entity | `isDead`（属性） | — | `bool` | `get_isDead()` |
 | Player | `characterContainer` | 0x4C | `Transform` | `get_characterContainer()`（模型挂载点） |
+| Entity | `characterAnimator` | 0x24 | `Animator` | `get_characterAnimator()` |
 | Player（继承 MonoBehaviour） | 世界坐标 | — | `Vector3` | `get_transform().get_position()` |
 | Player | `velocity` | 0x80 | `Vector3` | `get_...` / 直接字段 |
 | Player | `spawnPos` | 0xAC | `Vector3` | `get_spawnPos()`（参考点） |
@@ -122,6 +123,21 @@ RVA `0x4953F0`；而且 IL2CPP 的共享泛型方法还带一个**隐藏的 `Met
 
 > 字段偏移是**相对对象起始**（含 8 字节 `System.Object` 头），
 > 所以裸读时的地址是 `healthDataObj.handle + 0x8`。
+
+### 4.1 真实 Humanoid 骨骼
+
+本游戏 dump 中 `Animator.GetBoneTransform(HumanBodyBones)` 存在，枚举值来自
+`UnityEngine.HumanBodyBones`：`Hips=0`、`Spine=7`、`Chest=8`、`Neck=9`、
+`Head=10`、肩/臂/手为 `11..18`、腿/脚为 `1..6`。每帧读取链为：
+
+```text
+Player.get_characterAnimator()
+  -> Animator.GetBoneTransform(enum id)
+  -> Transform.get_position_Injected(out Vector3)
+```
+
+Frida 固定输出 19 个槽位；不存在的 Humanoid 节点输出 `valid=false`。取帧已经在
+Unity 主线程调度中，因此 `GetBoneTransform` 与位置访问不会从 Frida 定时器线程直接调用。
 
 ---
 
@@ -206,6 +222,7 @@ VP[c*4+r] = Σ_k P[k*4+r] * V[c*4+k]    # (P*V)[row=r, col=c]
 | 队伍 / 是否自己 | 队伍**不要**用 `get_team()`（返回 boxed 对象，宿主无法比较，见下）；改裸读 `Entity.<team>k__BackingField` 的 int（`readTeamOf`）。是否自己用 `get_isMyPlayer()`（`Player`） |
 | 生死 | **不要调** `get_isDead()`（有真实方法体，实测 AV）。由血量推导 `hp <= 0` |
 | 血量 | `get_healthData()` → 裸内存读 `hiddenValue ^ currentCryptoKey`（见第 5 节） |
+| 骨骼 | `get_characterAnimator()` → `GetBoneTransform(HumanBodyBones)` → `get_position_Injected(out Vector3)` |
 
 > **反例（早期版本就是错在这里）：**
 > `cam.method("get_worldToCameraMatrix").invoke(cam)` —— 多传了一个 `this`，运行期报

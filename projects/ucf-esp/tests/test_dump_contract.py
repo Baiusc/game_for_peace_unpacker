@@ -32,7 +32,7 @@ METHOD_RE = re.compile(r"\b(\w+)\s*\(([^)]*)\)\s*\{")
 # 只看我们关心、且名字在 dump 里唯一的这些类型
 WANTED = [
     "Matrix4x4", "ObscuredInt", "Camera", "Screen", "Transform",
-    "HealthData", "GameManager", "Entity", "Player", "Vector3",
+    "HealthData", "GameManager", "Entity", "Player", "Vector3", "Animator",
 ]
 
 
@@ -174,6 +174,20 @@ def main():
     expect(has_method(ply, "get_isMyPlayer"), "Player.get_isMyPlayer 不存在")
     print("  PASS Entity/Player.get_team / get_isDead / get_healthData / Player.get_isMyPlayer")
 
+    # ---- 7c. 真实 Humanoid 骨骼读取链 ----
+    animator = T["Animator"]
+    expect(has_method(animator, "GetBoneTransform", "HumanBodyBones humanBoneId"),
+           "Animator.GetBoneTransform(HumanBodyBones) 不存在")
+    expect(re.search(r"<characterContainer>k__BackingField;\s*//\s*0x4C", ply["body"]),
+           "Player.characterContainer backing field 不在 0x4C")
+    with open(DUMP, "r", encoding="utf-8", errors="replace") as f:
+        text = f.read()
+    expect("public enum HumanBodyBones" in text and "HumanBodyBones Head = 10" in text,
+           "dump.cs 缺少 Humanoid 骨骼枚举/Head=10")
+    expect(re.search(r"<characterAnimator>k__BackingField;\s*//\s*0x24", ent["body"]),
+           "Entity.characterAnimator 字段不存在")
+    print("  PASS Player.characterContainer@0x4c -> Entity.characterAnimator -> Animator.GetBoneTransform")
+
     # ---- 7b. 队伍：Team 是 enum : int，必须裸读 backing field ----
     # 坑：get_team() 返回的是 boxed Object（bridge 不解包 enum 的 value__），
     # 传到宿主是 {handle,type}，两个对象永远不相等 -> 队友识别整个失效。
@@ -200,12 +214,14 @@ def main():
         "get_main", "get_worldToCameraMatrix_Injected", "get_projectionMatrix_Injected",
         "get_position_Injected", "get_width", "get_height", "get_instance",
         "get_transform", "get_team", "get_isDead", "get_isMyPlayer", "get_healthData",
+        "get_characterAnimator", "GetBoneTransform",
     ]
     for name in used:
         expect(name in js, f"frida_dump.js 没用到 {name}？契约测试需要同步更新")
     for cls in ("UnityEngine.Camera", "UnityEngine.Screen", "GameManager"):
         expect(cls in js, f"frida_dump.js 没引用类 {cls}")
-    print(f"  PASS frida_dump.js 引用的 {len(used)} 个方法名 + 3 个类名与 dump 一致")
+    expect("BONE_IDS" in js and "readBonesOf" in js, "frida_dump.js 未实现固定骨骼槽位读取")
+    print(f"  PASS frida_dump.js 引用的 {len(used)} 个方法名 + 骨骼读取链与 dump 一致")
 
     print("全部通过")
     return 0

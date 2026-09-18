@@ -3472,6 +3472,28 @@ ${this.isEnum ? `enum` : this.isStruct ? `struct` : this.isInterface ? `interfac
   var UASM = "UnityEngine.CoreModule";
   var GM_INSTANCE_FIELD = "<instance>k__BackingField";
   var MAX_PLAYERS = 128;
+  var BONE_IDS = [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18
+  ];
+  var MAX_BONES = BONE_IDS.length;
   var MAT_FLOATS = 16;
   var MAT_BYTES = MAT_FLOATS * 4;
   var VEC3_BYTES = 3 * 4;
@@ -3668,6 +3690,30 @@ ${this.isEnum ? `enum` : this.isStruct ? `struct` : this.isInterface ? `interfac
         const v = callMethod(t, "get_position", 0);
         return { x: v.field("x").value, y: v.field("y").value, z: v.field("z").value };
       };
+      let boneWarned = false;
+      const readBonesOf = (p) => {
+        const bones = Array.from({ length: MAX_BONES }, () => ({ pos: [0, 0, 0], valid: false }));
+        try {
+          const animator = callMethod(p, "get_characterAnimator", 0);
+          if (!alive(animator) || !animator.tryMethod("GetBoneTransform", 1)) return bones;
+          for (let i = 0; i < BONE_IDS.length; i++) {
+            try {
+              const t = callMethod(animator, "GetBoneTransform", 1, BONE_IDS[i]);
+              if (!alive(t)) continue;
+              const v = readPosOf(t);
+              if (![v.x, v.y, v.z].every(Number.isFinite)) continue;
+              bones[i] = { pos: [v.x, v.y, v.z], valid: true };
+            } catch (e) {
+            }
+          }
+        } catch (e) {
+          if (!boneWarned) {
+            boneWarned = true;
+            console.log("[!] 真实骨骼读取不可用（后续帧保留 valid=false）:", e.message || e);
+          }
+        }
+        return bones;
+      };
       let hpChecked = 0;
       const readObscuredInt = (owner, fieldName) => {
         try {
@@ -3729,6 +3775,7 @@ ${this.isEnum ? `enum` : this.isStruct ? `struct` : this.isInterface ? `interfac
             out.maxHp = null;
           }
         }
+        out.bones = withHp ? readBonesOf(p) : [];
         if (ALLOW_IS_DEAD) {
           try {
             out.isDead = callMethod(p, "get_isDead", 0);

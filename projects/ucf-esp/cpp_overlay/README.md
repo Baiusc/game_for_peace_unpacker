@@ -66,6 +66,7 @@ build\Release\ucf_overlay_win32.exe
   输出打包进共享内存），C++ 端 `SharedTransport("UcfFrame")` 自动读取；
 - **HOME** 显隐菜单，**DELETE** 显隐 ESP 绘制层（键位在 `ucf_overlay.ini` 可配；菜单里调开关 / 颜色 / FOV / 平滑系数 / 目标选择）。启动默认：菜单显示、ESP 隐藏。
 - 菜单可交互、其余区域点击穿透：每帧轮询光标，悬停菜单矩形时动态移除 `WS_EX_TRANSPARENT`。
+- ESP 子菜单提供独立的“显示方框”和“显示骨骼”；退出设置默认保留配置和日志，END 键或“退出程序 (END)”按钮触发清理退出。共享内存映射始终关闭，不执行共享内存删除。
 
 需要 `d3d11.lib / dxgi.lib / d3dcompiler.lib / dwmapi.lib / user32.lib / gdi32.lib`
 （Windows SDK 自带）与 C++20（MSVC 或 MinGW-w64）。链接库已在 CMakeLists 里列好。
@@ -78,11 +79,18 @@ build\Release\ucf_overlay_win32.exe
 Frame { w2c[16], proj[16]（均列主序，m[col*4+row]）,
         width, height, inGame,
         local: PlayerState, players[64]: PlayerState, playerCount }
-PlayerState { pos[3], team, hp, maxHp, isDead, name[32] }
+PlayerState { pos[3], team, hp, maxHp, isDead, name[32], bones[19] }
+BoneState { pos[3], valid }
 ```
 
 投影约定与 `tools/esp_core.py` 的 `world_to_screen` / `combine_pv` 完全一致
 （列主序、屏幕 y 轴向下、NDC 裁剪阈值 3.0），保证 Python 宿主与 C++ 叠加层结果一致。
+
+`bones[19]` 固定顺序为 `Hips, LeftUpperLeg, RightUpperLeg, LeftLowerLeg,
+RightLowerLeg, LeftFoot, RightFoot, Spine, Chest, Neck, Head, LeftShoulder,
+RightShoulder, LeftUpperArm, RightUpperArm, LeftLowerArm, RightLowerArm,
+LeftHand, RightHand`。缺失骨骼使用 `valid=false`；ESP 子菜单中的“显示方框”和
+“显示骨骼”彼此独立。
 
 ## 与现有 tkinter 叠加层的关系
 

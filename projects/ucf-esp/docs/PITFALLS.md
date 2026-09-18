@@ -77,6 +77,21 @@
 
 - **现象**：菜单只有基础框/血条开关，距离与颜色不能完整控制；绘制层没有骨骼入口，目标选择只有最近/低血量。
 - **根因**：`Settings`、`DrawStyle`、绘制原语和主循环之间缺少完整的状态传递；`Frame` 没有新增可见性/骨骼字段。
-- **修法**：扩展现有 `key=value` 配置与菜单；`project_frame()` 使用已有 `inGame/isDead/team/pos` 做有效性、死亡、队伍和距离过滤；骨骼显示采用投影框内的调试骨架，不改变 `Frame/PlayerState` 契约；`smooth` 新增准星最近与方向角计算，主循环只显示平滑后的 yaw/pitch。
+- **修法**：扩展现有 `key=value` 配置与菜单；`project_frame()` 使用已有 `inGame/isDead/team/pos` 做有效性、死亡、队伍和距离过滤；当时骨骼显示采用投影框内的调试骨架，后续已由真实 `BoneState[19]` 契约替换；`smooth` 新增准星最近与方向角计算，主循环只显示平滑后的 yaw/pitch。
 - **验证**：核心 ctest、dump 契约、叠加层几何、投影校准和脚本配置测试全部通过；Windows D3D11/ImGui 编译仍需 Actions 或 Windows MSVC 实机验证。
 - **详见**：`cpp_overlay/src/menu_win32.cpp`、`overlay_viz.cpp`、`smooth.cpp`、`main_win32.cpp`。
+
+### 2026-09-18：真实 Humanoid 骨骼契约与读取链
+
+- **证据**：`dump.cs` 中 `Player.characterContainer@0x4C`、`Entity.characterAnimator@0x24`、`Animator.GetBoneTransform(HumanBodyBones)` 和 `Transform.get_position_Injected(out Vector3)` 均存在。
+- **修法**：`PlayerState` 增加固定 19 槽 `BoneState`；Frida 在 Unity 主线程读取每根骨骼，缺失节点输出 `valid=false`；Python 投影和 C++ 叠加层使用同一槽位/连接表。
+- **显示**：菜单 ESP 子菜单的“显示方框”和“显示骨骼”独立控制；骨骼线只在两个端点均有效且在 NDC/视口内时绘制。
+- **验证**：契约测试新增 Animator/字段/方法检查；共享内存打包长度 `23804`、FrameSlots 长度 `23808` 校验通过；bundle `node --check` 通过。
+- **详见**：`tools/frida_dump.js`、`tools/esp_core.py`、`cpp_overlay/tools/shm_writer.py`、`cpp_overlay/src/shared_state.hpp`、`overlay_viz.cpp`。
+
+### 2026-09-18：退出路径默认保留配置/日志
+
+- **修法**：`Settings.exit_delete_config` 与 `Settings.exit_delete_log` 默认均为 `false`；菜单“退出设置”只显示这两个删除选项和“退出程序 (END)”按钮。
+- **触发**：菜单按钮与 `VK_END` 都设置统一的退出请求；退出前保存配置并记录步骤。
+- **资源**：`SharedTransport` 使用持有对象，退出时显式析构，始终执行 `UnmapViewOfFile + CloseHandle`；Windows 不执行共享内存删除。
+- **验证**：核心配置 round-trip 检查默认不删除；Windows 完整路径需 Actions/MSVC 验证文件保留/删除结果。

@@ -4,6 +4,15 @@
 
 namespace ucf {
 
+static constexpr int BONE_PAIRS[][2] = {
+    {0, 7}, {7, 8}, {8, 9}, {9, 10},
+    {8, 11}, {11, 13}, {13, 15}, {15, 17},
+    {8, 12}, {12, 14}, {14, 16}, {16, 18},
+    {0, 1}, {1, 3}, {3, 5},
+    {0, 2}, {2, 4}, {4, 6},
+};
+static constexpr int BONE_PAIR_COUNT = sizeof(BONE_PAIRS) / sizeof(BONE_PAIRS[0]);
+
 static void kind_color(Kind k, const DrawStyle& style, float out[3]) {
     switch (k) {
         case Kind::Local:     std::copy(style.local, style.local + 3, out); break;
@@ -19,7 +28,7 @@ void build_draw_list(const Viewport& vp, const ScreenMark* marks, int n, DrawLis
 
 void build_draw_list(const Viewport& vp, const ScreenMark* marks, int n,
                      const DrawStyle& style, DrawList& out) {
-    out.boxCount = out.barCount = out.labelCount = out.skeletonCount = 0;
+    out.boxCount = out.barCount = out.labelCount = out.boneLineCount = 0;
 
     const float BOX_W = 40.0f, BOX_H = 60.0f;
     float bw = BOX_W * vp.sx;  if (bw < 6)  bw = 6;
@@ -61,11 +70,17 @@ void build_draw_list(const Viewport& vp, const ScreenMark* marks, int n,
             if (m.dist > 0 && style.show_distance && off < (int)sizeof(L.text))
                 off += snprintf(L.text + off, sizeof(L.text) - off, " %.0fm", m.dist);
         }
-        if (style.show_skeleton && out.skeletonCount < 64) {
-            SkeletonPrim& sk = out.skeletons[out.skeletonCount++];
-            sk.x = px - bw / 2; sk.y = py - bh / 2; sk.w = bw; sk.h = bh;
-            sk.r = col[0]; sk.g = col[1]; sk.b = col[2];
-            sk.thickness = style.line_thickness * 0.75f;
+        if (style.show_skeleton) {
+            for (int pair = 0; pair < BONE_PAIR_COUNT && out.boneLineCount < MAX_BONES * 64; ++pair) {
+                const auto& a = m.bones[BONE_PAIRS[pair][0]];
+                const auto& b = m.bones[BONE_PAIRS[pair][1]];
+                if (!a.valid || !b.valid) continue;
+                BoneLinePrim& line = out.boneLines[out.boneLineCount++];
+                line.x1 = vp.x + a.sx * vp.sx; line.y1 = vp.y + a.sy * vp.sy;
+                line.x2 = vp.x + b.sx * vp.sx; line.y2 = vp.y + b.sy * vp.sy;
+                line.r = col[0]; line.g = col[1]; line.b = col[2];
+                line.thickness = style.line_thickness * 0.75f;
+            }
         }
     }
 }

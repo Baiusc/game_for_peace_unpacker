@@ -1,5 +1,6 @@
 #pragma once
 #include <cstdint>
+#include "shared_state.hpp"
 
 // 通用 2D 可视化原语：把“投影后的屏幕标记”转成一组可直接交给
 // ImGui 背景绘制层（GetBackgroundDrawList）去画的形状。
@@ -15,6 +16,10 @@ struct ScreenMark {
     float  dist = 0;         // 到相机距离（米）
     bool   on_screen = false;
     bool   is_dead = false;
+    struct BoneScreen {
+        float sx = 0, sy = 0;
+        bool valid = false;
+    } bones[MAX_BONES]{};
 };
 
 // 帧坐标 -> 屏幕物理像素 的映射（与 overlay_tk.compute_viewport 同义）。
@@ -26,13 +31,13 @@ struct Viewport {
 struct BoxPrim   { float x, y, w, h; float r, g, b; float thickness = 2.0f; };
 struct BarPrim   { float x, y, w, h; float ratio; float r, g, b; };
 struct LabelPrim { float x, y; float r, g, b; char text[64]; };
-struct SkeletonPrim { float x, y, w, h; float r, g, b; float thickness = 1.5f; };
+struct BoneLinePrim { float x1, y1, x2, y2; float r, g, b; float thickness = 1.5f; };
 
 struct DrawList {
     BoxPrim   boxes[64];   int boxCount = 0;
     BarPrim   bars[64];    int barCount = 0;
     LabelPrim labels[64];  int labelCount = 0;
-    SkeletonPrim skeletons[64]; int skeletonCount = 0;
+    BoneLinePrim boneLines[MAX_BONES * 64]; int boneLineCount = 0;
 };
 
 struct DrawStyle {

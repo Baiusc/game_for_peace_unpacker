@@ -5,11 +5,21 @@
 
 // 与 frida_host.py 的 frame 契约对齐：
 //   w2c / proj 都是列主序扁平 16（m[col*4 + row]），与 src/projection.cpp 一致；
-//   players: pos[3], team, hp, maxHp, isDead
+//   players: pos[3], team, hp, maxHp, isDead, bones[19]
 // 这是 C++ 宿主（D3D11 叠加层）与 Python 宿主（tkinter）共用的数据形状。
 namespace ucf {
 
 constexpr int MAX_PLAYERS = 64;
+constexpr int MAX_BONES = 19;
+
+// 固定 Humanoid 槽位：顺序与 frida_dump.js 的 BONE_IDS 一致。
+// valid=false 表示该模型不是 Humanoid、该骨骼不存在或本帧读取失败。
+struct BoneState {
+    float pos[3] = {0, 0, 0};
+    bool  valid = false;
+    uint8_t pad[3] = {};
+};
+static_assert(sizeof(BoneState) == 16, "BoneState ABI must stay 16 bytes");
 
 struct PlayerState {
     float pos[3] = {0, 0, 0};
@@ -18,7 +28,10 @@ struct PlayerState {
     int   maxHp  = 100;
     bool  isDead = false;
     char  name[32] = {};
+    BoneState bones[MAX_BONES]{};
 };
+static_assert(sizeof(PlayerState) == 60 + MAX_BONES * sizeof(BoneState),
+              "PlayerState ABI changed; update Python shared-memory packing");
 
 struct Frame {
     float       w2c[16] = {};

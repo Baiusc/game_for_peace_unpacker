@@ -23,6 +23,6 @@ struct OverlayStatus {
 };
 
 MenuRect query_menu_rect();
-void draw_menu(Settings& s, bool& show_menu, const OverlayStatus& st);
+void draw_menu(Settings& s, bool& show_menu, bool& request_exit, const OverlayStatus& st);
 }
 #endif

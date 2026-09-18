@@ -26,6 +26,7 @@
 #include <cstdio>               // snprintf / fopen（诊断日志）
 #include <cmath>
 #include <algorithm>
+#include <memory>
 #include <imgui.h>
 #include <imgui_impl_win32.h>
 #include <imgui_impl_dx11.h>
@@ -42,7 +43,9 @@ static HWND                     g_hwnd   = nullptr;
 static ucf::Settings            g_settings{};
 static bool                     g_show_menu = true;
 static ucf::SyntheticSource     g_synth{};
+static std::unique_ptr<ucf::SharedTransport> g_shm;
 static ucf::ScreenMark          g_marks[ucf::MAX_PLAYERS + 1]{};
+static bool                     g_exit_requested = false;
 static bool                     g_flip_used = false;   // 交换链实际用的模型（诊断 HUD 用）
 static bool                     g_clear_transparent = true;  // 清屏是否透明(alpha=0)；BLT colorkey 时为不透明黑
 
@@ -50,6 +53,15 @@ static bool                     g_clear_transparent = true;  // 清屏是否透�
 static LRESULT CALLBACK wndproc(HWND h, UINT m, WPARAM w, LPARAM l) {
     if (ImGui_ImplWin32_WndProcHandler(h, m, w, l)) return TRUE;
     return DefWindowProcW(h, m, w, l);
+}
+
+// 每次写日志都立即关闭句柄，退出路径不留下持有中的日志文件。
+static void append_debug_log(const char* message) {
+    FILE* lf = std::fopen("ucf_debug.log", "a");
+    if (!lf) return;
+    std::fprintf(lf, "%s\n", message);
+    std::fflush(lf);
+    std::fclose(lf);
 }
 
 static void cleanup_render_target() {
@@ -86,6 +98,7 @@ static void poll_hotkeys() {
     };
     if (pressed(g_settings.menu_hotkey)) g_show_menu = !g_show_menu;
     if (pressed(g_settings.esp_hotkey))  g_settings.esp_visible = !g_settings.esp_visible;
+    if (pressed(VK_END))                 g_exit_requested = true;
 }
 
 // 点击穿透动态开关：
@@ -241,10 +254,10 @@ static void frame() {
     ImGui::NewFrame();
 
     ucf::Frame f{};
-    ucf::SharedTransport shm("UcfFrame");
-    bool have_data = shm.ok();
+    if (!g_shm) g_shm = std::make_unique<ucf::SharedTransport>("UcfFrame");
+    bool have_data = g_shm->ok();
     if (have_data) {
-        shm.read(f);
+        g_shm->read(f);
         // 共享内存可能已存在但尚无生产者写入（全零 Frame）-> 尺寸非法，回退自演
         have_data = (f.width > 0 && f.height > 0);
     }
@@ -320,7 +333,7 @@ static void frame() {
     st.target = target;
     st.target_yaw = output_angles.yaw;
     st.target_pitch = output_angles.pitch;
-    ucf::draw_menu(g_settings, g_show_menu, st);
+    ucf::draw_menu(g_settings, g_show_menu, g_exit_requested, st);
 
     ImGui::Render();
     // flip 透明路径：清空 (0,0,0,0)；BLT colorkey 路径：清空不透明黑 (0,0,0,255)。
@@ -401,9 +414,10 @@ int WINAPI WinMain(HINSTANCE hinst, HINSTANCE, LPSTR, int) {
     if (g_settings.menu_hotkey == 0x2D /*VK_INSERT*/)    // 旧 ini 存的是 INSERT：迁移为 HOME
         g_settings.menu_hotkey = VK_HOME;
     ShowWindow(g_hwnd, SW_SHOW);
+    append_debug_log("startup: overlay initialized");
 
     MSG msg{};
-    while (msg.message != WM_QUIT) {
+    while (msg.message != WM_QUIT && !g_exit_requested) {
         if (PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE)) {
             if (msg.message == WM_SIZE) {               // 处理 DPI/分辨率变化
                 RECT r; GetClientRect(g_hwnd, &r);
@@ -417,13 +431,35 @@ int WINAPI WinMain(HINSTANCE hinst, HINSTANCE, LPSTR, int) {
         frame();
     }
 
+    append_debug_log("exit: saving settings");
+    ucf::save_settings(g_settings, "ucf_overlay.ini");
+    append_debug_log("exit: settings saved");
+
+    // SharedTransport 析构总是执行 UnmapViewOfFile + CloseHandle；Windows
+    // 映射对象不做删除操作，最后一个句柄释放后由系统回收。
+    g_shm.reset();
+    append_debug_log("exit: shared memory mapping closed");
+
+    if (g_hwnd) { DestroyWindow(g_hwnd); g_hwnd = nullptr; }
+    append_debug_log("exit: window destroyed");
+
     ImGui_ImplDX11_Shutdown();
     ImGui_ImplWin32_Shutdown();
     ImGui::DestroyContext();
+    append_debug_log("exit: imgui shutdown");
     cleanup_render_target();
     if (g_swap)  g_swap->Release();
     if (g_ctx)   g_ctx->Release();
     if (g_device) g_device->Release();
+    append_debug_log("exit: d3d destroyed");
+    if (g_settings.exit_delete_config) {
+        std::remove("ucf_overlay.ini");
+        append_debug_log("exit: deleted ucf_overlay.ini");
+    }
+    if (g_settings.exit_delete_log) {
+        append_debug_log("exit: deleting ucf_debug.log");
+        std::remove("ucf_debug.log");
+    }
     return 0;
 }
 #else

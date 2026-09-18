@@ -63,6 +63,19 @@ void project_frame(const Frame& f, ScreenMark* marks, int& n) {
             const float dz = p.pos[2] - f.local.pos[2];
             m.dist = std::sqrt(dx * dx + dy * dy + dz * dz);
         }
+        for (int bi = 0; bi < MAX_BONES; ++bi) {
+            const BoneState& bone = p.bones[bi];
+            auto& bs = m.bones[bi];
+            bs.valid = false;
+            if (!bone.valid) continue;
+            float bndcx = 0, bndcy = 0, bwc = 0;
+            if (!clip_of(bone.pos, VP, bndcx, bndcy, bwc)) continue;
+            const float bx = (bndcx * 0.5f + 0.5f) * f.width;
+            const float by = (1.0f - (bndcy * 0.5f + 0.5f)) * f.height;
+            if (std::fabs(bndcx) > NDC_CLIP || std::fabs(bndcy) > NDC_CLIP ||
+                bx < 0 || bx > f.width || by < 0 || by > f.height) continue;
+            bs.sx = bx; bs.sy = by; bs.valid = true;
+        }
         ++n;
     }
 }
@@ -98,6 +111,21 @@ void SyntheticSource::update(Frame& out) {
         out.players[i].maxHp = 100;
         out.players[i].team = i % 2;
         out.players[i].isDead = (out.players[i].hp <= 0);
+        // 合成源也填充真实契约的 19 个骨骼槽位，便于离线验证连线渲染。
+        static const float bone_offsets[MAX_BONES][3] = {
+            {0, .90f, 0}, {-.15f, .60f, 0}, {.15f, .60f, 0},
+            {-.15f, .30f, 0}, {.15f, .30f, 0}, {-.15f, 0, 0}, {.15f, 0, 0},
+            {0, 1.10f, 0}, {0, 1.35f, 0}, {0, 1.55f, 0}, {0, 1.80f, 0},
+            {-.25f, 1.40f, 0}, {.25f, 1.40f, 0}, {-.45f, 1.25f, 0},
+            {.45f, 1.25f, 0}, {-.60f, 1.10f, 0}, {.60f, 1.10f, 0},
+            {-.75f, 1.00f, 0}, {.75f, 1.00f, 0},
+        };
+        for (int bi = 0; bi < MAX_BONES; ++bi) {
+            out.players[i].bones[bi].pos[0] = out.players[i].pos[0] + bone_offsets[bi][0];
+            out.players[i].bones[bi].pos[1] = out.players[i].pos[1] + bone_offsets[bi][1];
+            out.players[i].bones[bi].pos[2] = out.players[i].pos[2] + bone_offsets[bi][2];
+            out.players[i].bones[bi].valid = true;
+        }
     }
 }
 
@@ -123,19 +151,10 @@ void render_draw_list(ImDrawList* dl, const DrawList& d) {
         const LabelPrim& L = d.labels[i];
         dl->AddText(ImVec2(L.x, L.y), rgb(L.r, L.g, L.b), L.text);
     }
-    for (int i = 0; i < d.skeletonCount; ++i) {
-        const SkeletonPrim& s = d.skeletons[i];
-        const ImU32 c = rgb(s.r, s.g, s.b);
-        const float cx = s.x + s.w * 0.5f;
-        const float head = s.y + s.h * 0.16f;
-        const float shoulders = s.y + s.h * 0.30f;
-        const float hips = s.y + s.h * 0.62f;
-        const float feet = s.y + s.h * 0.98f;
-        dl->AddCircle(ImVec2(cx, head), s.w * 0.10f, c, 12, s.thickness);
-        dl->AddLine(ImVec2(cx, head + s.w * 0.10f), ImVec2(cx, hips), c, s.thickness);
-        dl->AddLine(ImVec2(s.x + s.w * 0.18f, shoulders), ImVec2(s.x + s.w * 0.82f, shoulders), c, s.thickness);
-        dl->AddLine(ImVec2(cx, hips), ImVec2(s.x + s.w * 0.25f, feet), c, s.thickness);
-        dl->AddLine(ImVec2(cx, hips), ImVec2(s.x + s.w * 0.75f, feet), c, s.thickness);
+    for (int i = 0; i < d.boneLineCount; ++i) {
+        const BoneLinePrim& line = d.boneLines[i];
+        dl->AddLine(ImVec2(line.x1, line.y1), ImVec2(line.x2, line.y2),
+                    rgb(line.r, line.g, line.b), line.thickness);
     }
 }
 
