@@ -51,7 +51,8 @@ if(WIN32)
   # ImGui 后端用 Windows 接口，关掉告警噪声
   target_compile_definitions(imgui PRIVATE _CRT_SECURE_NO_WARNINGS)
 
-  add_executable(ucf_overlay_win32
+  # WIN32 关键字 -> /SUBSYSTEM:WINDOWS，入口用 WinMain（无控制台窗口，适合透明叠加层）
+  add_executable(ucf_overlay_win32 WIN32
     src/main_win32.cpp
     src/overlay_win32.cpp
     src/menu_win32.cpp)

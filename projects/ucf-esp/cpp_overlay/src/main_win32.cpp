@@ -110,7 +110,7 @@ static void frame() {
 
     ImDrawList* bdl = ImGui::GetBackgroundDrawList();
     ucf::render_draw_list(bdl, dl);
-    draw_menu(g_settings, g_show_menu);
+    ucf::draw_menu(g_settings, g_show_menu);
 
     ImGui::Render();
     const float clear[4] = {0, 0, 0, 0};      // 透明清空
