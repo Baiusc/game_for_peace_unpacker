@@ -183,7 +183,7 @@ static void frame() {
                      shm.ok() ? "yes" : "no(synth)");
         ImVec2 p(12, 12);
         bdl->AddRectFilled(p, ImVec2(p.x + 300, p.y + 54), IM_COL32(0, 0, 0, 150));
-        bdl->AddText(p + ImVec2(6, 6), IM_COL32(90, 255, 130, 255), hud);
+        bdl->AddText(ImVec2(p.x + 6, p.y + 6), IM_COL32(90, 255, 130, 255), hud);
     }
 
     // 心跳日志（相对 exe 目录）：每 120 帧写一行，便于远程确认程序在跑。
