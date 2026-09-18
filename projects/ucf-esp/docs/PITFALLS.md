@@ -150,4 +150,11 @@
 - **落盘**：`--dump-frame DIR` 保存原始 Frame，不保存投影后的 marks；默认每帧一份、最多 500 份，可用 `--dump-every` 与 `--dump-max-frames` 调整，写临时文件后原子替换，避免留下半个 JSON。
 - **双缓冲**：`frame_bytes=23804` 是一个 Frame，`slot_bytes=23808` 多出的 4 字节是当前槽索引；写端必须先写后台槽，最后翻转索引。名称 `UcfFrame` 区分大小写，退出必须关闭映射句柄。
 - **失败策略**：共享内存写失败只记录一次并停止桥接，避免每帧刷屏，也避免继续运行一个已经不可信的半死写端。
-- **一致性**：`tests/test_projection_parity.py` 从 `real_frame_level3.json` 生成同一组矩阵、世界点和 Python 期望值，交给 `test_projection_parity` 使用 C++ `world_to_screen` 校验，误差阈值为 `1e-5`。
+- **一致性**：`tests/test_projection_parity.py` 从 `real_frame_level3.json` 生成同一组矩阵、世界点和 Python 期望值，交给 `test_projection_parity` 使用 C++ `world_to_screen` 校验，误差阈值为 `1e-4`。
+
+### 2026-09-18：目标状态与死亡切换防抖
+
+- **状态来源**：`TargetState` 只使用当前 `Candidate` 的 `valid/dead/hp/visible`；现有 `Frame` 没有真实遮挡字段，因此 `visible=false` 不能解释为已完成游戏内 LOS 检测。
+- **防抖**：`aim_lock_prevent` 开启且本地激活状态保持时，上一个目标变为死亡、阻挡或无效并切换到新目标时只跳过一次重锁定；状态松开后复位。
+- **显示**：异常状态的选中射线使用黄色；该逻辑只生成 DrawList，不调用鼠标、键盘、视角写入或任何输入 API。
+- **配置**：`aim_lock_prevent` 已加入 key=value 保存/加载和 Win32 菜单，并由 `overlay_tests` 覆盖状态、一次性跳过与 round-trip。

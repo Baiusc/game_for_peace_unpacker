@@ -1,0 +1,23 @@
+--- projects/ucf-esp/verification/target_state_lock_prevent_20260918/ORIGINAL_FILE	2026-09-18 18:13:54.307767800 +0800
++++ projects/ucf-esp/verification/target_state_lock_prevent_20260918/MODIFIED_FILE	2026-09-18 18:13:54.309524100 +0800
+@@ -40,6 +40,21 @@
+     float x = 0, y = 0;
+     bool valid = true;
+ };
++
++// 目标状态只描述本地 Frame 中已知的信息；当前契约没有遮挡字段，
++// visible=false 只代表上游没有提供可用投影/可见性标记，不推断游戏内 LOS。
++enum class TargetState { Normal, Blocked, Dead, Invalid };
++TargetState target_state(const Candidate& candidate);
++
++struct LockPreventState {
++    int last_target = -1;
++    bool active = false;
++};
++
++// 目标刚从候选集中掉出（死亡/无效/不可见）时只抑制下一次重锁定。
++// 不执行任何输入、视角或进程操作；key_held 仅表示上层本地模拟状态机是否保持激活。
++bool lock_prevent_should_skip(LockPreventState& state, const Candidate* c, int n,
++                              int current_target, bool enabled, bool key_held);
+ int select_screen_target(const ScreenCandidate* c, int n,
+                          float center_x, float center_y, float fov_radius);

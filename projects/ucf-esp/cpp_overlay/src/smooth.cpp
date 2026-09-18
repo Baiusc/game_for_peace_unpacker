@@ -43,6 +43,31 @@ static float dot(const Vec3& a, const Vec3& b) {
     return a.x * b.x + a.y * b.y + a.z * b.z;
 }
 
+TargetState target_state(const Candidate& candidate) {
+    if (candidate.dead || candidate.hp <= 0) return TargetState::Dead;
+    if (!candidate.valid) return TargetState::Invalid;
+    if (!candidate.visible) return TargetState::Blocked;
+    return TargetState::Normal;
+}
+
+bool lock_prevent_should_skip(LockPreventState& state, const Candidate* c, int n,
+                              int current_target, bool enabled, bool key_held) {
+    if (!enabled || !key_held) {
+        state.last_target = -1;
+        state.active = false;
+        return false;
+    }
+    bool skip = state.active;
+    state.active = false;
+    if (state.last_target >= 0 && state.last_target < n &&
+        current_target != state.last_target && c != nullptr &&
+        target_state(c[state.last_target]) != TargetState::Normal) {
+        skip = true;
+    }
+    state.last_target = current_target;
+    return skip;
+}
+
 int select_target(const Vec3& cam_forward, const Candidate* c, int n,
                   float fov_deg, int mode) {
     Vec3 f = normalize(cam_forward);

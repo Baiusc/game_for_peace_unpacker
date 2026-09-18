@@ -113,7 +113,11 @@ void build_draw_list(const Viewport& vp, const ScreenMark* marks, int n,
             ray.x1 = vp.x + vp.w * 0.5f;
             ray.y1 = style.ray_from_bottom ? vp.y + vp.h : vp.y + vp.h * 0.5f;
             ray.x2 = px; ray.y2 = py;
-            ray.r = col[0]; ray.g = col[1]; ray.b = col[2];
+            if (style.target_state != TargetState::Normal) {
+                ray.r = 1.0f; ray.g = 0.85f; ray.b = 0.1f;
+            } else {
+                ray.r = col[0]; ray.g = col[1]; ray.b = col[2];
+            }
         }
     }
 }

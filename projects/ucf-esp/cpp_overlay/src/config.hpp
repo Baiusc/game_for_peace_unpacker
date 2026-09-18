@@ -20,6 +20,7 @@ struct Settings {
     bool  aim_teammates   = false;
     bool  aim_dead        = false;
     bool  aim_visible_only = true;
+    bool  aim_lock_prevent = false;
     float fov_deg         = 90.0f;
     bool  show_target_ray = true;
     bool  ray_from_bottom = true;

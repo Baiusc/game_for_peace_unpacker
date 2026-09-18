@@ -23,6 +23,7 @@ bool save_settings(const Settings& s, const char* path) {
     fprintf(f, "aim_teammates=%d\n", s.aim_teammates ? 1 : 0);
     fprintf(f, "aim_dead=%d\n", s.aim_dead ? 1 : 0);
     fprintf(f, "aim_visible_only=%d\n", s.aim_visible_only ? 1 : 0);
+    fprintf(f, "aim_lock_prevent=%d\n", s.aim_lock_prevent ? 1 : 0);
     fprintf(f, "fov_deg=%.3f\n",      s.fov_deg);
     fprintf(f, "show_target_ray=%d\n", s.show_target_ray ? 1 : 0);
     fprintf(f, "ray_from_bottom=%d\n", s.ray_from_bottom ? 1 : 0);
@@ -87,6 +88,7 @@ bool load_settings(Settings& s, const char* path) {
         else if (!std::strcmp(key, "aim_teammates"))  s.aim_teammates = std::atoi(val) != 0;
         else if (!std::strcmp(key, "aim_dead"))       s.aim_dead = std::atoi(val) != 0;
         else if (!std::strcmp(key, "aim_visible_only")) s.aim_visible_only = std::atoi(val) != 0;
+        else if (!std::strcmp(key, "aim_lock_prevent")) s.aim_lock_prevent = std::atoi(val) != 0;
         else if (!std::strcmp(key, "fov_deg"))        s.fov_deg        = std::atof(val);
         else if (!std::strcmp(key, "show_target_ray")) s.show_target_ray = std::atoi(val) != 0;
         else if (!std::strcmp(key, "ray_from_bottom")) s.ray_from_bottom = std::atoi(val) != 0;

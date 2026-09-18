@@ -1,6 +1,7 @@
 #pragma once
 #include <cstdint>
 #include "shared_state.hpp"
+#include "smooth.hpp"
 
 // 通用 2D 可视化原语：把“投影后的屏幕标记”转成一组可直接交给
 // ImGui 背景绘制层（GetBackgroundDrawList）去画的形状。
@@ -54,6 +55,7 @@ struct DrawStyle {
     bool show_teammate = true;
     bool show_enemy = true;
     int target_index = -1;
+    TargetState target_state = TargetState::Normal;
     bool show_target_ray = false;
     bool ray_from_bottom = true;
     float max_distance = 250.0f;

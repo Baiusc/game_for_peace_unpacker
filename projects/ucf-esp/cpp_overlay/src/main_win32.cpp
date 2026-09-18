@@ -464,7 +464,9 @@ static void frame() {
 
     // 目标选择与角度平滑只产生诊断结果，不写鼠标、不写输入。
     static ucf::Angles output_angles{};
+    static ucf::LockPreventState lock_prevent{};
     int target = -1;
+    ucf::TargetState selected_state = ucf::TargetState::Invalid;
     if (g_settings.aimbot_enabled && f.inGame) {
         ucf::Candidate candidates[ucf::MAX_PLAYERS]{};
         ucf::ScreenCandidate screen_candidates[ucf::MAX_PLAYERS]{};
@@ -507,10 +509,19 @@ static void frame() {
                                                fov_radius);
         }
         if (target >= 0) {
+            selected_state = ucf::target_state(candidates[target]);
             output_angles = ucf::smooth_angles(output_angles,
                 ucf::angles_from_direction(candidates[target].dir),
                 g_settings.responsiveness);
         }
+        if (ucf::lock_prevent_should_skip(lock_prevent, candidates, player_count,
+                                          target, g_settings.aim_lock_prevent,
+                                          g_settings.aimbot_enabled)) {
+            target = -1;
+            selected_state = ucf::TargetState::Invalid;
+        }
+    } else {
+        ucf::lock_prevent_should_skip(lock_prevent, nullptr, 0, -1, false, false);
     }
 
     if (g_settings.esp_enabled && g_settings.esp_visible) {
@@ -523,6 +534,7 @@ static void frame() {
         style.show_teammate = g_settings.show_teammate;
         style.show_enemy = g_settings.show_enemy;
         style.target_index = target >= 0 ? target + 1 : -1;
+        style.target_state = selected_state;
         style.show_target_ray = g_settings.show_target_ray;
         style.ray_from_bottom = g_settings.ray_from_bottom;
         style.max_distance = g_settings.max_distance;

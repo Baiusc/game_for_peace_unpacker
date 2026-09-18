@@ -85,6 +85,26 @@ static void test_smooth() {
     ucf::Angles a{0, 0};
     ucf::Angles b = ucf::smooth_angles(a, tgt, 0.0f);
     CHECK(approx(b.yaw, 0.0f) && approx(b.pitch, 0.0f));
+
+    ucf::Candidate state_candidate{};
+    state_candidate.hp = 100;
+    CHECK(ucf::target_state(state_candidate) == ucf::TargetState::Normal);
+    state_candidate.visible = false;
+    CHECK(ucf::target_state(state_candidate) == ucf::TargetState::Blocked);
+    state_candidate.visible = true;
+    state_candidate.dead = true;
+    CHECK(ucf::target_state(state_candidate) == ucf::TargetState::Dead);
+    state_candidate.dead = false;
+    state_candidate.valid = false;
+    CHECK(ucf::target_state(state_candidate) == ucf::TargetState::Invalid);
+
+    ucf::Candidate lock_candidates[2]{};
+    ucf::LockPreventState lock{};
+    CHECK(!ucf::lock_prevent_should_skip(lock, lock_candidates, 2, 0, true, true));
+    lock_candidates[0].dead = true;
+    CHECK(ucf::lock_prevent_should_skip(lock, lock_candidates, 2, 1, true, true));
+    CHECK(!ucf::lock_prevent_should_skip(lock, lock_candidates, 2, 1, true, true));
+    CHECK(!ucf::lock_prevent_should_skip(lock, lock_candidates, 2, 1, true, false));
 }
 
 static void test_select_target() {
@@ -140,6 +160,7 @@ static void test_config_roundtrip() {
     s.show_skeleton = true; s.aimbot_enabled = true; s.aim_max_distance = 42.0f;
     s.show_fov_circle = true;
     s.aim_selection_mode = 1; s.aim_point_mode = 3; s.aim_bone_id = 15;
+    s.aim_lock_prevent = true;
     s.exit_delete_config = true;
     CHECK(ucf::save_settings(s, "settings_test.txt"));
     ucf::Settings r{};
@@ -152,6 +173,7 @@ static void test_config_roundtrip() {
     CHECK(r.show_skeleton && r.aimbot_enabled && approx(r.aim_max_distance, 42.0f));
     CHECK(r.show_fov_circle);
     CHECK(r.aim_selection_mode == 1 && r.aim_point_mode == 3 && r.aim_bone_id == 15);
+    CHECK(r.aim_lock_prevent);
     CHECK(r.exit_delete_config && !r.exit_delete_log);
     std::remove("settings_test.txt");
 }
