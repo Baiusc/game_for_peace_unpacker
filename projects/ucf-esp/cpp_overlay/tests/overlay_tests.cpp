@@ -103,6 +103,15 @@ static void test_select_target() {
     CHECK(r == 0);
     const ucf::Angles a = ucf::angles_from_direction({1, 0, 1});
     CHECK(approx(a.yaw, 0.785398f, 1e-3f));
+
+    ucf::ScreenCandidate screen[3]{};
+    screen[0] = {640.0f, 360.0f, true};
+    screen[1] = {650.0f, 360.0f, true};
+    screen[2] = {641.0f, 361.0f, true};
+    CHECK(ucf::select_screen_target(screen, 3, 640.0f, 360.0f, 20.0f) == 0);
+    screen[0].valid = false;
+    CHECK(ucf::select_screen_target(screen, 3, 640.0f, 360.0f, 20.0f) == 2);
+    CHECK(ucf::select_screen_target(screen, 3, 640.0f, 360.0f, 0.0f) == -1);
 }
 
 static void test_transport_roundtrip() {

@@ -1,0 +1,28 @@
+diff --git a/projects/ucf-esp/verification/screen_center_target_20260918/ORIGINAL_FILE b/projects/ucf-esp/verification/screen_center_target_20260918/MODIFIED_FILE
+index 2b88647..0f15911 100755
+--- a/projects/ucf-esp/verification/screen_center_target_20260918/ORIGINAL_FILE
++++ b/projects/ucf-esp/verification/screen_center_target_20260918/MODIFIED_FILE
+@@ -72,4 +72,23 @@ int select_target(const Vec3& cam_forward, const Candidate* c, int n,
+     return best;
+ }
+
++int select_screen_target(const ScreenCandidate* c, int n,
++                         float center_x, float center_y, float fov_radius) {
++    if (!c || n <= 0 || fov_radius <= 0.0f) return -1;
++    const float radius2 = fov_radius * fov_radius;
++    int best = -1;
++    float best_distance2 = radius2;
++    for (int i = 0; i < n; ++i) {
++        if (!c[i].valid) continue;
++        const float dx = c[i].x - center_x;
++        const float dy = c[i].y - center_y;
++        const float distance2 = dx * dx + dy * dy;
++        if (distance2 <= best_distance2) {
++            best = i;
++            best_distance2 = distance2;
++        }
++    }
++    return best;
++}
++
+ } // namespace ucf

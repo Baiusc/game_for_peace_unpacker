@@ -34,6 +34,15 @@ struct Candidate {
 int select_target(const Vec3& cam_forward, const Candidate* c, int n,
                   float fov_deg, int mode);
 
+// 屏幕空间选靶：只考虑 FOV 圆内目标，返回距离屏幕中心最近的下标。
+// 这是叠加层显示与用户视线一致的选靶规则，不注入鼠标或输入。
+struct ScreenCandidate {
+    float x = 0, y = 0;
+    bool valid = true;
+};
+int select_screen_target(const ScreenCandidate* c, int n,
+                         float center_x, float center_y, float fov_radius);
+
 Angles angles_from_direction(Vec3 dir);
 float angle_distance(Angles a, Angles b);
 

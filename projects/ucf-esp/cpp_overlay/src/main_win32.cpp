@@ -203,12 +203,6 @@ static void record_frame(const ucf::Frame& f) {
     ++g_recorded_frames;
 }
 
-// 当前投影约定使用 OpenGL 风格的相机空间 -Z 为前方。
-// 对正交旋转的 world-to-camera 矩阵取转置，得到世界空间相机前向量。
-static ucf::Vec3 camera_forward_from_view(const float w2c[16]) {
-    return {-w2c[2], -w2c[6], -w2c[10]};
-}
-
 static void cleanup_render_target() {
     if (g_rtv) { g_rtv->Release(); g_rtv = nullptr; }
 }
@@ -436,6 +430,7 @@ static void frame() {
     int target = -1;
     if (g_settings.aimbot_enabled && f.inGame) {
         ucf::Candidate candidates[ucf::MAX_PLAYERS]{};
+        ucf::ScreenCandidate screen_candidates[ucf::MAX_PLAYERS]{};
         const int player_count = std::max(0, std::min(f.playerCount, ucf::MAX_PLAYERS));
         for (int i = 0; i < player_count; ++i) {
             const auto& p = f.players[i];
@@ -448,15 +443,22 @@ static void frame() {
             candidates[i].team = p.team;
             candidates[i].dead = p.isDead || p.hp <= 0;
             candidates[i].visible = g_marks[i + 1].on_screen;
+            screen_candidates[i].x = g_marks[i + 1].sx;
+            screen_candidates[i].y = g_marks[i + 1].sy;
+            screen_candidates[i].valid = true;
             if ((!g_settings.aim_teammates && p.team == f.local.team) ||
                 (!g_settings.aim_dead && candidates[i].dead) ||
                 (g_settings.aim_visible_only && !candidates[i].visible) ||
                 (g_settings.aim_max_distance > 0.0f && candidates[i].dist > g_settings.aim_max_distance)) {
                 candidates[i].valid = false;
+                screen_candidates[i].valid = false;
             }
         }
-        target = ucf::select_target(camera_forward_from_view(f.w2c), candidates, player_count,
-                                    g_settings.fov_deg, g_settings.target_mode);
+        const float fov = std::max(1.0f, std::min(180.0f, g_settings.fov_deg));
+        const float fov_radius = (fov / 90.0f) * (std::min(float(f.width), float(f.height)) * 0.5f);
+        target = ucf::select_screen_target(screen_candidates, player_count,
+                                           float(f.width) * 0.5f, float(f.height) * 0.5f,
+                                           fov_radius);
         if (target >= 0) {
             output_angles = ucf::smooth_angles(output_angles,
                 ucf::angles_from_direction(candidates[target].dir),

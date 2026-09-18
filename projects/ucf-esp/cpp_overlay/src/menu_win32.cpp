@@ -86,7 +86,7 @@ void draw_menu(Settings& s, bool& show_menu, bool& request_exit,
         ImGui::Checkbox("显示目标射线", &s.show_target_ray);
         ImGui::Checkbox("射线从屏幕底部", &s.ray_from_bottom);
         ImGui::SliderFloat("瞄准最大距离", &s.aim_max_distance, 0.0f, 1000.0f, "%.0f m");
-        ImGui::Combo("目标选择", &s.target_mode, "最近目标\0最低血量\0准星最近\0");
+        ImGui::TextUnformatted("选靶规则：FOV 圆内距屏幕中心最近");
         ImGui::Checkbox("允许队友", &s.aim_teammates);
         ImGui::Checkbox("允许死亡目标", &s.aim_dead);
         ImGui::Checkbox("仅屏幕内目标", &s.aim_visible_only);
