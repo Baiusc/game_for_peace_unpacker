@@ -1,0 +1,13 @@
+diff --git a/projects/ucf-esp/verification/windows_nomininmax_20260918/ORIGINAL_FILE b/projects/ucf-esp/verification/windows_nomininmax_20260918/MODIFIED_FILE
+index 86617d9..2b6205a 100755
+--- a/projects/ucf-esp/verification/windows_nomininmax_20260918/ORIGINAL_FILE
++++ b/projects/ucf-esp/verification/windows_nomininmax_20260918/MODIFIED_FILE
+@@ -59,6 +59,8 @@ if(WIN32)
+     src/overlay_win32.cpp
+     src/menu_win32.cpp)
+   target_include_directories(ucf_overlay_win32 PRIVATE ${IMGUI_DIR} src)
++  # Windows.h 的 min/max 宏会破坏 std::min/std::max；叠加层源码使用 STL 数值函数。
++  target_compile_definitions(ucf_overlay_win32 PRIVATE NOMINMAX)
+   target_link_libraries(ucf_overlay_win32 PRIVATE
+     ucf_overlay_core imgui
+     d3d11 dxgi d3dcompiler dwmapi user32 gdi32)

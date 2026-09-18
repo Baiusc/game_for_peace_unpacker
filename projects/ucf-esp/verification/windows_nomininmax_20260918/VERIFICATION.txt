@@ -1,0 +1,10 @@
+BASELINE command: ctest --test-dir projects/ucf-esp/cpp_overlay/build --output-on-failure
+BASELINE output: 1/1 test passed
+BASELINE exit: 0
+MODIFIED command: cmake --build projects/ucf-esp/cpp_overlay/build -j2 && ctest --test-dir projects/ucf-esp/cpp_overlay/build --output-on-failure
+MODIFIED output: build passed; 1/1 test passed
+MODIFIED exit: 0
+ROLLBACK command: projects/ucf-esp/verification/windows_nomininmax_20260918/ROLLBACK.sh
+ROLLBACK output: rollback restored
+ROLLBACK exit: 0
+RESTORED result: ROLLBACK_TEST_COPY equals ORIGINAL_FILE
