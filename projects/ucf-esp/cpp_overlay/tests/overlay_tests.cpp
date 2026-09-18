@@ -227,8 +227,27 @@ static void test_config_roundtrip() {
     std::remove("settings_test.txt");
 }
 
+static void test_viewport_mapping() {
+    const auto auto_letterbox = ucf::compute_viewport(
+        0, 0, 1536, 864, 800, 600, ucf::FitMode::Auto);
+    CHECK(approx(auto_letterbox.x, 192.0f) && approx(auto_letterbox.y, 0.0f));
+    CHECK(approx(auto_letterbox.w, 1152.0f) && approx(auto_letterbox.h, 864.0f));
+    CHECK(approx(auto_letterbox.sx, 1.44f) && approx(auto_letterbox.sy, 1.44f));
+
+    const auto stretch = ucf::compute_viewport(
+        0, 0, 1536, 864, 800, 600, ucf::FitMode::Stretch);
+    CHECK(approx(stretch.x, 0.0f) && approx(stretch.y, 0.0f));
+    CHECK(approx(stretch.sx, 1.92f) && approx(stretch.sy, 1.44f));
+
+    const auto windowed = ucf::compute_viewport(
+        120, 80, 1280, 720, 1280, 720, ucf::FitMode::Auto);
+    CHECK(approx(windowed.x, 120.0f) && approx(windowed.y, 80.0f));
+    CHECK(approx(windowed.sx, 1.0f) && approx(windowed.sy, 1.0f));
+}
+
 int main() {
     printf("[overlay_tests]\n");
+    test_viewport_mapping();
     test_draw_list();
     test_smooth();
     test_select_target();

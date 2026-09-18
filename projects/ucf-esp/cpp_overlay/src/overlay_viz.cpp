@@ -1,8 +1,33 @@
 #include "overlay_viz.hpp"
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 
 namespace ucf {
+
+Viewport compute_viewport(float client_x, float client_y, float client_w, float client_h,
+                          float frame_w, float frame_h, FitMode mode) {
+    client_w = std::max(1.0f, client_w);
+    client_h = std::max(1.0f, client_h);
+    frame_w = std::max(1.0f, frame_w);
+    frame_h = std::max(1.0f, frame_h);
+    if (mode == FitMode::Auto) {
+        const float frame_aspect = frame_w / frame_h;
+        const float client_aspect = client_w / client_h;
+        const float relative_error = std::fabs(client_aspect - frame_aspect) / frame_aspect;
+        mode = relative_error <= 0.02f ? FitMode::Stretch : FitMode::Letterbox;
+    }
+    if (mode == FitMode::Letterbox) {
+        const float scale = std::min(client_w / frame_w, client_h / frame_h);
+        const float w = frame_w * scale;
+        const float h = frame_h * scale;
+        return {client_x + (client_w - w) * 0.5f,
+                client_y + (client_h - h) * 0.5f,
+                w, h, scale, scale};
+    }
+    return {client_x, client_y, client_w, client_h,
+            client_w / frame_w, client_h / frame_h};
+}
 
 static constexpr int BONE_PAIRS[][2] = {
     {0, 7}, {7, 8}, {8, 9}, {9, 10},

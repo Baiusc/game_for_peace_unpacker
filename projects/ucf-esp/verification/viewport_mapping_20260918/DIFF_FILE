@@ -1,0 +1,169 @@
+diff --git a/media/baiusc/DATA1/Repositories/ReposMyself/my_hack/game_for_peace_unpacker/projects/ucf-esp/verification/viewport_mapping_20260918/ORIGINAL_FILE b/media/baiusc/DATA1/Repositories/ReposMyself/my_hack/game_for_peace_unpacker/projects/ucf-esp/verification/viewport_mapping_20260918/MODIFIED_FILE
+index f956cba..10764e1 100755
+--- a/media/baiusc/DATA1/Repositories/ReposMyself/my_hack/game_for_peace_unpacker/projects/ucf-esp/verification/viewport_mapping_20260918/ORIGINAL_FILE
++++ b/media/baiusc/DATA1/Repositories/ReposMyself/my_hack/game_for_peace_unpacker/projects/ucf-esp/verification/viewport_mapping_20260918/MODIFIED_FILE
+@@ -19,6 +19,7 @@
+ #ifdef _WIN32
+ #define WIN32_LEAN_AND_MEAN
+ #include <windows.h>
++#include <tlhelp32.h>
+ #include <d3d11.h>
+ #include <dxgi1_2.h>
+ #include <dxgi1_3.h>           // CreateDXGIFactory2
+@@ -64,6 +65,84 @@ static bool                     g_flip_used = false;   // 交换链实际用的
+ static bool                     g_clear_transparent = true;  // 清屏是否透明(alpha=0)；BLT colorkey 时为不透明黑
+ static ucf::input_sim::LocalInputSim g_input_sim{};
+ static bool g_input_sim_was_enabled = false;
++static ucf::FitMode g_overlay_fit = ucf::FitMode::Auto;
++static int g_overlay_origin_x = 0;
++static int g_overlay_origin_y = 0;
++
++struct GameClientRect { int x = 0, y = 0, w = 0, h = 0; bool valid = false; };
++
++static DWORD find_game_pid() {
++    HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
++    if (snapshot == INVALID_HANDLE_VALUE) return 0;
++    PROCESSENTRY32W entry{sizeof(entry)};
++    DWORD result = 0;
++    if (Process32FirstW(snapshot, &entry)) {
++        do {
++            if (_wcsicmp(entry.szExeFile, L"UnityCrossFire.exe") == 0) {
++                result = entry.th32ProcessID;
++                break;
++            }
++        } while (Process32NextW(snapshot, &entry));
++    }
++    CloseHandle(snapshot);
++    return result;
++}
++
++struct EnumGameWindows { DWORD pid = 0; GameClientRect best{}; };
++
++static BOOL CALLBACK enum_game_windows(HWND hwnd, LPARAM param) {
++    auto& state = *reinterpret_cast<EnumGameWindows*>(param);
++    if (!IsWindowVisible(hwnd) || IsIconic(hwnd)) return TRUE;
++    DWORD pid = 0;
++    GetWindowThreadProcessId(hwnd, &pid);
++    if (!state.pid || pid != state.pid) return TRUE;
++    RECT client{};
++    if (!GetClientRect(hwnd, &client)) return TRUE;
++    POINT origin{client.left, client.top};
++    if (!ClientToScreen(hwnd, &origin)) return TRUE;
++    const int w = client.right - client.left;
++    const int h = client.bottom - client.top;
++    if (w <= 0 || h <= 0 || w * h <= state.best.w * state.best.h) return TRUE;
++    state.best = {origin.x, origin.y, w, h, true};
++    return TRUE;
++}
++
++static GameClientRect find_game_client_rect() {
++    EnumGameWindows state{find_game_pid(), {}};
++    if (state.pid) EnumWindows(enum_game_windows, reinterpret_cast<LPARAM>(&state));
++    return state.best;
++}
++
++static const char* fit_name() {
++    switch (g_overlay_fit) {
++        case ucf::FitMode::Stretch: return "stretch";
++        case ucf::FitMode::Letterbox: return "letterbox";
++        default: return "auto";
++    }
++}
++
++static void parse_overlay_fit(const char* command_line) {
++    if (!command_line) return;
++    if (std::strstr(command_line, "--overlay-fit letterbox"))
++        g_overlay_fit = ucf::FitMode::Letterbox;
++    else if (std::strstr(command_line, "--overlay-fit stretch"))
++        g_overlay_fit = ucf::FitMode::Stretch;
++}
++
++static void draw_fov(ImDrawList* draw_list, const ucf::Viewport& vp,
++                     float frame_w, float frame_h, float fov_deg) {
++    const float radius = (fov_deg / 90.0f) * (std::min(frame_w, frame_h) * 0.5f);
++    constexpr int segments = 96;
++    ImVec2 previous{};
++    for (int i = 0; i <= segments; ++i) {
++        const float angle = 6.28318530718f * float(i) / float(segments);
++        const ImVec2 point{
++            vp.x + (frame_w * 0.5f + std::cos(angle) * radius) * vp.sx,
++            vp.y + (frame_h * 0.5f + std::sin(angle) * radius) * vp.sy};
++        if (i > 0) draw_list->AddLine(previous, point, IM_COL32(255, 220, 80, 180), 1.0f);
++        previous = point;
++    }
++}
+ 
+ // ImGui_ImplWin32_WndProcHandler 已在 <imgui_impl_win32.h> 中声明，直接调用即可。
+ static LRESULT CALLBACK wndproc(HWND h, UINT m, WPARAM w, LPARAM l) {
+@@ -461,7 +540,23 @@ static void frame() {
+     float cw = float(rc.right - rc.left), ch = float(rc.bottom - rc.top);
+     float fw = (f.width  > 0) ? float(f.width)  : 1280.0f;   // 分母兜底，避免 scale=inf
+     float fh = (f.height > 0) ? float(f.height) : 720.0f;
+-    ucf::Viewport vp{0, 0, cw, ch, cw / fw, ch / fh};
++    static auto next_game_rect = std::chrono::steady_clock::time_point{};
++    static GameClientRect game_rect{};
++    const auto now = std::chrono::steady_clock::now();
++    if (now >= next_game_rect) {
++        game_rect = find_game_client_rect();
++        next_game_rect = now + std::chrono::milliseconds(500);
++    }
++    ucf::Viewport vp{};
++    if (game_rect.valid) {
++        vp = ucf::compute_viewport(
++            float(game_rect.x - g_overlay_origin_x),
++            float(game_rect.y - g_overlay_origin_y),
++            float(game_rect.w), float(game_rect.h), fw, fh, g_overlay_fit);
++    } else {
++        // 游戏窗口尚未出现时保留整屏回退；一旦找到 Unity 窗口，下一次刷新自动切换。
++        vp = ucf::compute_viewport(0, 0, cw, ch, fw, fh, g_overlay_fit);
++    }
+ 
+     ucf::DrawList dl{};
+ 
+@@ -579,9 +674,7 @@ static void frame() {
+     ImDrawList* bdl = ImGui::GetBackgroundDrawList();
+     if (g_settings.show_fov_circle) {
+         const float fov = std::max(1.0f, std::min(180.0f, g_settings.fov_deg));
+-        const float radius = (fov / 90.0f) * (std::min(vp.w, vp.h) * 0.5f);
+-        bdl->AddCircle(ImVec2(vp.x + vp.w * 0.5f, vp.y + vp.h * 0.5f),
+-                       radius, IM_COL32(255, 220, 80, 180), 96, 1.0f);
++        draw_fov(bdl, vp, fw, fh, fov);
+     }
+     const auto draw_begin = std::chrono::steady_clock::now();
+     ucf::render_draw_list(bdl, dl);
+@@ -664,11 +757,12 @@ static void frame() {
+         if ((dbg_frames++ % 120) == 0) {
+             FILE* lf = std::fopen("ucf_debug.log", "a");
+             if (lf) {
+-                fprintf(lf, "[%ld] mode=%s menu=%d esp=%d win=%dx%d frame=%dx%d players=%d scale=%.2f src=%s clear=%s present_hr=0x%08X\n",
++                fprintf(lf, "[%ld] mode=%s menu=%d esp=%d win=%dx%d frame=%dx%d players=%d viewport=%d,%d %dx%d scale=%.3fx%.3f fit=%s src=%s clear=%s present_hr=0x%08X\n",
+                         dbg_frames, g_flip_used ? "FLIP" : "BLT",
+                         g_show_menu ? 1 : 0, g_settings.esp_visible ? 1 : 0,
+                         int(cw), int(ch), f.width, f.height,
+-                        n, cw / fw, have_data ? "shm" : "synth",
++                        n, int(vp.x), int(vp.y), int(vp.w), int(vp.h), vp.sx, vp.sy,
++                        fit_name(), have_data ? "shm" : "synth",
+                         g_clear_transparent ? "transp" : "black",
+                         (unsigned long)present_hr);
+                 fclose(lf);
+@@ -697,6 +791,11 @@ static void init_overlay_fonts() {
+ }
+ 
+ int WINAPI WinMain(HINSTANCE hinst, HINSTANCE, LPSTR, int) {
++    parse_overlay_fit(GetCommandLineA());
++    g_overlay_origin_x = GetSystemMetrics(SM_XVIRTUALSCREEN);
++    g_overlay_origin_y = GetSystemMetrics(SM_YVIRTUALSCREEN);
++    const int overlay_w = GetSystemMetrics(SM_CXVIRTUALSCREEN);
++    const int overlay_h = GetSystemMetrics(SM_CYVIRTUALSCREEN);
+     WNDCLASSEXW wc{sizeof(wc)};
+     wc.style = CS_HREDRAW | CS_VREDRAW;
+     wc.lpfnWndProc = wndproc;
+@@ -711,7 +810,7 @@ int WINAPI WinMain(HINSTANCE hinst, HINSTANCE, LPSTR, int) {
+     g_hwnd = CreateWindowExW(
+         WS_EX_TRANSPARENT | WS_EX_TOPMOST | WS_EX_NOACTIVATE,
+         wc.lpszClassName, L"UCF Overlay",
+-        WS_POPUP, 0, 0, GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN),
++        WS_POPUP, g_overlay_origin_x, g_overlay_origin_y, overlay_w, overlay_h,
+         nullptr, nullptr, hinst, nullptr);
+ 
+     if (!init_d3d11(g_hwnd)) {

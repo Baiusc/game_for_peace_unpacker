@@ -29,6 +29,13 @@ struct Viewport {
     float sx = 1, sy = 1;              // 帧坐标 -> 像素 的缩放
 };
 
+enum class FitMode { Auto, Stretch, Letterbox };
+
+// 根据真实游戏客户区计算帧坐标到桌面像素的映射。
+// Auto 在宽高比接近时铺满，否则等比居中，避免 800x600 帧被拉成 16:9。
+Viewport compute_viewport(float client_x, float client_y, float client_w, float client_h,
+                          float frame_w, float frame_h, FitMode mode = FitMode::Auto);
+
 struct BoxPrim   { float x, y, w, h; float r, g, b; float thickness = 2.0f; bool selected = false; };
 struct BarPrim   { float x, y, w, h; float ratio; float r, g, b; };
 struct LabelPrim { float x, y; float r, g, b; char text[64]; };

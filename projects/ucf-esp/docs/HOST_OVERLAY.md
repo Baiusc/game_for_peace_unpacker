@@ -484,6 +484,21 @@ frida 16+ 会把 `send(对象)` **直接解成 dict** 递给 `on_message`，而�
 
 `--overlay-rect x,y,w,h` 可以手动指定显示区（屏幕物理像素），跳过自动找窗口。
 
+### C++ D3D11 叠加层的视口适配
+
+`ucf_overlay_win32.exe` 每 500ms 按进程查找 `UnityCrossFire.exe` 的最大可见窗口，读取客户区在桌面上的位置和尺寸，
+再用同一套 `auto/stretch/letterbox` 规则映射 Frame 坐标。窗口化、无边框全屏和不同游戏分辨率不再默认按整块桌面拉伸。
+默认 `auto`：宽高比接近时铺满，不接近时等比居中；也可启动时指定：
+
+```powershell
+ucf_overlay_win32.exe --overlay-fit auto
+ucf_overlay_win32.exe --overlay-fit letterbox
+ucf_overlay_win32.exe --overlay-fit stretch
+```
+
+`ucf_debug.log` 会记录 `viewport=x,y,w,h scale=sx,sy fit=...`。如果游戏窗口未找到，叠加层暂时回退到整屏，
+找到窗口后自动切换。
+
 ### ③ 画到别的窗口上
 
 `clip`（默认开）：游戏窗口**不在前台 / 被最小化 / 不可见**时 `withdraw()` 隐藏。
