@@ -229,3 +229,19 @@
 - **修法（frida_dump.js）**：遮挡检测按墙钟节流——`frameTick` 每帧只判定一次 `visDoRefreshThisFrame`（每 `VIS_REFRESH_MS`≈150ms 整批重算），结果按玩家 handle 缓存复用；非重算帧走缓存，不再每帧射线。死亡玩家（`hp<=0`）跳过射线直接判 `visible=false`。`CFG.visibility=false` 可彻底关闭（visible 恒 true）。改源码后**必须重打包 bundle**。
 - **代价与权衡**：遮挡状态 ~7Hz 刷新（150ms），对“隔墙虚线框/自动瞄准排除 BLOCKED”完全够用（墙体不会 150ms 内瞬移）。若仍觉卡，调大 `CFG.visRefreshMs`（如 250）或关 `visibility`。
 - **回放替代 synth**：不连游戏时，C++ 叠加层优先从录制文件（`dev_record_path`，默认 `dev_frames.jsonl`，与 `record_frame` 写出同格式 schema_version 2）回放真实帧（`RecordedSource`，JSONL 逐行解析、循环播放、按 `dev_replay_speed` 推进）；文件缺失/空才退回 `SyntheticSource` 的 13 个假玩家。默认 `dev_replay_enabled=true`。录制默认封顶 `dev_record_max_frames=500` 帧、每次录制截断为干净一段 clip。
+
+### 2026-09-19（续）：掉帧真凶不是 Linecast，而是「bridge 调用本身的开销」+「骨骼兜底 Find」
+
+- **现象**：按上一条节流 `Linecast` 之后，复测依然是“INS 注入进对局就卡，隐藏 ESP 也卡，掉帧修复没奏效”。
+- **先量化再动手**：宿主日志里 `[*] 已发送 N 帧` 的心跳间隔是写死的 `REPORT_MS=5000`，而两次报告之间只增长约 26 帧 → **实际约 5 FPS**（请求的可是 8ms=125Hz）。也就是每帧 `frameTick` 在 Unity 主线程上要跑 **~190ms**。**用「心跳两次报告之间的帧数增量 ÷ 5」就能直接从日志反推真实 FPS**，不用装任何工具。
+- **根因（按贡献排序）**：
+  1. **`obj.tryMethod(name, argc)` 每次都不便宜**：bridge 内部是 `new Il2Cpp.Method(classGetMethodFromName(this, Memory.allocUtf8String(name), argc))` —— 一次 native 字符串分配 + 一次 native 方法表查找，命中后还要 `bind()` **构造一个 `Proxy`**。取帧是「每帧 × 每玩家(10) × 每字段(≈10)」，8ms 间隔下就是上千次调用/帧。**这是最大头**，与 Linecast 无关。
+  2. **骨骼**：每玩家 19 次 `GetBoneTransform` + 19 次 `readPosOf`；`GetBoneTransform` 全返回 null 时（非 Humanoid 模型）还要兜底 `characterContainer.Find` —— 那是按名字**递归搜索整个 Transform 层级的字符串查找**，19 槽 × 最多 3 个别名 = 最多 57 次/玩家。实测骨骼 100% `valid=false`，等于每帧纯烧掉几百次调用。
+  3. `Physics.Linecast`（上一条已节流，量级比上面两项小一个数量级）。
+- **修法**：
+  - `callMethod` 两级缓存：`(类|名字|参数个数) -> 未绑定 Method` 消掉 `allocUtf8String` + `classGetMethodFromName`；`(类|对象|名字|参数个数) -> 已绑定 Method` 连 `bind()` 的 Proxy 构造也省掉。稳态下只剩 `Map.get` + `invoke`。
+  - **禁止缓存「对象地址 -> 类」**：Unity 会回收对象，地址复用后旧映射会把新对象当成旧类，调错方法就可能踩野内存（AV）。每次现取 `obj.class`（一次 `objectGetClass`，便宜）即可 —— 类链在 key 里，地址被复用成别的类时自然 miss 并重新解析。测试里加了 `CLASS_OF` 不得出现的断言来钉住这条。
+  - 骨骼按墙钟节流（`BONE_REFRESH_MS`=250ms）+ 按玩家缓存；`--no-bones` 可彻底关。
+  - **采样间隔默认 8ms → 33ms（≈30Hz）**：单帧真实耗时就是几十毫秒，8ms 的预算根本跑不完，只会把主线程占满。间隔必须 ≥ 单帧真实耗时。
+  - 新增帧内分段计时：心跳里多打一行 `perf: 单帧 Xms（玩家 … / 骨骼 … / 遮挡 … / send …）… 调用命中/缺失 … 实际 N FPS`。以后再遇到“卡”，先看这行，不用猜。
+- **重打包坑（务必记住）**：`esbuild` 用 `--platform=neutral` 时默认 charset 是 ASCII，会把源码里的中文转义成 `\uXXXX`，于是 `test_script_config.py` 里按中文锚点做的“源码与 bundle 是否同步”检查全部失败（表现为 `bundle.js 缺少 level0 的锚点 'level0 心跳'`）。**打包命令必须带 `--charset=utf8`**：`esbuild frida_dump.js --bundle --format=iife --platform=neutral --charset=utf8 --outfile=...`。

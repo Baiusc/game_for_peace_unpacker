@@ -108,7 +108,16 @@ import "frida-il2cpp-bridge";
 // ---------------------------------------------------------------------------
 const CFG = (typeof UCFG !== "undefined" && UCFG && typeof UCFG === "object") ? UCFG : {};
 const LEVEL = Number.isFinite(CFG.level) ? CFG.level : 4;
-const INTERVAL_MS = Number.isFinite(CFG.interval) ? CFG.interval : 8;
+// 默认 33ms（≈30Hz）。曾经默认 8ms，但取帧是「主线程 × 每玩家 × 每字段」的一长串
+// bridge 调用，8ms 这个预算根本跑不完 —— 实测单帧要 ~190ms，反而把游戏拖到 5 FPS。
+// 30Hz 对 ESP 叠加与自动瞄准完全够用（人眼/屏幕刷新 60Hz，目标位置误差可忽略）。
+const INTERVAL_MS = Number.isFinite(CFG.interval) ? CFG.interval : 33;
+// 骨骼读取总开关与刷新周期（见 readBonesOf 上方的性能说明）
+const BONES = CFG.bones !== false;
+const BONE_REFRESH_MS = Number.isFinite(CFG.bonesRefreshMs) ? CFG.bonesRefreshMs : 250;
+// 帧内分段计时：每 5s 随心跳打一行耗时明细，用来定位「卡在哪一段」。
+// CFG.perf === false 可关（省一点点开销）。
+const PERF_ON = CFG.perf !== false;
 const DISCOVER = CFG.discover === true;
 const PROBE = CFG.probe === true;
 // 默认不调用泛型基类上的静态泛型方法（见顶部约束 5），--allow-get-instance 才开
@@ -212,29 +221,72 @@ Il2Cpp.perform(() => {
   discover(GameManager, "GameManager");
 
   // ---------------------------------------------------------------------
-  // 通用调用工具
-  //   callMethod(obj, 名字, 参数个数, ...实参)   —— 实例方法（不传 this！）
-  // 若对象自己的类里找不到，再沿类层级找声明它的父类（Component.get_transform
-  // 这类继承来的成员就靠这条回退），避免“静默失败”。
+  // 【性能关键】实例方法解析缓存
+  //
+  // bridge 的 `Object.tryMethod(name, argc)` 每次调用都要做三件不便宜的事：
+  //   ① `Memory.allocUtf8String(name)` —— 一次 native 堆分配（名字必须落成 C 字符串）
+  //   ② `classGetMethodFromName`       —— 一次 native 方法表字符串查找
+  //   ③ `...(method).bind(this)`       —— 构造一个 JS Proxy（bind 的实现就是 new Proxy）
+  // 单看一次不贵，但取帧是「每帧 × 每玩家(10) × 每个字段(≈10)」上千次调用：
+  // 8ms 间隔下主线程被执行到 ~190ms/帧，游戏实测掉到 5 FPS —— 这才是“注入后卡顿”
+  // 的真正大头（不是 Physics.Linecast，那条只是其中一小项）。
+  //
+  // 这里按 (类指针 | 对象指针 | 名字 | 参数个数) 缓存**已绑定**的 Method，稳态下
+  // callMethod 只剩 Map.get + invoke。对象指针就是内存地址，句柄复用后语义依然正确
+  // （同一个地址上的对象，本来就该被作用到）。换局时实例被销毁会换地址，缓存由
+  // clearMethodCache() 主动清空，再加一个尺寸上限兜底。
   // ---------------------------------------------------------------------
-  const findDeclaringClass = (obj, name, argc) => {
-    for (const klass of obj.class.hierarchy()) {
-      for (const m of klass.methods) {
-        if (m.name === name && !m.isStatic && (argc < 0 || m.parameterCount === argc)) return klass;
+  const METHOD_CACHE = new Map();     // (类|名字|参数个数) -> 未绑定 Method（可能为 null=确认不存在）
+  const BOUND_CACHE = new Map();      // (类|对象|名字|参数个数) -> 已绑定 Method
+  const CACHE_LIMIT = 20000;
+  let cacheHits = 0, cacheMisses = 0;
+
+  const clearMethodCache = () => {
+    METHOD_CACHE.clear();
+    BOUND_CACHE.clear();
+    cacheHits = 0;
+    cacheMisses = 0;
+  };
+
+  const resolveInstanceMethod = (klass, name, argc) => {
+    const key = klass.handle.toString() + "|" + name + "|" + argc;
+    const hit = METHOD_CACHE.get(key);
+    if (hit !== undefined) return hit;              // 命中（含已确认“不存在”的 null）
+    cacheMisses++;
+    let m = klass.tryMethod(name, argc);            // ← 全脚本唯一的 allocUtf8String 点
+    if (m && m.isStatic) m = undefined;             // 同名静态：按实例语义继续沿层级找
+    if (!m) {
+      // 沿继承链逐层用 native 查找（比 JS 层遍历 klass.methods 快，也避开 methods 数组重建）
+      for (const k of klass.hierarchy()) {
+        const cand = k.tryMethod(name, argc);
+        if (cand && !cand.isStatic) { m = cand; break; }
       }
     }
-    return null;
+    const out = m || null;
+    if (METHOD_CACHE.size > CACHE_LIMIT) METHOD_CACHE.clear();
+    METHOD_CACHE.set(key, out);
+    return out;
   };
 
   const callMethod = (obj, name, argc, ...args) => {
     if (!obj) return null;
-    let m = obj.tryMethod(name, argc);
-    if (!m) {
-      const klass = findDeclaringClass(obj, name, argc);
-      if (!klass) throw new Error(`找不到实例方法 ${name}/${argc}（含继承链）`);
-      m = klass.method(name, argc).bind(obj);
+    // 注意：这里**不能**缓存「对象地址 -> 类」。Unity 会回收对象，地址复用之后旧映射
+    // 会把新对象当成旧类，用错方法就可能踩到野内存。每次都现取 obj.class（一次
+    // objectGetClass，native 但便宜），换来地址复用时的绝对安全 —— 类链进 key，
+    // 地址被复用成别的类时自然 miss，重新解析。
+    const klass = obj.class;
+    const hkey = obj.handle.toString();
+    const bkey = klass.handle.toString() + "|" + hkey + "|" + name + "|" + argc;
+    let bound = BOUND_CACHE.get(bkey);
+    if (bound === undefined) {
+      const m = resolveInstanceMethod(klass, name, argc);
+      if (!m) throw new Error(`找不到实例方法 ${name}/${argc}（含继承链）`);
+      bound = m.bind(obj);
+      if (BOUND_CACHE.size > CACHE_LIMIT) BOUND_CACHE.clear();
+      BOUND_CACHE.set(bkey, bound);
     }
-    return m.invoke(...args);
+    cacheHits++;
+    return bound.invoke(...args);
   };
 
   // 静态方法：Klass.method(名字, 参数个数).invoke(实参...)
@@ -320,6 +372,7 @@ Il2Cpp.perform(() => {
   let visibilityWarned = false;
   const readVisibilityOf = (targetTransform) => {
     if (!visibilityOrigin || !targetTransform) return null;
+    const vt = perfNow();          // 记 Physics.Linecast 这一段花了多少
     try {
       const end = callMethod(targetTransform, "get_position", 0);
       const hit = Memory.alloc(0x30);
@@ -341,6 +394,8 @@ Il2Cpp.perform(() => {
         console.log("[!] Physics.Linecast 不可用，visible 回退为 true:", e.message || e);
       }
       return null;
+    } finally {
+      if (PERF_ON) ST.visMs += Date.now() - vt;
     }
   };
 
@@ -444,7 +499,19 @@ Il2Cpp.perform(() => {
   // 真实 Humanoid 骨骼：Player.characterAnimator -> Animator.GetBoneTransform(id)
   // -> Transform.get_position_Injected(out Vector3)。调用发生在 Unity 主线程，
   // 缺失骨骼只标记 valid=false，不让单个模型影响整帧。
+  //
+  // 【开销】每个玩家 19 次 GetBoneTransform + 19 次 readPosOf；若 GetBoneTransform
+  // 全返回 null（非 Humanoid 模型常见），还要兜底跑 characterContainer.Find —— 那是
+  // 按名字递归搜索整个 Transform 层级的**字符串**查找，19 槽 × 最多 3 个别名 = 最多
+  // 57 次/玩家。实测骨骼 100% valid=false，也就是每帧纯浪费几百次调用在主线程上。
+  // 骨架不需要 30Hz：改为按墙钟节流（默认 250ms）+ 按玩家缓存复用。
   let boneWarned = false;
+  let bonesLastRefresh = -1e9;
+  let bonesDoRefreshThisFrame = false;      // frameTick 每帧只判定一次
+  let bonesCache = Object.create(null);     // playerHandle -> bones[]
+  let bonesFailStreak = 0;                  // 连续整批无效次数（仅用于诊断日志）
+  let bonesValidLast = 0;
+  const BONE_FAIL_LIMIT = Number.isFinite(CFG.bonesFailLimit) ? CFG.bonesFailLimit : 0;
   const BONE_NAME_ALIASES = [
     ["Hips", "Bip01 Pelvis", "mixamorig:Hips"],
     ["LeftUpLeg", "Left thigh", "Bip01 L Thigh", "mixamorig:LeftUpLeg"],
@@ -578,6 +645,7 @@ Il2Cpp.perform(() => {
   // 单个玩家（withHp=false 时跳过一切 ObscuredInt 裸读，用于 LEVEL 3 分档）
   // ---------------------------------------------------------------------
   const readPlayer = (p, withHp) => {
+    const t0 = perfNow();          // perfNow/ST 定义在下方但此处是运行时调用，安全
     const out = { isLocal: false };
     try {
       const t = callMethod(p, "get_transform", 0);
@@ -606,7 +674,19 @@ Il2Cpp.perform(() => {
         out.maxHp = hd ? readObscuredInt(hd, "maxHealth") : null;
       } catch (e) { out.hp = null; out.maxHp = null; }
     }
-    out.bones = withHp ? readBonesOf(p) : [];
+    // 骨骼：只在「重算帧」真正读取（每 ~250ms 一次），其余帧复用缓存。
+    if (!BONES || !withHp) {
+      out.bones = [];
+    } else if (bonesDoRefreshThisFrame) {
+      const bt = perfNow();
+      out.bones = readBonesOf(p);
+      bonesCache[p.handle.toString()] = out.bones;
+      if (PERF_ON) ST.boneMs += Date.now() - bt;
+      ST.boneReads++;
+      for (let i = 0; i < out.bones.length; i++) if (out.bones[i].valid) bonesValidLast++;
+    } else {
+      out.bones = bonesCache[p.handle.toString()] || [];
+    }
     // isDead：Entity.get_isDead() 和 HealthData.isDead 都是“有真实方法体”的
     // 非 trivial getter（dump 里没有 [CompilerGeneratedAttribute]），默认不调。
     // 改由血量推导 —— 血量本来就是裸内存读出来的明文，零 invoke，更安全也更准。
@@ -615,6 +695,7 @@ Il2Cpp.perform(() => {
     } else {
       out.isDead = out.hp === undefined || out.hp === null ? null : out.hp <= 0;
     }
+    if (PERF_ON) { ST.playerMs += Date.now() - t0; ST.players++; }
     return out;
   };
 
@@ -643,6 +724,45 @@ Il2Cpp.perform(() => {
   const WARN_MS = 3000;
   const REPORT_MS = 5000;
 
+  // 帧内分段计时（毫秒累计，报告后清零）：用来量出“卡”到底卡在哪一段。
+  // Date.now() 只有 1ms 精度，但这里是「一帧内累积几十次调用」的总和，够用。
+  const ST = {
+    frames: 0, players: 0,
+    tickMs: 0, playerMs: 0, boneMs: 0, visMs: 0, sendMs: 0, boneReads: 0,
+  };
+  let tickT0 = 0;
+  const perfNow = () => (PERF_ON ? Date.now() : 0);
+
+  const perfReport = () => {
+    if (!PERF_ON || ST.frames === 0) return "";
+    const n = ST.frames;
+    const avg = (v) => (v / n).toFixed(1);
+    return ` | perf: 单帧 ${avg(ST.tickMs)}ms（玩家 ${avg(ST.playerMs)}` +
+           ` / 骨骼 ${avg(ST.boneMs)}·${ST.boneReads}次` +
+           ` / 遮挡 ${avg(ST.visMs)} / send ${avg(ST.sendMs)}）` +
+           ` 均玩家 ${(ST.players / n).toFixed(1)}` +
+           ` 调用命中 ${cacheHits}/缺失 ${cacheMisses}` +
+           ` 实际 ${(n * 1000 / REPORT_MS).toFixed(1)}FPS`;
+  };
+  const perfReset = () => {
+    ST.frames = ST.players = 0;
+    ST.tickMs = ST.playerMs = ST.boneMs = ST.visMs = ST.sendMs = ST.boneReads = 0;
+  };
+
+  // 骨骼一条都读不到时给出明确诊断 —— 否则用户只看到“没有骨架”却不知为何，
+  // 会误以为是投影/叠加层的问题。
+  let bonesDiagCount = 0;
+  const reportBonesDiag = () => {
+    if (!BONES || bonesLastRefresh < 0) return;      // 没启用 / 还没读过一次
+    if (bonesValidLast > 0) { bonesDiagCount = 0; return; }
+    if (bonesDiagCount === 0 || bonesDiagCount % 6 === 0) {
+      console.log("[!] 骨骼读取全部无效：角色模型可能不是 Humanoid，或骨骼名不在脚本的" +
+                  "BONE_IDS/别名表里 —— 骨架显示不出来与此有关，不是投影问题。" +
+                  "（已按 " + BONE_REFRESH_MS + "ms 节流，不再拖累帧率；--no-bones 可彻底关）");
+    }
+    bonesDiagCount++;
+  };
+
   // 不在对局 / 还没相机 时也要照常发帧（inGame:false）：
   // 以前直接 return，宿主既看不到"我还活着"（会误报 10s 无数据），
   // 又不会清屏 —— 回菜单后屏幕上一直留着上一次的框。
@@ -657,6 +777,7 @@ Il2Cpp.perform(() => {
   const frameTick = () => {
     tick++;
     const now = Date.now();
+    if (PERF_ON) tickT0 = now;
 
     // 遮挡检测节流：每 ~VIS_REFRESH_MS 整批重算一次，整帧只判定一次，结果按玩家缓存复用。
     if (VISIBILITY) {
@@ -669,6 +790,20 @@ Il2Cpp.perform(() => {
       }
     } else {
       visDoRefreshThisFrame = false;
+    }
+
+    // 骨骼节流：同理，每 ~BONE_REFRESH_MS 整批读一次（骨架 4Hz 足够，省主线程）。
+    if (BONES && LEVEL >= 4) {
+      if ((now - bonesLastRefresh) >= BONE_REFRESH_MS) {
+        bonesCache = Object.create(null);
+        bonesLastRefresh = now;
+        bonesDoRefreshThisFrame = true;
+        bonesValidLast = 0;      // 本帧重新累计有效骨骼数（诊断用）
+      } else {
+        bonesDoRefreshThisFrame = false;
+      }
+    } else {
+      bonesDoRefreshThisFrame = false;
     }
 
     let M;
@@ -754,15 +889,24 @@ Il2Cpp.perform(() => {
           `（null 槽位 ${n - frame.players.length}）取元素=${useGet ? ".get(i)" : "下标"}`);
       }
     }
+    const st = perfNow();
     send(frame); // 发给宿主做投影 / 叠加
     sent++;
+    if (PERF_ON) {
+      ST.sendMs += Date.now() - st;
+      ST.tickMs += Date.now() - tickT0;
+      ST.frames++;
+    }
     if (tick <= 3) {
       logMatrix("worldToCameraMatrix", M.w2c);
       logMatrix("projectionMatrix", M.proj);
       console.log("[frame]", JSON.stringify(frame));
     } else if (now - lastReport > REPORT_MS) {
       lastReport = now; // 心跳：证明循环还活着（叠加层看不到时可据此判断）
-      console.log(`[*] 已发送 ${sent} 帧 (level=${LEVEL}, players=${frame.players.length}, screen=${scr.width}x${scr.height})`);
+      console.log(`[*] 已发送 ${sent} 帧 (level=${LEVEL}, players=${frame.players.length}, screen=${scr.width}x${scr.height})`
+                  + perfReport());
+      reportBonesDiag();
+      perfReset();
     }
   };
 
