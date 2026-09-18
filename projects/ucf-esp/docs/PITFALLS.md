@@ -171,4 +171,11 @@
 - **现象**：`frida_host.py --shm` 能打开 `UcfFrame`，但第一帧写入失败并停止桥接。
 - **根因**：Frida Frame 的玩家 `pos` 可能是 `{x,y,z}` 字典，而 `shm_writer._ps_items()` 原先只按 `[0],[1],[2]` 列表读取。
 - **修法**：`shm_writer.py` 新增 `_vec3()`，同时兼容字典和列表/元组；宿主异常日志改为 `repr + traceback`，保留完整类型、消息和行号。
-- **验证**：`test_shm_bridge.py` 新增字典坐标打包用例，Frame 长度仍为 `23804`，FrameSlots 仍为 `23808`。
+- **验证**：`test_shm_bridge.py` 新增字典坐标打包用例，Frame 长度为 `23804`，单槽描述为 `23808`，双缓冲共享区为 `47612`。
+
+### 2026-09-18：双缓冲共享区大小必须包含两个 Frame
+
+- **现象**：第一帧可能写入成功，切换到 `back=1` 后出现 `mmap slice assignment is wrong size`。
+- **根因**：`SLOT_FMT.size` 只是 `cur + 一个 Frame` 的描述，不能作为整个双缓冲共享区大小；旧 `SHM_SIZE` 少分配了一个 Frame。
+- **修法**：`SHM_SIZE = 4 + 2 * FRAME_FMT.size = 47612`；C++ `FrameSlots` 增加 ABI 静态断言；写入前检查 `start + frame_size <= len(shm)`。
+- **验证**：共享区长度、两槽边界、字典坐标打包和 C++ ctest 均通过。

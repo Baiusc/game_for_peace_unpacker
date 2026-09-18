@@ -1,0 +1,42 @@
+SHM double-buffer size verification
+changed_branch=cpp_overlay/tools/shm_writer.py: SHM_SIZE from SLOT_FMT.size to 4 + 2 * FRAME_FMT.size
+changed_field=UcfFrame shared mapping size; FRAME_FMT=23804, SLOT_FMT=23808, SHM_SIZE=47612
+
+BASELINE
+command: git show HEAD:projects/ucf-esp/cpp_overlay/tools/shm_writer.py > verification/shm_double_buffer_size_20260918/ORIGINAL_FILE
+input: repository HEAD blob
+literal output: (empty)
+result: ORIGINAL_FILE created from pre-fix code
+exit status: 0
+
+MODIFIED
+command: PYTHONDONTWRITEBYTECODE=1 python3 projects/ucf-esp/tests/test_shm_bridge.py
+input: built-in fixed Frame fixture plus dictionary-coordinate fixture
+literal output:
+shm bridge codec: PASS
+frame_bytes=23804 slot_bytes=23808 shm_bytes=47612
+result: Frame length, slot descriptor, and two-slot shared mapping size verified
+exit status: 0
+
+MODIFIED BUILD/TEST
+command: cmake --build projects/ucf-esp/cpp_overlay/build && ctest --test-dir projects/ucf-esp/cpp_overlay/build --output-on-failure
+input: current C++ sources and local build tree
+literal output: 100% tests passed, 0 tests failed out of 2
+result: ucf_overlay_tests and projection_parity_self_test passed
+exit status: 0
+
+ROLLBACK
+command: /tmp/ucf_shm_size_rollback_20260918/ROLLBACK.sh && cmp MODIFIED_FILE ORIGINAL_FILE
+input: separate copy of MODIFIED_FILE and ORIGINAL_FILE
+literal output:
+rollback restored MODIFIED_FILE from ORIGINAL_FILE
+rollback_test=PASS
+result: separate test copy restored byte-for-byte; repository MODIFIED_FILE remains changed
+exit status: 0
+
+artifacts:
+MODIFIED_FILE=projects/ucf-esp/verification/shm_double_buffer_size_20260918/MODIFIED_FILE
+DIFF_FILE=projects/ucf-esp/verification/shm_double_buffer_size_20260918/DIFF_FILE
+VERIFICATION.txt=projects/ucf-esp/verification/shm_double_buffer_size_20260918/VERIFICATION.txt
+ROLLBACK.sh=projects/ucf-esp/verification/shm_double_buffer_size_20260918/ROLLBACK.sh
+restored_behavior/status: rollback test restored the separate copy; current source remains fixed and all local tests passed

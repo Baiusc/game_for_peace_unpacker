@@ -182,6 +182,9 @@ class SharedFrameWriter:
             cur = 0
         back = 1 - cur
         start = 4 + back * self.frame_size
+        end = start + self.frame_size
+        if end > len(self.shm):
+            raise ValueError(f"共享内存空间不足: end={end} shm_len={len(self.shm)}")
         self.shm[start:start + self.frame_size] = raw
         struct.pack_into("<i", self.shm, 0, back)
 

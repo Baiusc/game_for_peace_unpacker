@@ -1,0 +1,23 @@
+diff --git a/media/baiusc/DATA1/Repositories/ReposMyself/my_hack/game_for_peace_unpacker/projects/ucf-esp/verification/shm_double_buffer_size_20260918/ORIGINAL_FILE b/media/baiusc/DATA1/Repositories/ReposMyself/my_hack/game_for_peace_unpacker/projects/ucf-esp/verification/shm_double_buffer_size_20260918/MODIFIED_FILE
+index 0ae314f..0261d94 100755
+--- a/media/baiusc/DATA1/Repositories/ReposMyself/my_hack/game_for_peace_unpacker/projects/ucf-esp/verification/shm_double_buffer_size_20260918/ORIGINAL_FILE
++++ b/media/baiusc/DATA1/Repositories/ReposMyself/my_hack/game_for_peace_unpacker/projects/ucf-esp/verification/shm_double_buffer_size_20260918/MODIFIED_FILE
+@@ -30,7 +30,8 @@ FRAME_FMT = struct.Struct(
+ # FrameSlots = int cur + Frame
+ SLOT_FMT = struct.Struct("<i" + FRAME_FMT.format[1:])
+ SHM_NAME = "UcfFrame"
+-SHM_SIZE = SLOT_FMT.size            # 4 + Frame
++# 共享区 = cur(4) + 两个固定长度 Frame 槽；SLOT_FMT 只是单槽布局描述。
++SHM_SIZE = 4 + 2 * FRAME_FMT.size
+ 
+ 
+ def _vec3(value, default=(0.0, 0.0, 0.0)):
+@@ -76,7 +77,7 @@ def build_frame(w2c, proj, width, height, in_game, local, players):
+ def main():
+     if sys.platform != "win32":
+         # 非 Windows 下 mmap 不支持 tagname；这里仅演示打包逻辑，确认布局与 C++ 一致
+-        print(f"[shm_writer] 仅 Windows 支持命名共享内存（tagname）。Frame 大小 = {SHM_SIZE} 字节")
++        print(f"[shm_writer] 仅 Windows 支持命名共享内存（tagname）。共享区大小 = {SHM_SIZE} 字节")
+         f = build_frame([0]*16, [0]*16, 1280, 720, True,
+                         {"pos": [0,0,0]}, [{"pos": [1,0,0], "hp": 50}]*12)
+         print(f"[shm_writer] 打包 OK，长度 {len(f)}（应等于 {FRAME_FMT.size}）")

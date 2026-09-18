@@ -51,6 +51,8 @@ struct FrameSlots {
     std::atomic<int> cur{0};   // 当前可读槽（0 或 1）
     Frame            slots[2]{};
 };
+static_assert(sizeof(FrameSlots) == sizeof(int) + 2 * sizeof(Frame),
+              "FrameSlots ABI must contain cur plus two complete Frame slots");
 
 // 进程内双缓冲传输（测试、合成数据源用，不跨进程）。
 class LocalTransport {
