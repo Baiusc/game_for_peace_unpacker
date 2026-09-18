@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <cstdlib>
+#include <algorithm>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -61,8 +62,7 @@ void LocalInputSim::set_config(const Config& config) {
     cfg_ = config;
     if (cfg_.align_tolerance_px < 0.0f) cfg_.align_tolerance_px = 0.0f;
     if (cfg_.jitter_px < 0) cfg_.jitter_px = 0;
-    if (cfg_.smooth_factor < 0.05f) cfg_.smooth_factor = 0.05f;
-    if (cfg_.smooth_factor > 1.0f) cfg_.smooth_factor = 1.0f;
+    cfg_.smooth_factor = std::max(0.05f, std::min(1.0f, cfg_.smooth_factor));
     if (cfg_.max_step_px < 1) cfg_.max_step_px = 1;
 }
 
@@ -71,9 +71,8 @@ void LocalInputSim::move_to(const ScreenPoint& target, const ScreenPoint& crossh
     const float ey = target.y - crosshair.y;
     const float distance = std::sqrt(ex * ex + ey * ey);
     if (distance <= cfg_.align_tolerance_px) return;
-    float step_len = distance * cfg_.smooth_factor;
-    if (step_len > static_cast<float>(cfg_.max_step_px))
-        step_len = static_cast<float>(cfg_.max_step_px);
+    const float step_len = std::min(distance * cfg_.smooth_factor,
+                                    static_cast<float>(cfg_.max_step_px));
     const float ux = ex / distance;
     const float uy = ey / distance;
     float jx = 0.0f, jy = 0.0f;

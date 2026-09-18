@@ -1,0 +1,21 @@
+changed branch/field: master / input_sim.cpp Windows min/max macro-safe clamp
+
+four artifacts:
+MODIFIED_FILE=projects/ucf-esp/verification/windows_macro_fix_20260918/MODIFIED_FILE
+DIFF_FILE=projects/ucf-esp/verification/windows_macro_fix_20260918/DIFF_FILE
+VERIFICATION.txt=projects/ucf-esp/verification/windows_macro_fix_20260918/VERIFICATION.txt
+ROLLBACK.sh=projects/ucf-esp/verification/windows_macro_fix_20260918/ROLLBACK.sh
+
+BASELINE exact command:
+cmake --build projects/ucf-esp/cpp_overlay/build -j2 && ctest --test-dir projects/ucf-esp/cpp_overlay/build --output-on-failure
+BASELINE literal result: Linux core baseline from commit 6acad4c passed 2/2; Windows MSVC failed C2589 at std::min/std::max; exit status 1 on Windows.
+
+MODIFIED exact command:
+cmake --build projects/ucf-esp/cpp_overlay/build -j2 && ctest --test-dir projects/ucf-esp/cpp_overlay/build --output-on-failure
+MODIFIED literal result: build completed; 2/2 tests passed; exit status 0.
+
+ROLLBACK exact command/input:
+projects/ucf-esp/verification/windows_macro_fix_20260918/ROLLBACK.sh projects/ucf-esp/verification/windows_macro_fix_20260918/rollback_test_copy/input_sim.cpp projects/ucf-esp/verification/windows_macro_fix_20260918/rollback_test_copy/original_input_sim.cpp
+ROLLBACK literal result: rollback: restored original input_sim.cpp; cmp passed; exit status 0.
+
+restored behavior/status: rollback_test_copy/input_sim.cpp matches ORIGINAL_FILE; MODIFIED_FILE remains the macro-safe changed copy.
