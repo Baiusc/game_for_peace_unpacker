@@ -21,13 +21,20 @@ struct Candidate {
     Vec3  dir   = {};   // 敌人相对相机的位置向量（不必归一化）
     float dist  = 0;    // 距离（米），用于“最近”模式
     int   hp    = 0;    // 血量，用于“最低血量”模式
+    int   team  = 0;
+    bool  dead  = false;
+    bool  visible = true;
+    bool  valid = true;
 };
 
 // 在候选敌人里，挑出“落在 fov_deg 视锥内”的，再按 mode 选一个：
-//   mode==0 -> 距离最近；mode==1 -> 血量最低。
+//   mode==0 -> 距离最近；mode==1 -> 血量最低；mode==2 -> 准星最近。
 // 返回选中的下标；无可用目标返回 -1。
 // cam_forward 为相机前向量（不必归一化）。
 int select_target(const Vec3& cam_forward, const Candidate* c, int n,
                   float fov_deg, int mode);
+
+Angles angles_from_direction(Vec3 dir);
+float angle_distance(Angles a, Angles b);
 
 } // namespace ucf

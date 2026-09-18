@@ -51,10 +51,18 @@ void project_frame(const Frame& f, ScreenMark* marks, int& n) {
         bool clipped = !ok || std::fabs(ndcx) > NDC_CLIP || std::fabs(ndcy) > NDC_CLIP;
         m.sx = sx; m.sy = sy;
         m.hp = p.hp; m.max_hp = p.maxHp;
-        m.is_dead = p.isDead;
-        m.on_screen = (!clipped && sx >= 0 && sx <= f.width && sy >= 0 && sy <= f.height);
-        m.kind = isLocal[i] ? Kind::Local : Kind::Enemy;   // 单机演示：非本地即敌人
-        if (ok) { /* 距离可在宿主侧算，这里省略 */ }
+        m.is_dead = p.isDead || p.hp <= 0;
+        m.on_screen = f.inGame && (!clipped && sx >= 0 && sx <= f.width && sy >= 0 && sy <= f.height);
+        if (isLocal[i]) {
+            m.kind = Kind::Local;
+            m.dist = 0.0f;
+        } else {
+            m.kind = (p.team == f.local.team) ? Kind::Teammate : Kind::Enemy;
+            const float dx = p.pos[0] - f.local.pos[0];
+            const float dy = p.pos[1] - f.local.pos[1];
+            const float dz = p.pos[2] - f.local.pos[2];
+            m.dist = std::sqrt(dx * dx + dy * dy + dz * dz);
+        }
         ++n;
     }
 }
@@ -101,7 +109,7 @@ static ImU32 rgb(float r, float g, float b) {
 void render_draw_list(ImDrawList* dl, const DrawList& d) {
     for (int i = 0; i < d.boxCount; ++i) {
         const BoxPrim& b = d.boxes[i];
-        dl->AddRect(ImVec2(b.x, b.y), ImVec2(b.x + b.w, b.y + b.h), rgb(b.r, b.g, b.b), 0, 0, 2.0f);
+        dl->AddRect(ImVec2(b.x, b.y), ImVec2(b.x + b.w, b.y + b.h), rgb(b.r, b.g, b.b), 0, 0, b.thickness);
     }
     for (int i = 0; i < d.barCount; ++i) {
         const BarPrim& bar = d.bars[i];
@@ -114,6 +122,20 @@ void render_draw_list(ImDrawList* dl, const DrawList& d) {
     for (int i = 0; i < d.labelCount; ++i) {
         const LabelPrim& L = d.labels[i];
         dl->AddText(ImVec2(L.x, L.y), rgb(L.r, L.g, L.b), L.text);
+    }
+    for (int i = 0; i < d.skeletonCount; ++i) {
+        const SkeletonPrim& s = d.skeletons[i];
+        const ImU32 c = rgb(s.r, s.g, s.b);
+        const float cx = s.x + s.w * 0.5f;
+        const float head = s.y + s.h * 0.16f;
+        const float shoulders = s.y + s.h * 0.30f;
+        const float hips = s.y + s.h * 0.62f;
+        const float feet = s.y + s.h * 0.98f;
+        dl->AddCircle(ImVec2(cx, head), s.w * 0.10f, c, 12, s.thickness);
+        dl->AddLine(ImVec2(cx, head + s.w * 0.10f), ImVec2(cx, hips), c, s.thickness);
+        dl->AddLine(ImVec2(s.x + s.w * 0.18f, shoulders), ImVec2(s.x + s.w * 0.82f, shoulders), c, s.thickness);
+        dl->AddLine(ImVec2(cx, hips), ImVec2(s.x + s.w * 0.25f, feet), c, s.thickness);
+        dl->AddLine(ImVec2(cx, hips), ImVec2(s.x + s.w * 0.75f, feet), c, s.thickness);
     }
 }
 

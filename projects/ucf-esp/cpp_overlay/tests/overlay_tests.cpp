@@ -35,6 +35,16 @@ static void test_draw_list() {
     CHECK(std::strstr(dl.labels[0].text, "12m") != nullptr);
     // 血条比例 50/100 = 0.5
     CHECK(approx(dl.bars[0].ratio, 0.5f));
+
+    ucf::DrawStyle style{};
+    style.show_box = false;
+    style.show_skeleton = true;
+    style.show_health = false;
+    style.show_distance = false;
+    ucf::build_draw_list(vp, marks, 1, style, dl);
+    CHECK(dl.boxCount == 0);
+    CHECK(dl.barCount == 0);
+    CHECK(dl.skeletonCount == 1);
 }
 
 static void test_smooth() {
@@ -61,6 +71,10 @@ static void test_select_target() {
     // 最低血量模式：cs[1] 被锥裁掉，剩下 0/2，cs[1]? hp 100 vs 50 -> 选 2
     r = ucf::select_target(fwd, cs, 3, 90.0f, 1);
     CHECK(r == 2);
+    r = ucf::select_target(fwd, cs, 3, 90.0f, 2);
+    CHECK(r == 0);
+    const ucf::Angles a = ucf::angles_from_direction({1, 0, 1});
+    CHECK(approx(a.yaw, 0.785398f, 1e-3f));
 }
 
 static void test_transport_roundtrip() {
@@ -82,6 +96,7 @@ static void test_config_roundtrip() {
     ucf::Settings s{};
     s.esp_enabled = false; s.show_enemy = false; s.fov_deg = 110.0f; s.target_mode = 1;
     s.color_enemy[0] = 0.1f;
+    s.show_skeleton = true; s.aimbot_enabled = true; s.aim_max_distance = 42.0f;
     CHECK(ucf::save_settings(s, "settings_test.txt"));
     ucf::Settings r{};
     CHECK(ucf::load_settings(r, "settings_test.txt"));
@@ -90,6 +105,7 @@ static void test_config_roundtrip() {
     CHECK(approx(r.fov_deg, 110.0f));
     CHECK(r.target_mode == 1);
     CHECK(approx(r.color_enemy[0], 0.1f));
+    CHECK(r.show_skeleton && r.aimbot_enabled && approx(r.aim_max_distance, 42.0f));
     std::remove("settings_test.txt");
 }
 

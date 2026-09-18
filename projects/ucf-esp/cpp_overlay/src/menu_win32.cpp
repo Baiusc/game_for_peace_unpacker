@@ -3,6 +3,7 @@
 #ifdef _WIN32
 #include <imgui.h>
 #include <windows.h>
+#include <cstring>
 
 namespace ucf {
 
@@ -16,6 +17,8 @@ MenuRect query_menu_rect() { return g_menu_rect; }
 void draw_menu(Settings& s, bool& show_menu, const OverlayStatus& st) {
     if (!show_menu) { g_menu_rect.valid = false; return; }
 
+    const Settings before = s;
+
     ImGui::SetNextWindowPos(ImVec2(12, 12), ImGuiCond_FirstUseEver);
     ImGui::Begin("UCF Overlay", &show_menu,
                  ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse);
@@ -26,20 +29,33 @@ void draw_menu(Settings& s, bool& show_menu, const OverlayStatus& st) {
     g_menu_rect = {true, p.x, p.y, sz.x, sz.y};
 
     // 中文渲染依赖 main 里 init_overlay_fonts() 加载的系统 CJK 字体；缺失则退回 ASCII。
+    ImGui::TextUnformatted("UCF 调试可视化");
     ImGui::Checkbox("ESP 绘制层（DEL）", &s.esp_visible);
     ImGui::Checkbox("ESP 总开关",        &s.esp_enabled);
-    if (ImGui::TreeNode("显示项")) {
+    if (ImGui::TreeNode("ESP 显示项")) {
+        ImGui::Checkbox("框",       &s.show_box);
+        ImGui::Checkbox("骨骼",     &s.show_skeleton);
         ImGui::Checkbox("本地玩家", &s.show_local);
         ImGui::Checkbox("队友",     &s.show_teammate);
         ImGui::Checkbox("敌人",     &s.show_enemy);
         ImGui::Checkbox("血条",     &s.show_health);
         ImGui::Checkbox("距离",     &s.show_distance);
+        ImGui::SliderFloat("最大距离", &s.max_distance, 0.0f, 1000.0f, "%.0f m");
+        ImGui::SliderFloat("线宽", &s.line_thickness, 1.0f, 5.0f, "%.1f");
         ImGui::TreePop();
     }
     ImGui::Separator();
-    ImGui::SliderFloat("视场角 FOV", &s.fov_deg, 10.0f, 180.0f);
+    if (ImGui::TreeNode("Aimbot（仅输出角度）")) {
+        ImGui::Checkbox("Aimbot 开关", &s.aimbot_enabled);
+        ImGui::SliderFloat("瞄准 FOV", &s.fov_deg, 5.0f, 180.0f);
+        ImGui::SliderFloat("瞄准最大距离", &s.aim_max_distance, 0.0f, 1000.0f, "%.0f m");
+        ImGui::Combo("目标选择", &s.target_mode, "最近目标\0最低血量\0准星最近\0");
+        ImGui::Checkbox("允许队友", &s.aim_teammates);
+        ImGui::Checkbox("允许死亡目标", &s.aim_dead);
+        ImGui::Checkbox("仅屏幕内目标", &s.aim_visible_only);
+        ImGui::TreePop();
+    }
     ImGui::SliderFloat("平滑系数",   &s.responsiveness, 0.05f, 1.0f);
-    ImGui::Combo("目标选择", &s.target_mode, "最近目标\0血量最低\0");
     ImGui::ColorEdit3("本地颜色",   s.color_local);
     ImGui::ColorEdit3("队友颜色",   s.color_teammate);
     ImGui::ColorEdit3("敌人颜色",   s.color_enemy);
@@ -52,7 +68,12 @@ void draw_menu(Settings& s, bool& show_menu, const OverlayStatus& st) {
                 st.flip ? "FLIP" : "BLT", st.shm ? "shm" : "synth",
                 st.players, st.scale, ImGui::GetIO().Framerate);
     ImGui::Text("present: 0x%08lX", st.present_hr);
+    ImGui::Text("target:%d yaw:%.3f pitch:%.3f", st.target, st.target_yaw, st.target_pitch);
     ImGui::End();
+
+    // 配置项在菜单中修改后立即持久化；按钮仍保留给用户显式保存。
+    if (std::memcmp(&before, &s, sizeof(Settings)) != 0)
+        save_settings(s, "ucf_overlay.ini");
 
     if (!show_menu) g_menu_rect.valid = false;   // 点了右上角 X 关闭
 }

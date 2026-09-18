@@ -72,3 +72,11 @@
 4. **IL2CPP 调用**：先看 dump 里有没有 `[CompilerGeneratedAttribute]`；没有 = 有方法体 = 必须在 Unity 主线程调用，否则走「裸内存读 / 静态字段 / 堆扫描」避开 invoke。
 5. **推送**：SSH key push；**不**把 PAT 写进 remote URL / `.git/config`；构建失败日志由用户手动贴回。
 6. **踩坑即记**：任何新坑按本文件模板追加，并在对应 deep-doc 补「排错」细节。
+
+### 2026-09-18：菜单、ESP 与纯角度目标输出统一接线
+
+- **现象**：菜单只有基础框/血条开关，距离与颜色不能完整控制；绘制层没有骨骼入口，目标选择只有最近/低血量。
+- **根因**：`Settings`、`DrawStyle`、绘制原语和主循环之间缺少完整的状态传递；`Frame` 没有新增可见性/骨骼字段。
+- **修法**：扩展现有 `key=value` 配置与菜单；`project_frame()` 使用已有 `inGame/isDead/team/pos` 做有效性、死亡、队伍和距离过滤；骨骼显示采用投影框内的调试骨架，不改变 `Frame/PlayerState` 契约；`smooth` 新增准星最近与方向角计算，主循环只显示平滑后的 yaw/pitch。
+- **验证**：核心 ctest、dump 契约、叠加层几何、投影校准和脚本配置测试全部通过；Windows D3D11/ImGui 编译仍需 Actions 或 Windows MSVC 实机验证。
+- **详见**：`cpp_overlay/src/menu_win32.cpp`、`overlay_viz.cpp`、`smooth.cpp`、`main_win32.cpp`。

@@ -1,19 +1,25 @@
 #include "overlay_viz.hpp"
+#include <algorithm>
 #include <cstdio>
 
 namespace ucf {
 
-static void kind_color(Kind k, float out[3]) {
+static void kind_color(Kind k, const DrawStyle& style, float out[3]) {
     switch (k) {
-        case Kind::Local:     out[0] = 0.22f; out[1] = 0.83f; out[2] = 0.33f; break;
-        case Kind::Teammate:  out[0] = 0.35f; out[1] = 0.65f; out[2] = 1.00f; break;
-        case Kind::Enemy:     out[0] = 0.97f; out[1] = 0.32f; out[2] = 0.29f; break;
+        case Kind::Local:     std::copy(style.local, style.local + 3, out); break;
+        case Kind::Teammate:  std::copy(style.teammate, style.teammate + 3, out); break;
+        case Kind::Enemy:     std::copy(style.enemy, style.enemy + 3, out); break;
         default:              out[0] = out[1] = out[2] = 1.0f; break;
     }
 }
 
 void build_draw_list(const Viewport& vp, const ScreenMark* marks, int n, DrawList& out) {
-    out.boxCount = out.barCount = out.labelCount = 0;
+    build_draw_list(vp, marks, n, DrawStyle{}, out);
+}
+
+void build_draw_list(const Viewport& vp, const ScreenMark* marks, int n,
+                     const DrawStyle& style, DrawList& out) {
+    out.boxCount = out.barCount = out.labelCount = out.skeletonCount = 0;
 
     const float BOX_W = 40.0f, BOX_H = 60.0f;
     float bw = BOX_W * vp.sx;  if (bw < 6)  bw = 6;
@@ -23,17 +29,19 @@ void build_draw_list(const Viewport& vp, const ScreenMark* marks, int n, DrawLis
     for (int i = 0; i < n; ++i) {
         const ScreenMark& m = marks[i];
         if (!m.on_screen || m.is_dead) continue;   // 屏幕外 / 死亡不画
+        if (style.max_distance > 0.0f && m.dist > style.max_distance) continue;
 
         float px = vp.x + m.sx * vp.sx;
         float py = vp.y + m.sy * vp.sy;
-        float col[3]; kind_color(m.kind, col);
+        float col[3]; kind_color(m.kind, style, col);
 
-        if (out.boxCount < 64) {
+        if (style.show_box && out.boxCount < 64) {
             BoxPrim& b = out.boxes[out.boxCount++];
             b.x = px - bw / 2; b.y = py - bh / 2; b.w = bw; b.h = bh;
             b.r = col[0]; b.g = col[1]; b.b = col[2];
+            b.thickness = style.line_thickness;
         }
-        if (out.barCount < 64) {
+        if (style.show_health && out.barCount < 64) {
             BarPrim& bar = out.bars[out.barCount++];
             bar.x = px - bw / 2; bar.y = py - bh / 2 - bar_h * 2;
             bar.w = bw; bar.h = bar_h;
@@ -48,10 +56,16 @@ void build_draw_list(const Viewport& vp, const ScreenMark* marks, int n, DrawLis
             const char* kn = (m.kind == Kind::Local) ? "local"
                            : (m.kind == Kind::Teammate) ? "teammate" : "enemy";
             int off = snprintf(L.text, sizeof(L.text), "%s ", kn);
-            if (m.max_hp > 0 && off < (int)sizeof(L.text))
+            if (m.max_hp > 0 && style.show_health && off < (int)sizeof(L.text))
                 off += snprintf(L.text + off, sizeof(L.text) - off, "%d/%d", m.hp, m.max_hp);
-            if (m.dist > 0 && off < (int)sizeof(L.text))
+            if (m.dist > 0 && style.show_distance && off < (int)sizeof(L.text))
                 off += snprintf(L.text + off, sizeof(L.text) - off, " %.0fm", m.dist);
+        }
+        if (style.show_skeleton && out.skeletonCount < 64) {
+            SkeletonPrim& sk = out.skeletons[out.skeletonCount++];
+            sk.x = px - bw / 2; sk.y = py - bh / 2; sk.w = bw; sk.h = bh;
+            sk.r = col[0]; sk.g = col[1]; sk.b = col[2];
+            sk.thickness = style.line_thickness * 0.75f;
         }
     }
 }

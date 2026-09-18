@@ -13,6 +13,7 @@
 #include "menu_win32.hpp"
 #include "config.hpp"
 #include "shared_state.hpp"
+#include "smooth.hpp"
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -23,6 +24,8 @@
 #include <dwmapi.h>
 #include <cwchar>               // swprintf
 #include <cstdio>               // snprintf / fopen（诊断日志）
+#include <cmath>
+#include <algorithm>
 #include <imgui.h>
 #include <imgui_impl_win32.h>
 #include <imgui_impl_dx11.h>
@@ -257,8 +260,51 @@ static void frame() {
     ucf::Viewport vp{0, 0, cw, ch, cw / fw, ch / fh};
 
     ucf::DrawList dl{};
-    if (g_settings.esp_enabled && g_settings.esp_visible)
-        ucf::build_draw_list(vp, g_marks, n, dl);
+    if (g_settings.esp_enabled && g_settings.esp_visible) {
+        ucf::DrawStyle style{};
+        style.show_box = g_settings.show_box;
+        style.show_skeleton = g_settings.show_skeleton;
+        style.show_health = g_settings.show_health;
+        style.show_distance = g_settings.show_distance;
+        style.max_distance = g_settings.max_distance;
+        style.line_thickness = g_settings.line_thickness;
+        std::copy(g_settings.color_local, g_settings.color_local + 3, style.local);
+        std::copy(g_settings.color_teammate, g_settings.color_teammate + 3, style.teammate);
+        std::copy(g_settings.color_enemy, g_settings.color_enemy + 3, style.enemy);
+        ucf::build_draw_list(vp, g_marks, n, style, dl);
+    }
+
+    // 目标选择与角度平滑只产生诊断结果，不写鼠标、不写输入。
+    static ucf::Angles output_angles{};
+    int target = -1;
+    if (g_settings.aimbot_enabled && f.inGame) {
+        ucf::Candidate candidates[ucf::MAX_PLAYERS]{};
+        for (int i = 0; i < f.playerCount && i < ucf::MAX_PLAYERS; ++i) {
+            const auto& p = f.players[i];
+            const float dx = p.pos[0] - f.local.pos[0];
+            const float dy = p.pos[1] - f.local.pos[1];
+            const float dz = p.pos[2] - f.local.pos[2];
+            candidates[i].dir = {dx, dy, dz};
+            candidates[i].dist = std::sqrt(dx * dx + dy * dy + dz * dz);
+            candidates[i].hp = p.hp;
+            candidates[i].team = p.team;
+            candidates[i].dead = p.isDead || p.hp <= 0;
+            candidates[i].visible = g_marks[i + 1].on_screen;
+            if ((!g_settings.aim_teammates && p.team == f.local.team) ||
+                (!g_settings.aim_dead && candidates[i].dead) ||
+                (g_settings.aim_visible_only && !candidates[i].visible) ||
+                (g_settings.aim_max_distance > 0.0f && candidates[i].dist > g_settings.aim_max_distance)) {
+                candidates[i].valid = false;
+            }
+        }
+        target = ucf::select_target({0, 0, 1}, candidates, f.playerCount,
+                                    g_settings.fov_deg, g_settings.target_mode);
+        if (target >= 0) {
+            output_angles = ucf::smooth_angles(output_angles,
+                ucf::angles_from_direction(candidates[target].dir),
+                g_settings.responsiveness);
+        }
+    }
 
     ImDrawList* bdl = ImGui::GetBackgroundDrawList();
     ucf::render_draw_list(bdl, dl);
@@ -271,6 +317,9 @@ static void frame() {
     st.players = n;
     st.scale = cw / fw;
     st.present_hr = last_present_hr;
+    st.target = target;
+    st.target_yaw = output_angles.yaw;
+    st.target_pitch = output_angles.pitch;
     ucf::draw_menu(g_settings, g_show_menu, st);
 
     ImGui::Render();

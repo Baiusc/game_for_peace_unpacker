@@ -17,6 +17,9 @@ struct OverlayStatus {
     int           players = 0;
     float         scale = 0.0f;
     unsigned long present_hr = 0;    // 上一帧 Present 的 HRESULT
+    int           target = -1;
+    float         target_yaw = 0.0f;
+    float         target_pitch = 0.0f;
 };
 
 MenuRect query_menu_rect();

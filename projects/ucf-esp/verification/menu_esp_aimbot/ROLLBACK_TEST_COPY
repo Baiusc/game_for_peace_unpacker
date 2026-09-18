@@ -6,22 +6,13 @@ namespace ucf {
 
 struct Settings {
     bool  esp_enabled     = true;
-    bool  show_box        = true;
-    bool  show_skeleton   = false;
     bool  show_local      = false;
     bool  show_teammate   = true;
     bool  show_enemy      = true;
     bool  show_health     = true;
     bool  show_distance   = true;
-    float max_distance    = 250.0f;
-    float line_thickness  = 2.0f;
-    bool  aimbot_enabled  = false;
-    bool  aim_teammates   = false;
-    bool  aim_dead        = false;
-    bool  aim_visible_only = true;
     float fov_deg         = 90.0f;
-    int   target_mode     = 0;          // 0=最近, 1=最低血量, 2=准星最近
-    float aim_max_distance = 250.0f;
+    int   target_mode     = 0;          // 0=最近, 1=最低血量
     float responsiveness  = 0.35f;      // 平滑系数（0..1]
     int   menu_hotkey     = 0x24;      // VK_HOME：切换菜单显示（原 INSERT 与注入键冲突）
     int   esp_hotkey      = 0x2E;      // VK_DELETE：切换 ESP 绘制层显隐
