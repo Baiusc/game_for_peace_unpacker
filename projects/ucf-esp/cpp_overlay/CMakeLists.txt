@@ -6,6 +6,12 @@ if(NOT MSVC)
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
+# MSVC：静态链接运行库（/MT）。产物 exe 不依赖 VC++ Redistributable，
+# 可直接拷到裸 Win11 虚拟机运行（GitHub Actions 也用此配置）。
+if(MSVC)
+  set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+endif()
+
 # 复用父目录的投影数学（列主序约定与 esp_core.py / src/projection.cpp 一致）
 add_library(ucf_projection ../src/projection.cpp)
 target_include_directories(ucf_projection PUBLIC ../src)

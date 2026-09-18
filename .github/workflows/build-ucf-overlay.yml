@@ -1,0 +1,38 @@
+name: Build UCF Overlay (Windows)
+
+# 只编译 cpp_overlay 这个自研单机游戏的调试叠加层（D3D11 + ImGui）。
+# 产物为静态链接的 exe，直接拷到 Win11 虚拟机即可运行，无需安装 VS / SDK / VC++ 运行库。
+on:
+  push:
+    paths:
+      - 'projects/ucf-esp/cpp_overlay/**'
+      - '.github/workflows/build-ucf-overlay.yml'
+  pull_request:
+    paths:
+      - 'projects/ucf-esp/cpp_overlay/**'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure CMake
+        run: cmake -S projects/ucf-esp/cpp_overlay -B build -A x64
+
+      - name: Build (Release)
+        run: cmake --build build --config Release
+
+      - name: List build output
+        run: dir build\Release
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ucf_overlay_win32
+          path: build/Release/ucf_overlay_win32.exe
+          if-no-files-found: error
+          retention-days: 30
