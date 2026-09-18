@@ -249,7 +249,7 @@ atexit.register(close_shm_writer)
 atexit.register(close_dumper)
 
 
-def build_script_source(js, level=DEFAULT_LEVEL, interval_ms=50, discover=False,
+def build_script_source(js, level=DEFAULT_LEVEL, interval_ms=16, discover=False,
                         probe=False, allow_get_instance=False, allow_is_dead=False,
                         main_thread=True):
     """在脚本最前面拼一行运行配置，供 frida_dump.js 里的 UCFG 读取。
@@ -647,7 +647,7 @@ def kill_stale_shells(device, game_name):
 
 
 def inject(device, js_path, use_overlay, forced_pid=None, wait_seconds=DEFAULT_WAIT_MODULE,
-           level=DEFAULT_LEVEL, interval_ms=50, discover=False, silence=10.0,
+           level=DEFAULT_LEVEL, interval_ms=16, discover=False, silence=10.0,
            probe=False, allow_get_instance=False, allow_is_dead=False,
            main_thread=True):
     """挑进程 -> 读脚本 -> attach -> 注入。日志顺序按真实执行顺序打印，便于排查。"""
@@ -718,7 +718,7 @@ _GAME_PATH = None  # 记录原始 --game 参数，供进程名匹配
 
 def run_live(game, use_overlay, auto=False, no_launch=False, force_launch=False,
              forced_pid=None, wait_seconds=DEFAULT_WAIT_MODULE, cleanup=True,
-             kill_stale=False, level=DEFAULT_LEVEL, interval_ms=50,
+             kill_stale=False, level=DEFAULT_LEVEL, interval_ms=16,
              discover=False, silence=10.0, script=None,
              probe=False, allow_get_instance=False, allow_is_dead=False,
              main_thread=True):
@@ -819,8 +819,8 @@ def main():
                     help="运行档位（排查闪退用，默认 4）："
                          "0=不碰 IL2CPP 只心跳 / 1=只初始化 IL2CPP / "
                          "2=只读相机矩阵 / 3=+玩家不含血量 / 4=全量")
-    ap.add_argument("--interval", type=int, default=50,
-                    help="每帧采样间隔毫秒（默认 50；排查时可改大到 1000 降频）")
+    ap.add_argument("--interval", type=int, default=16,
+                    help="每帧采样间隔毫秒（默认 16 约 60Hz；排查时可改大到 1000 降频）")
     ap.add_argument("--discover", action="store_true",
                     help="打印 Camera/GameManager 的真实方法名与字段名（对齐版本用）")
     ap.add_argument("--probe", action="store_true",

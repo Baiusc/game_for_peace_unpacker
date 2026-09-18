@@ -1,0 +1,41 @@
+Aimbot target/input verification
+changed_branch=cpp_overlay/src/main_win32.cpp and src/input_sim/input_sim.cpp
+changed_field=missing-bone target fallback; separate aim/fire side-key state machine; viewport-mapped input points
+
+BASELINE
+command: git show HEAD:projects/ucf-esp/cpp_overlay/src/input_sim/input_sim.cpp > verification/aim_target_input_20260918/ORIGINAL_FILE
+input: repository HEAD blob
+literal output: (empty)
+result: ORIGINAL_FILE created from pre-fix code
+exit status: 0
+
+MODIFIED
+command: ctest --test-dir projects/ucf-esp/cpp_overlay/build --output-on-failure
+input: mock sender with aim hold, fire-key edge, blocked target, and disabled module
+literal output:
+100% tests passed, 0 tests failed out of 2
+result: hold trace emits movement without fire; fire side-key edge emits one click; blocked and disabled paths emit no events
+exit status: 0
+
+MODIFIED AUXILIARY
+command: PYTHONDONTWRITEBYTECODE=1 python3 projects/ucf-esp/tests/test_script_config.py
+input: source and bundle script configuration
+literal output: 全部通过
+result: default Frida sampling configuration remains synchronized
+exit status: 0
+
+ROLLBACK
+command: /tmp/ucf_aim_target_input_rollback_20260918/ROLLBACK.sh && cmp MODIFIED_FILE ORIGINAL_FILE
+input: separate copy of MODIFIED_FILE and ORIGINAL_FILE
+literal output:
+rollback restored MODIFIED_FILE from ORIGINAL_FILE
+rollback_test=PASS
+result: separate test copy restored byte-for-byte; repository MODIFIED_FILE remains changed
+exit status: 0
+
+artifacts:
+MODIFIED_FILE=projects/ucf-esp/verification/aim_target_input_20260918/MODIFIED_FILE
+DIFF_FILE=projects/ucf-esp/verification/aim_target_input_20260918/DIFF_FILE
+VERIFICATION.txt=projects/ucf-esp/verification/aim_target_input_20260918/VERIFICATION.txt
+ROLLBACK.sh=projects/ucf-esp/verification/aim_target_input_20260918/ROLLBACK.sh
+restored behavior/status: rollback test restored the separate copy; current source remains changed and tests pass

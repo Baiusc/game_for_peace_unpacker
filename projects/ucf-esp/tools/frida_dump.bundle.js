@@ -3462,7 +3462,7 @@ ${this.isEnum ? `enum` : this.isStruct ? `struct` : this.isInterface ? `interfac
   // frida_dump.js
   var CFG = typeof UCFG !== "undefined" && UCFG && typeof UCFG === "object" ? UCFG : {};
   var LEVEL = Number.isFinite(CFG.level) ? CFG.level : 4;
-  var INTERVAL_MS = Number.isFinite(CFG.interval) ? CFG.interval : 50;
+  var INTERVAL_MS = Number.isFinite(CFG.interval) ? CFG.interval : 16;
   var DISCOVER = CFG.discover === true;
   var PROBE = CFG.probe === true;
   var ALLOW_GET_INSTANCE = CFG.allowGetInstance === true;

@@ -108,7 +108,7 @@ import "frida-il2cpp-bridge";
 // ---------------------------------------------------------------------------
 const CFG = (typeof UCFG !== "undefined" && UCFG && typeof UCFG === "object") ? UCFG : {};
 const LEVEL = Number.isFinite(CFG.level) ? CFG.level : 4;
-const INTERVAL_MS = Number.isFinite(CFG.interval) ? CFG.interval : 50;
+const INTERVAL_MS = Number.isFinite(CFG.interval) ? CFG.interval : 16;
 const DISCOVER = CFG.discover === true;
 const PROBE = CFG.probe === true;
 // 默认不调用泛型基类上的静态泛型方法（见顶部约束 5），--allow-get-instance 才开

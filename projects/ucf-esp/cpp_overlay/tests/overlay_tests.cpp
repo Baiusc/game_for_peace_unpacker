@@ -37,20 +37,25 @@ static void test_input_sim() {
     const ucf::input_sim::ScreenPoint far{10.0f, 0.0f};
     const ucf::input_sim::ScreenPoint near{2.0f, 0.0f};
     const ucf::input_sim::ScreenPoint center{0.0f, 0.0f};
-    sim.update(true, far, center, ucf::TargetState::Normal);
+    sim.update(true, false, far, center, ucf::TargetState::Normal);
     CHECK(mock.moves == 1 && mock.downs == 0 && mock.ups == 0);
-    sim.update(true, far, center, ucf::TargetState::Normal);
+    sim.update(true, false, far, center, ucf::TargetState::Normal);
     CHECK(mock.moves == 2 && mock.downs == 0 && mock.ups == 0);
-    sim.update(false, far, center, ucf::TargetState::Normal);
-    sim.update(true, near, center, ucf::TargetState::Normal);
+    sim.update(false, false, far, center, ucf::TargetState::Normal);
+    sim.update(false, true, near, center, ucf::TargetState::Normal);
     CHECK(mock.downs == 1 && mock.ups == 1);
+    sim.update(false, true, near, center, ucf::TargetState::Normal);
+    CHECK(mock.downs == 1 && mock.ups == 1); // 触发键持续按住不重复开火
+    sim.update(false, false, near, center, ucf::TargetState::Normal);
+    sim.update(false, true, near, center, ucf::TargetState::Normal);
+    CHECK(mock.downs == 2 && mock.ups == 2); // 松开后再次点按才触发
     const int moves_before_blocked = mock.moves;
-    sim.update(true, near, center, ucf::TargetState::Blocked);
-    CHECK(mock.moves == moves_before_blocked && mock.downs == 1 && mock.ups == 1);
+    sim.update(true, true, near, center, ucf::TargetState::Blocked);
+    CHECK(mock.moves == moves_before_blocked && mock.downs == 2 && mock.ups == 2);
 
     MockInputSender off_mock;
     ucf::input_sim::LocalInputSim off(&off_mock);
-    off.update(true, near, center, ucf::TargetState::Normal);
+    off.update(true, true, near, center, ucf::TargetState::Normal);
     CHECK(off_mock.moves == 0 && off_mock.downs == 0 && off_mock.ups == 0);
 }
 

@@ -299,7 +299,12 @@ static bool aim_point_world(const ucf::Settings& settings, const ucf::PlayerStat
         out = {player.pos[0], player.pos[1], player.pos[2]};
         return true;
     }
-    if (bone >= ucf::MAX_BONES || !player.bones[bone].valid) return false;
+    // 真实帧可能暂时没有 Humanoid bones（截图中的 bones valid=0）。
+    // 仍使用玩家根位置完成选靶/射线，避免整个 aimbot 因骨骼缺失变成 target=-1。
+    if (bone >= ucf::MAX_BONES || !player.bones[bone].valid) {
+        out = {player.pos[0], player.pos[1], player.pos[2]};
+        return std::isfinite(out.x) && std::isfinite(out.y) && std::isfinite(out.z);
+    }
     out = {player.bones[bone].pos[0], player.bones[bone].pos[1], player.bones[bone].pos[2]};
     return true;
 }
@@ -312,7 +317,12 @@ static bool aim_point_screen(const ucf::Settings& settings, const ucf::ScreenMar
         x = mark.sx; y = mark.sy;
         return true;
     }
-    if (bone >= ucf::MAX_BONES || !mark.bones[bone].valid) return false;
+    // 与 aim_point_world 对称：骨骼未到达时回退到玩家根位置的投影。
+    if (bone >= ucf::MAX_BONES || !mark.bones[bone].valid) {
+        if (!mark.on_screen) return false;
+        x = mark.sx; y = mark.sy;
+        return true;
+    }
     x = mark.bones[bone].sx; y = mark.bones[bone].sy;
     return true;
 }
@@ -630,19 +640,24 @@ static void frame() {
         input_cfg.align_tolerance_px = g_settings.input_sim_tolerance_px;
         input_cfg.jitter_px = g_settings.input_sim_jitter_px;
         g_input_sim.set_config(input_cfg);
-        const bool key_down = (GetAsyncKeyState(input_cfg.aim_key) & 0x8000) != 0;
+        const bool aim_key_down = (GetAsyncKeyState(input_cfg.aim_key) & 0x8000) != 0;
+        const bool fire_key_down = (GetAsyncKeyState(input_cfg.fire_key) & 0x8000) != 0;
         ucf::input_sim::ScreenPoint target_point{};
         const ucf::input_sim::ScreenPoint crosshair{
-            float(f.width) * 0.5f, float(f.height) * 0.5f};
+            vp.x + vp.w * 0.5f, vp.y + vp.h * 0.5f};
         const int player_count = std::max(0, std::min(f.playerCount, ucf::MAX_PLAYERS));
         const bool point_ok = target >= 0 && target < player_count &&
             aim_point_screen(g_settings, g_marks[target + 1],
                              target_point.x, target_point.y);
         if (point_ok && selected_state == ucf::TargetState::Normal) {
-            g_input_sim.update(key_down, target_point, crosshair, selected_state);
+            // SendInput 使用桌面物理像素；先把 Frame 坐标映射到真实游戏客户区。
+            target_point.x = vp.x + target_point.x * vp.sx;
+            target_point.y = vp.y + target_point.y * vp.sy;
+            g_input_sim.update(aim_key_down, fire_key_down,
+                               target_point, crosshair, selected_state);
         } else {
             // 异常目标状态是硬门；松开内部边沿状态但不产生任何输入事件。
-            g_input_sim.update(false, target_point, crosshair, selected_state);
+            g_input_sim.update(false, false, target_point, crosshair, selected_state);
         }
         g_input_sim_was_enabled = true;
     } else if (g_input_sim_was_enabled) {
@@ -757,9 +772,10 @@ static void frame() {
         if ((dbg_frames++ % 120) == 0) {
             FILE* lf = std::fopen("ucf_debug.log", "a");
             if (lf) {
-                fprintf(lf, "[%ld] mode=%s menu=%d esp=%d win=%dx%d frame=%dx%d players=%d viewport=%d,%d %dx%d scale=%.3fx%.3f fit=%s src=%s clear=%s present_hr=0x%08X\n",
+                fprintf(lf, "[%ld] mode=%s menu=%d esp=%d aim=%d target=%d win=%dx%d frame=%dx%d players=%d viewport=%d,%d %dx%d scale=%.3fx%.3f fit=%s src=%s clear=%s present_hr=0x%08X\n",
                         dbg_frames, g_flip_used ? "FLIP" : "BLT",
                         g_show_menu ? 1 : 0, g_settings.esp_visible ? 1 : 0,
+                        g_settings.aimbot_enabled ? 1 : 0, target,
                         int(cw), int(ch), f.width, f.height,
                         n, int(vp.x), int(vp.y), int(vp.w), int(vp.h), vp.sx, vp.sy,
                         fit_name(), have_data ? "shm" : "synth",

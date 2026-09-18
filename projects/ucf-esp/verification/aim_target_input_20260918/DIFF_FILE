@@ -1,0 +1,42 @@
+diff --git a/media/baiusc/DATA1/Repositories/ReposMyself/my_hack/game_for_peace_unpacker/projects/ucf-esp/verification/aim_target_input_20260918/ORIGINAL_FILE b/media/baiusc/DATA1/Repositories/ReposMyself/my_hack/game_for_peace_unpacker/projects/ucf-esp/verification/aim_target_input_20260918/MODIFIED_FILE
+index 1f1f4c0..219465d 100755
+--- a/media/baiusc/DATA1/Repositories/ReposMyself/my_hack/game_for_peace_unpacker/projects/ucf-esp/verification/aim_target_input_20260918/ORIGINAL_FILE
++++ b/media/baiusc/DATA1/Repositories/ReposMyself/my_hack/game_for_peace_unpacker/projects/ucf-esp/verification/aim_target_input_20260918/MODIFIED_FILE
+@@ -94,26 +94,27 @@ void LocalInputSim::on_tap_move_and_fire(const ScreenPoint& target_screen,
+     }
+ }
+ 
+-void LocalInputSim::update(bool key_down, const ScreenPoint& target_screen,
++void LocalInputSim::update(bool aim_key_down, bool fire_key_down,
++                           const ScreenPoint& target_screen,
+                            const ScreenPoint& crosshair, TargetState state) {
+     if (!cfg_.enabled) {
+         reset_lock();
+         return;
+     }
+-    if (!key_down) {
+-        reset_lock();
+-        return;
+-    }
+     if (state != TargetState::Normal) {
+-        was_down_ = true;
++        // 阻挡/死亡/无效目标不产生输入；同步边沿状态，避免目标恢复时误触发。
++        was_fire_down_ = fire_key_down;
+         return;
+     }
+     crosshair_ = crosshair;
+-    if (!was_down_) on_tap_move_and_fire(target_screen, crosshair);
+-    else on_hold_trace(target_screen);
+-    was_down_ = true;
++    if (aim_key_down) on_hold_trace(target_screen);
++    if (fire_key_down && !was_fire_down_)
++        on_tap_move_and_fire(target_screen, crosshair);
++    was_fire_down_ = fire_key_down;
+ }
+ 
+-void LocalInputSim::reset_lock() { was_down_ = false; }
++void LocalInputSim::reset_lock() {
++    was_fire_down_ = false;
++}
+ 
+ } // namespace ucf::input_sim

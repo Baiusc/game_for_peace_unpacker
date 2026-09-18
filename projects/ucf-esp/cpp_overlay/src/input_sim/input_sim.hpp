@@ -37,11 +37,12 @@ public:
 
     // 按住状态的后续帧：只移动，不执行开火。
     void on_hold_trace(const ScreenPoint& target_screen);
-    // 点按边沿：先执行一次移动；原准星已在容差内才开火。
+    // 触发键点按边沿：先执行一次移动；原准星已在容差内才开火。
     void on_tap_move_and_fire(const ScreenPoint& target_screen,
                               const ScreenPoint& crosshair);
-    // 统一边沿状态机：上升沿走 tap，持续按住走 trace，松开复位。
-    void update(bool key_down, const ScreenPoint& target_screen,
+    // 瞄准键按住只 trace；触发键上升沿执行一次 move+fire。
+    void update(bool aim_key_down, bool fire_key_down,
+                const ScreenPoint& target_screen,
                 const ScreenPoint& crosshair, TargetState state);
     void reset_lock();
 
@@ -51,7 +52,7 @@ private:
 
     Config cfg_{};
     Sender* sender_ = nullptr;
-    bool was_down_ = false;
+    bool was_fire_down_ = false;
     ScreenPoint crosshair_{};
 };
 

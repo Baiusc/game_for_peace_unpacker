@@ -89,7 +89,7 @@ python tools/frida_host.py --list          # 只看进程：哪些同名进程�
 | `--pid <N>` | 直接指定要注入的 pid（跳过自动挑选） |
 | `--wait-inject <秒>` | 等 `GameAssembly.dll` 载入的最长秒数（默认 20） |
 | `--level <0-4>` | 运行档位（默认 4 全量）。排查闪退时用：0=不碰 IL2CPP / 1=只初始化 / 2=只读矩阵 / 3=+玩家不含血量 / 4=全量 |
-| `--interval <毫秒>` | 每帧采样间隔（默认 50）。排查时可改 `1000` 降频观察 |
+| `--interval <毫秒>` | 每帧采样间隔（默认 16，约 60Hz）。排查时可改 `1000` 降频观察 |
 | `--discover` | 打印 `Camera` / `GameManager` 的真实方法名与字段名，用于对齐版本 |
 | `--probe` | **单步探测**：注入后把每个关键调用各做一遍并逐步打日志，进程若崩掉，最后那行 `▶ [n/N]` 就是崩点。定位闪退首选 |
 | `--allow-get-instance` | 允许调用 `GameManager.get_instance()`（声明在泛型基类 `Singleton<T>` 上，共享泛型方法极易 AV，**默认不走**） |
