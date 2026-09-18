@@ -219,3 +219,6 @@ projects/*/*.iml
 my_exe/
 *evidence*/
 !projects/ucf-esp/data
+
+*/sdk/
+*/SDK/

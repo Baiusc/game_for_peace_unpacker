@@ -1,0 +1,56 @@
+cmake_minimum_required(VERSION 3.16)
+project(ucf_cpp_overlay LANGUAGES CXX)
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+if(NOT MSVC)
+  add_compile_options(-Wall -Wextra -Wpedantic)
+endif()
+
+# 复用父目录的投影数学（列主序约定与 esp_core.py / src/projection.cpp 一致）
+add_library(ucf_projection ../src/projection.cpp)
+target_include_directories(ucf_projection PUBLIC ../src)
+
+# 平台无关的叠加层逻辑：共享内存契约 + 2D 可视化原语 + 平滑/目标选择 + 配置
+add_library(ucf_overlay_core
+    src/shared_state.cpp
+    src/overlay_viz.cpp
+    src/smooth.cpp
+    src/config.cpp)
+target_include_directories(ucf_overlay_core PUBLIC src)
+target_link_libraries(ucf_overlay_core PUBLIC ucf_projection)
+
+include(CTest)
+if(BUILD_TESTING)
+  add_executable(ucf_overlay_tests tests/overlay_tests.cpp)
+  target_link_libraries(ucf_overlay_tests PRIVATE ucf_overlay_core)
+  add_test(NAME ucf_overlay_tests COMMAND ucf_overlay_tests)
+endif()
+
+# ---------------------------------------------------------------------------
+# Windows-only：D3D11 + ImGui 透明叠加层。
+# 本机 Windows 才编译/运行；Linux 只构建上面的核心库 + 测试。
+# ImGui 源码已复制到 ext/imgui/（来自 3rd_project 的 CS2 Internal，版本 1.92.5）。
+# 若换了其它版本，按实际文件调整下面 imgui 库的源文件列表即可。
+# ---------------------------------------------------------------------------
+if(WIN32)
+  set(IMGUI_DIR ${CMAKE_CURRENT_SOURCE_DIR}/ext/imgui)
+  add_library(imgui STATIC
+    ${IMGUI_DIR}/imgui.cpp
+    ${IMGUI_DIR}/imgui_draw.cpp
+    ${IMGUI_DIR}/imgui_tables.cpp
+    ${IMGUI_DIR}/imgui_widgets.cpp
+    ${IMGUI_DIR}/imgui_impl_win32.cpp
+    ${IMGUI_DIR}/imgui_impl_dx11.cpp)
+  target_include_directories(imgui PUBLIC ${IMGUI_DIR})
+  # ImGui 后端用 Windows 接口，关掉告警噪声
+  target_compile_definitions(imgui PRIVATE _CRT_SECURE_NO_WARNINGS)
+
+  add_executable(ucf_overlay_win32
+    src/main_win32.cpp
+    src/overlay_win32.cpp
+    src/menu_win32.cpp)
+  target_include_directories(ucf_overlay_win32 PRIVATE ${IMGUI_DIR} src)
+  target_link_libraries(ucf_overlay_win32 PRIVATE
+    ucf_overlay_core imgui
+    d3d11 dxgi d3dcompiler dwmapi user32 gdi32)
+endif()
