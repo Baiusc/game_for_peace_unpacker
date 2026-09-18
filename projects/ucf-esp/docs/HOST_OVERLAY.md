@@ -554,3 +554,21 @@ python tools/replay.py dev_frames/session.jsonl --summary --limit 0
 每行包含 `schema_version=2`、序号、时间戳、矩阵、窗口尺寸、`local`、`players`、
 `playerCount` 与骨骼数组。写盘失败只停止录制，不停止主采样循环；`--record-no-bones`
 和 `--record-no-name` 可减小文件。回放工具不连接游戏，损坏 JSONL 行会报告行号并跳过。
+# Frida 真实帧接入 C++ 共享内存
+
+路线 B 使用 `frida_host.py --shm` 作为写端：Frida 收到的原始 `Frame` 按
+`cpp_overlay/tools/shm_writer.py` 的同一布局写入 Windows 命名共享内存
+`UcfFrame`。写入采用后台槽写完整帧，再翻转 `cur` 的双缓冲顺序。
+
+```powershell
+# 终端 1：启动/附加自有 UnityCrossFire，并写入 UcfFrame
+python tools\frida_host.py --game "C:\path\UnityCrossFire.exe" --shm
+
+# 终端 2：C++ 叠加层读取 UcfFrame
+ucf_overlay_win32.exe
+```
+
+`--shm` 默认关闭 tkinter 叠加层，避免两个渲染窗口重复绘制。`frida_probe.py`
+只用于进程选择诊断，正常路线 B 不需要单独运行；遇到同名进程或缺少
+`GameAssembly.dll` 时再用 `--list`/`--probe` 排查。共享内存桥不新增契约字段，
+宿主退出时关闭映射句柄；没有写端时 C++ 仍回退到合成数据源。

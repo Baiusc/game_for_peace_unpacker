@@ -136,3 +136,11 @@
 - **方案 B**：屏幕空间 FOV，使用目标取点的投影坐标，按屏幕中心距离选择；与可视化 FOV 圆共用半径。
 - **取点**：身体中心、头部 `bones[10]`、胸部 `bones[8]`、指定骨骼槽位；无效骨骼不作为有效候选。
 - **边界**：取点只影响本地调试目标选择和角度输出，不写视角、不注入鼠标/输入。
+
+### 2026-09-18：Frida 真实帧接入 UcfFrame
+
+- **现象**：C++ 叠加层能读合成帧，但 `frida_host.py` 的真实帧没有写入共享内存。
+- **根因**：原宿主只把帧投影后推给 tkinter，`SharedTransport("UcfFrame")` 没有真实写端。
+- **修法**：新增 `--shm`，复用 `cpp_overlay/tools/shm_writer.py` 的布局编码器，按后台槽写入、翻转 `cur` 的双缓冲顺序写入 `UcfFrame`；共享内存写失败只报一次并停桥，避免回调刷屏。
+- **验证**：离线校验 `FRAME_FMT`/`SLOT_FMT` 与 `build_frame()` 长度；Windows 实机需分别启动 `frida_host.py --shm` 与 C++ exe 验证源切换。
+- **详见**：`tools/frida_host.py`、`tests/test_shm_bridge.py`、`docs/HOST_OVERLAY.md`。

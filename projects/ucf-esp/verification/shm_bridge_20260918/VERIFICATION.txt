@@ -1,0 +1,34 @@
+SHM bridge verification
+=======================
+Changed branch/field: tools/frida_host.py --shm -> SharedFrameWriter -> UcfFrame
+Artifacts:
+- MODIFIED_FILE
+- DIFF_FILE
+- VERIFICATION.txt
+- ROLLBACK.sh
+
+BASELINE
+Command: PYTHONDONTWRITEBYTECODE=1 python3 -m py_compile /tmp/frida_host_original.py
+Literal output: (empty)
+Result: original host syntax passed
+Exit status: 0
+
+MODIFIED
+Command: PYTHONDONTWRITEBYTECODE=1 python3 -m py_compile projects/ucf-esp/tools/frida_host.py
+Literal output: (empty)
+Command: PYTHONDONTWRITEBYTECODE=1 python3 projects/ucf-esp/tests/test_shm_bridge.py
+Literal output:
+shm bridge codec: PASS
+frame_bytes=23804 slot_bytes=23808
+Result: modified host and shared-memory codec passed
+Exit status: 0
+
+ROLLBACK
+Command: ROLLBACK.sh on a separate temporary copy, then cmp MODIFIED_FILE ORIGINAL_FILE
+Literal output:
+rollback restored MODIFIED_FILE from ORIGINAL_FILE
+rollback copy compare: PASS
+Result: rollback restored the copied file; working MODIFIED_FILE was then reopened from the modified snapshot
+Exit status: 0
+
+Restored behavior/status: rollback copy equals ORIGINAL_FILE; repository working source remains the modified --shm branch.

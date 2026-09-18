@@ -1,0 +1,155 @@
+--- projects/ucf-esp/verification/shm_bridge_20260918/ORIGINAL_FILE	2026-09-18 17:07:22.587002200 +0800
++++ projects/ucf-esp/verification/shm_bridge_20260918/MODIFIED_FILE	2026-09-18 17:07:22.579935500 +0800
+@@ -7,6 +7,7 @@
+ # 本机 Windows 用法：
+ #   python tools/frida_host.py                      # 先清残留同名进程 -> 启动游戏 -> 按 [INS] 注入
+ #   python tools/frida_host.py --no-overlay         # 只打印，不画窗口
++#   python tools/frida_host.py --shm                # 真实帧写入 UcfFrame，供 C++ 叠加层读取
+ #   python tools/frida_host.py --game "C:\aG\U3DCF单机版30人生化UCF新年版本\UnityCrossFire.exe"
+ #   python tools/frida_host.py --no-launch          # 不启动游戏（也不清理），附加到已运行的进程
+ #   python tools/frida_host.py --no-launch --kill-stale   # 只清掉没加载 GameAssembly 的空壳，保留真游戏
+@@ -48,6 +49,9 @@
+ import subprocess
+ import argparse
+ import atexit
++import importlib.util
++import mmap
++import struct
+
+ import esp_core
+ import frida_probe
+@@ -65,6 +69,7 @@
+ PRINT_THROTTLE_S = 0.5
+ WARNED_ONCE = {}  # 同类错误只报一次，避免 20Hz 刷屏
+ RECORDER = None
++SHM_WRITER = None
+ DEFAULT_WAIT_MODULE = 20.0  # 等 GameAssembly.dll 载入的最长秒数
+ DEFAULT_GAME_NAME = "UnityCrossFire.exe"
+ DEFAULT_LEVEL = 4  # 默认全量档（见 frida_dump.js 顶部的 LEVEL 说明）
+@@ -138,12 +143,63 @@
+         self.active = False
+
+
++class SharedFrameWriter:
++    """把原始 Frame 按 cpp_overlay 的双缓冲布局写入命名共享内存。"""
++
++    def __init__(self, name="UcfFrame"):
++        if sys.platform != "win32":
++            raise RuntimeError("命名共享内存桥仅支持 Windows")
++        codec_path = os.path.join(SCRIPT_DIR, "..", "cpp_overlay", "tools",
++                                  "shm_writer.py")
++        spec = importlib.util.spec_from_file_location("ucf_shm_codec", codec_path)
++        if spec is None or spec.loader is None:
++            raise RuntimeError(f"找不到共享内存布局模块: {codec_path}")
++        codec = importlib.util.module_from_spec(spec)
++        spec.loader.exec_module(codec)
++        self.codec = codec
++        self.name = name
++        self.frame_size = codec.FRAME_FMT.size
++        self.shm = mmap.mmap(-1, codec.SHM_SIZE, tagname=name)
++        self.closed = False
++
++    def write(self, frame):
++        if self.closed:
++            return
++        players = frame.get("players") or []
++        local = frame.get("local") or {"pos": [0.0, 0.0, 0.0]}
++        raw = self.codec.build_frame(
++            frame.get("w2c") or [0.0] * 16,
++            frame.get("proj") or [0.0] * 16,
++            frame.get("width", 1280), frame.get("height", 720),
++            frame.get("inGame", False), local, players)
++        if len(raw) != self.frame_size:
++            raise ValueError(f"Frame 长度错误: {len(raw)} != {self.frame_size}")
++        cur = struct.unpack_from("<i", self.shm, 0)[0]
++        if cur not in (0, 1):
++            cur = 0
++        back = 1 - cur
++        start = 4 + back * self.frame_size
++        self.shm[start:start + self.frame_size] = raw
++        struct.pack_into("<i", self.shm, 0, back)
++
++    def close(self):
++        if not self.closed:
++            self.closed = True
++            self.shm.close()
++
++
+ def close_recorder():
+     if RECORDER is not None:
+         RECORDER.close()
+
+
++def close_shm_writer():
++    if SHM_WRITER is not None:
++        SHM_WRITER.close()
++
++
+ atexit.register(close_recorder)
++atexit.register(close_shm_writer)
+
+
+ def build_script_source(js, level=DEFAULT_LEVEL, interval_ms=50, discover=False,
+@@ -311,7 +367,7 @@
+
+
+ def on_message(message, data):
+-    global LAST_MSG_TS, LAST_PRINT_TS
++    global LAST_MSG_TS, LAST_PRINT_TS, SHM_WRITER
+     if message.get("type") != "send":
+         print("[frida]", message)
+         return
+@@ -327,6 +383,15 @@
+         return
+     if RECORDER is not None:
+         RECORDER.write(frame)
++    if SHM_WRITER is not None:
++        try:
++            SHM_WRITER.write(frame)
++        except Exception as exc:
++            if not WARNED_ONCE.get("shm"):
++                WARNED_ONCE["shm"] = True
++                print(f"[shm] 写入失败，已停止共享内存桥: {exc}")
++            SHM_WRITER.close()
++            SHM_WRITER = None
+     LAST_MSG_TS = time.time()
+
+     # 不在对局 / 还没拿到矩阵：JS 会照常发帧（inGame:false），这里只需清屏。
+@@ -659,7 +724,7 @@
+
+
+ def main():
+-    global RECORDER
++    global RECORDER, SHM_WRITER
+     ap = argparse.ArgumentParser(description="UCF-ESP frida 宿主（按 INS 触发注入）")
+     ap.add_argument("--game", default=DEFAULT_GAME_NAME,
+                     help="游戏 exe：完整路径 / 裸文件名均可（默认 UnityCrossFire.exe，"
+@@ -671,6 +736,10 @@
+     ap.add_argument("--record-every", type=int, default=1, help="每隔 N 个原始帧写一帧")
+     ap.add_argument("--record-no-bones", action="store_true", help="录制时省略骨骼")
+     ap.add_argument("--record-no-name", action="store_true", help="录制时省略玩家名称")
++    ap.add_argument("--shm", action="store_true",
++                    help="把原始 Frame 写入 Windows 命名共享内存 UcfFrame，供 C++ 叠加层读取")
++    ap.add_argument("--shm-name", default="UcfFrame",
++                    help="共享内存名称（默认 UcfFrame，必须与 C++ 端一致）")
+     ap.add_argument("--no-overlay", action="store_true", help="不创建叠加窗口，仅打印")
+     ap.add_argument("--auto", action="store_true", help="启动即注入，不等待 INS（旧行为）")
+     ap.add_argument("--no-launch", action="store_true", help="不启动游戏，附加到已手动运行的进程")
+@@ -755,7 +824,16 @@
+             print("[!]", e)
+         return
+
+-    run_live(args.game, use_overlay=not args.no_overlay, auto=args.auto,
++    if args.shm:
++        try:
++            SHM_WRITER = SharedFrameWriter(args.shm_name)
++            print(f"[shm] 已连接命名共享内存 {args.shm_name!r}，"
++                  f"Frame={SHM_WRITER.frame_size} bytes；写入原始帧")
++        except Exception as exc:
++            print(f"[shm] 打开失败: {exc}")
++            return
++
++    run_live(args.game, use_overlay=not args.no_overlay and not args.shm, auto=args.auto,
+              no_launch=args.no_launch, force_launch=args.force_launch,
+              forced_pid=args.pid, wait_seconds=args.wait_inject,
+              cleanup=not args.no_cleanup, kill_stale=args.kill_stale,
