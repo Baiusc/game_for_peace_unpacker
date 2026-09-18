@@ -1,0 +1,32 @@
+diff --git a/media/baiusc/DATA1/Repositories/ReposMyself/my_hack/game_for_peace_unpacker/projects/ucf-esp/verification/projection_duplicate_local_20260918/ORIGINAL_FILE b/media/baiusc/DATA1/Repositories/ReposMyself/my_hack/game_for_peace_unpacker/projects/ucf-esp/verification/projection_duplicate_local_20260918/MODIFIED_FILE
+index 773536f..5a0f570 100755
+--- a/media/baiusc/DATA1/Repositories/ReposMyself/my_hack/game_for_peace_unpacker/projects/ucf-esp/verification/projection_duplicate_local_20260918/ORIGINAL_FILE
++++ b/media/baiusc/DATA1/Repositories/ReposMyself/my_hack/game_for_peace_unpacker/projects/ucf-esp/verification/projection_duplicate_local_20260918/MODIFIED_FILE
+@@ -72,6 +72,13 @@ def _dist3(a, b):
+     return ((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2) ** 0.5
+ 
+ 
++def _same_position(a, b, eps=1e-4):
++    """判断两个玩家位置是否是同一帧的重复本地玩家记录。"""
++    if a is None or b is None:
++        return False
++    return all(abs(float(a[i]) - float(b[i])) <= eps for i in range(3))
++
++
+ class Mark:
+     """一个玩家在屏幕上的投影结果。"""
+     __slots__ = ("kind", "screen", "world", "team", "hp", "max_hp",
+@@ -174,6 +181,13 @@ def project_frame(frame, w=None, h=None, ndc_clip=NDC_CLIP):
+         marks.append(_make("local", local, local_team, True, w, h, VP,
+                            cam_pos, ndc_clip))
+     for p in frame.get("players", []):
++        # allPlayers 通常包含 myPlayer；local 已单独放在 Frame.local，不能再投影一次。
++        # 兼容旧帧：优先使用显式标记，缺失标记时用位置去重。
++        p_world = _vec(p.get("pos")) if isinstance(p, dict) else None
++        if isinstance(p, dict) and (p.get("isLocal") is True or
++                                    p.get("isMyPlayer") is True or
++                                    _same_position(p_world, _vec(local.get("pos")) if local else None)):
++            continue
+         marks.append(_make("other", p, local_team, False, w, h, VP,
+                            cam_pos, ndc_clip))
+     return VP, marks

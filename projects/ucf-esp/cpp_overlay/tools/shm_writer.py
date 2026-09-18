@@ -64,7 +64,18 @@ def build_frame(w2c, proj, width, height, in_game, local, players):
     head = struct.pack("<16f16fii?3x",
                        *(list(w2c) + list(proj) + [int(width), int(height), bool(in_game)]))
     body = PS_FMT.pack(*_ps_items(local))
-    players = players[:N_PLAYERS]
+    # frida 的 allPlayers 往往包含 myPlayer；Frame.local 已经单独保存，
+    # 写入共享内存前剔除重复项，避免 C++ 把本地玩家再次当作队友绘制。
+    local_pos = _vec3(local.get("pos"))
+    filtered_players = []
+    for player in players:
+        if player.get("isLocal") is True or player.get("isMyPlayer") is True:
+            continue
+        player_pos = _vec3(player.get("pos"))
+        if all(abs(player_pos[i] - local_pos[i]) <= 1e-4 for i in range(3)):
+            continue
+        filtered_players.append(player)
+    players = filtered_players[:N_PLAYERS]
     for p in players:
         body += PS_FMT.pack(*_ps_items(p))
     empty = PS_FMT.pack(*_ps_items({"pos": [0.0, 0.0, 0.0]}))

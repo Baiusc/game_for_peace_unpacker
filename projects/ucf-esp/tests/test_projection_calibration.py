@@ -109,6 +109,16 @@ def test_local_player_is_near_clipped():
            f"投影数学未被篡改：screen=({local.screen[0]:.1f}, {local.screen[1]:.1f}) 仍是实测值")
 
 
+def test_local_duplicate_is_not_projected_twice():
+    """allPlayers 中的 myPlayer 已在 local 字段中，不能产生第二个标记。"""
+    fr = load()
+    _, marks = esp_core.project_frame(fr)
+    expect(sum(1 for m in marks if m.kind == "local") == 1,
+           "local 只投影一次")
+    expect(len(marks) == len(fr["players"]),
+           f"去掉 players[0] 的本地重复项后标记数为 {len(marks)}")
+
+
 def test_world_to_screen_matches_manual():
     """world_to_screen 与纯手算逐点对照（含敌方）。"""
     fr = load()
@@ -215,6 +225,7 @@ def main():
     for fn in (test_vp_matches_independent_p_times_v,
                test_camera_position,
                test_local_player_is_near_clipped,
+               test_local_duplicate_is_not_projected_twice,
                test_world_to_screen_matches_manual,
                test_enemies_project_into_screen,
                test_no_explosive_coord_is_drawable,

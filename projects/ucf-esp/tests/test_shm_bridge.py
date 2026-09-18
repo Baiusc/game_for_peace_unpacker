@@ -21,6 +21,14 @@ def main():
     assert MODULE.SLOT_FMT.size == 4 + MODULE.FRAME_FMT.size
     assert MODULE.SHM_SIZE == 4 + 2 * MODULE.FRAME_FMT.size
     assert MODULE.SHM_NAME == "UcfFrame"
+    duplicate_players = [
+        {"isLocal": True, "pos": [0.0, 1.0, 2.0]},
+        {"isLocal": False, "pos": [4.0, 5.0, 6.0], "hp": 75},
+    ]
+    dedup_frame = MODULE.build_frame(
+        [0.0] * 16, [0.0] * 16, 800, 600, True,
+        {"pos": [0.0, 1.0, 2.0]}, duplicate_players)
+    assert MODULE.FRAME_FMT.unpack_from(dedup_frame)[-1] == 1
     dict_frame = MODULE.build_frame(
         [0.0] * 16, [0.0] * 16, 800, 600, True,
         {"pos": {"x": 1.0, "y": 2.0, "z": 3.0}},
