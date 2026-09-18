@@ -53,6 +53,7 @@ import atexit
 import importlib.util
 import mmap
 import struct
+import traceback
 
 import esp_core
 import frida_probe
@@ -441,7 +442,8 @@ def on_message(message, data):
         except Exception as exc:
             if not WARNED_ONCE.get("shm"):
                 WARNED_ONCE["shm"] = True
-                print(f"[shm] 写入失败，已停止共享内存桥: {exc}")
+                print(f"[shm] 写入失败，已停止共享内存桥: {exc!r}")
+                traceback.print_exc()
             SHM_WRITER.close()
             SHM_WRITER = None
     LAST_MSG_TS = time.time()

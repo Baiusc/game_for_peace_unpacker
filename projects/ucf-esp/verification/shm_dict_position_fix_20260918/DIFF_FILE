@@ -1,0 +1,25 @@
+--- projects/ucf-esp/verification/shm_dict_position_fix_20260918/ORIGINAL_FILE	2026-09-18 22:02:52.911423100 +0800
++++ projects/ucf-esp/verification/shm_dict_position_fix_20260918/MODIFIED_FILE	2026-09-18 22:02:52.914357700 +0800
+@@ -33,9 +33,21 @@
+ SHM_SIZE = SLOT_FMT.size            # 4 + Frame
+
+
++def _vec3(value, default=(0.0, 0.0, 0.0)):
++    """兼容 Frame JSON 的 {x,y,z} 与共享内存写入所需的 [x,y,z]。"""
++    if isinstance(value, dict):
++        return (float(value.get("x", default[0])),
++                float(value.get("y", default[1])),
++                float(value.get("z", default[2])))
++    if isinstance(value, (list, tuple)) and len(value) >= 3:
++        return (float(value[0]), float(value[1]), float(value[2]))
++    return tuple(float(v) for v in default)
++
++
+ def _ps_items(p):
+     name = (p.get("name", "")[:31].encode("utf-8", "replace") + b"\x00" * 32)[:32]
+-    items = [float(p["pos"][0]), float(p["pos"][1]), float(p["pos"][2]),
++    pos = _vec3(p.get("pos"))
++    items = [pos[0], pos[1], pos[2],
+             int(p.get("team", 0)), int(p.get("hp", 100)),
+             int(p.get("maxHp", 100)), bool(p.get("isDead", False)), name]
+     bones = p.get("bones", []) or []

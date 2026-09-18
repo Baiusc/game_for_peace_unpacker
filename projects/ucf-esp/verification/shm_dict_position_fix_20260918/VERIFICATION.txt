@@ -1,0 +1,37 @@
+Shared-memory dictionary-position fix verification
+==================================================
+Changed branch/field: shm_writer._vec3 accepts Frame pos as {x,y,z} or [x,y,z]; frida_host prints full SHM traceback.
+Artifacts:
+- MODIFIED_FILE
+- DIFF_FILE
+- VERIFICATION.txt
+- ROLLBACK.sh
+
+BASELINE
+Command: git show HEAD:projects/ucf-esp/cpp_overlay/tools/shm_writer.py > ORIGINAL_FILE
+Literal output: (empty)
+Result: baseline codec captured before dictionary-position compatibility.
+Exit status: 0
+
+MODIFIED
+Command: PYTHONDONTWRITEBYTECODE=1 python3 projects/ucf-esp/tests/test_shm_bridge.py
+Literal output:
+shm bridge codec: PASS
+frame_bytes=23804 slot_bytes=23808
+Command: PYTHONDONTWRITEBYTECODE=1 python3 -m py_compile projects/ucf-esp/tools/frida_host.py projects/ucf-esp/cpp_overlay/tools/shm_writer.py
+Literal output: (empty)
+Command: ctest --test-dir projects/ucf-esp/cpp_overlay/build --output-on-failure
+Literal output:
+100% tests passed, 0 tests failed out of 2
+Result: list and dictionary positions both pack successfully; host syntax and C++ tests pass.
+Exit status: 0
+
+ROLLBACK
+Command: ROLLBACK.sh on a separate temporary copy, then cmp MODIFIED_FILE ORIGINAL_FILE
+Literal output:
+rollback restored MODIFIED_FILE from ORIGINAL_FILE
+rollback copy compare: PASS
+Result: rollback restored the copied file; working MODIFIED_FILE remains the fix.
+Exit status: 0
+
+Restored behavior/status: rollback copy equals ORIGINAL_FILE; working source remains modified.

@@ -20,6 +20,12 @@ def main():
     assert len(frame) == MODULE.FRAME_FMT.size
     assert MODULE.SLOT_FMT.size == 4 + MODULE.FRAME_FMT.size
     assert MODULE.SHM_NAME == "UcfFrame"
+    dict_frame = MODULE.build_frame(
+        [0.0] * 16, [0.0] * 16, 800, 600, True,
+        {"pos": {"x": 1.0, "y": 2.0, "z": 3.0}},
+        [{"pos": {"x": 4.0, "y": 5.0, "z": 6.0}, "hp": 90}],
+    )
+    assert len(dict_frame) == MODULE.FRAME_FMT.size
     print("shm bridge codec: PASS")
     print(f"frame_bytes={len(frame)} slot_bytes={MODULE.SLOT_FMT.size}")
 
