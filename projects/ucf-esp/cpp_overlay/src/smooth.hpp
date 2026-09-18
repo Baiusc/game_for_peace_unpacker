@@ -1,5 +1,6 @@
 #pragma once
 #include <cstddef>
+#include "shared_state.hpp"
 
 // 相机角度平滑 + 目标选择（纯数学，不注入鼠标、不碰任何进程）。
 //
@@ -26,6 +27,11 @@ struct Candidate {
     bool  visible = true;
     bool  valid = true;
 };
+
+// 当前契约没有 LOS/遮挡字段；此谓词只检查 PlayerState 是否具备可用的
+// 基础位置数据。屏幕投影有效性仍由 overlay_win32 在生成 Candidate 时补充。
+// TODO: Frame 增加 visible 字段后，在这里合并真实可见性状态。
+bool is_target_visible(const PlayerState& player);
 
 // 在候选敌人里，挑出“落在 fov_deg 视锥内”的，再按 mode 选一个：
 //   mode==0 -> 距离最近；mode==1 -> 血量最低；mode==2 -> 准星最近。

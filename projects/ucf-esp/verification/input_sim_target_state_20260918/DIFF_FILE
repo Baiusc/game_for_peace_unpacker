@@ -1,0 +1,61 @@
+--- projects/ucf-esp/verification/input_sim_target_state_20260918/ORIGINAL_FILE	2026-09-18 18:26:41.497139100 +0800
++++ projects/ucf-esp/verification/input_sim_target_state_20260918/MODIFIED_FILE	2026-09-18 18:26:41.499840000 +0800
+@@ -0,0 +1,58 @@
++#pragma once
++
++#include "../smooth.hpp"
++
++namespace ucf::input_sim {
++
++constexpr int kXButton1 = 0x05;
++constexpr int kXButton2 = 0x06;
++
++struct ScreenPoint {
++    float x = 0.0f;
++    float y = 0.0f;
++};
++
++struct Config {
++    bool enabled = false;
++    int aim_key = kXButton2;
++    int fire_key = kXButton1;
++    float align_tolerance_px = 4.0f;
++    int jitter_px = 2;
++};
++
++class Sender {
++public:
++    virtual ~Sender() = default;
++    virtual void move(int dx, int dy) = 0;
++    virtual void button_down(int key) = 0;
++    virtual void button_up(int key) = 0;
++};
++
++// Windows 使用 SendInput；非 Windows 构建使用空实现，供核心库和单测编译。
++class LocalInputSim {
++public:
++    explicit LocalInputSim(Sender* sender = nullptr);
++    void set_config(const Config& config);
++    const Config& config() const { return cfg_; }
++
++    // 按住状态的后续帧：只移动，不执行开火。
++    void on_hold_trace(const ScreenPoint& target_screen);
++    // 点按边沿：先执行一次移动；原准星已在容差内才开火。
++    void on_tap_move_and_fire(const ScreenPoint& target_screen,
++                              const ScreenPoint& crosshair);
++    // 统一边沿状态机：上升沿走 tap，持续按住走 trace，松开复位。
++    void update(bool key_down, const ScreenPoint& target_screen,
++                const ScreenPoint& crosshair, TargetState state);
++    void reset_lock();
++
++private:
++    void move_to(const ScreenPoint& target, const ScreenPoint& crosshair);
++    bool aligned(const ScreenPoint& target, const ScreenPoint& crosshair) const;
++
++    Config cfg_{};
++    Sender* sender_ = nullptr;
++    bool was_down_ = false;
++    ScreenPoint crosshair_{};
++};
++
++} // namespace ucf::input_sim

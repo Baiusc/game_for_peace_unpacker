@@ -1,0 +1,33 @@
+Input simulation and target-state verification
+===============================================
+Changed branch/field: independent input_sim module, input_sim_enabled default false, TargetState visibility gate and lock prevention.
+Artifacts:
+- MODIFIED_FILE
+- DIFF_FILE
+- VERIFICATION.txt
+- ROLLBACK.sh
+
+BASELINE
+Command: : > ORIGINAL_FILE
+Literal output: (empty)
+Result: input_sim.hpp is a new independent module; no previous implementation existed.
+Exit status: 0
+
+MODIFIED
+Command: cmake --build projects/ucf-esp/cpp_overlay/build
+Literal output: [100%] Built target test_projection_parity
+Command: ctest --test-dir projects/ucf-esp/cpp_overlay/build --output-on-failure
+Literal output:
+100% tests passed, 0 tests failed out of 2
+Result: TargetState, lock-prevent, config round-trip, input mock, tap/hold, tolerance and default-OFF tests passed.
+Exit status: 0
+
+ROLLBACK
+Command: ROLLBACK.sh on a separate temporary copy, then cmp MODIFIED_FILE ORIGINAL_FILE
+Literal output:
+rollback restored MODIFIED_FILE from ORIGINAL_FILE
+rollback copy compare: PASS
+Result: rollback restored the copied file; working MODIFIED_FILE remains the modified branch.
+Exit status: 0
+
+Restored behavior/status: rollback copy equals ORIGINAL_FILE; working source remains the modified implementation.

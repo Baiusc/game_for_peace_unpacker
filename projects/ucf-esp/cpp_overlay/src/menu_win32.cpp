@@ -146,6 +146,15 @@ void draw_menu(Settings& s, bool& show_menu, bool& request_exit,
                         st.read_ms, st.project_ms, st.draw_ms, ImGui::GetIO().Framerate);
         ImGui::TreePop();
     }
+    if (ImGui::TreeNode("本地模拟输入（仅自研单机）")) {
+        ImGui::Checkbox("启用本地输入模拟", &s.input_sim_enabled);
+        ImGui::InputInt("瞄准侧键 VK", &s.input_sim_aim_key);
+        ImGui::InputInt("触发侧键 VK", &s.input_sim_fire_key);
+        ImGui::SliderFloat("对齐容差(px)", &s.input_sim_tolerance_px, 0.0f, 20.0f);
+        ImGui::SliderInt("抖动上限(px)", &s.input_sim_jitter_px, 0, 20);
+        ImGui::TextUnformatted("仅自研单机调试构建；默认关闭");
+        ImGui::TreePop();
+    }
     ImGui::Separator();
     if (ImGui::TreeNode("退出设置")) {
         ImGui::Checkbox("退出时删除配置 (ucf_overlay.ini)", &s.exit_delete_config);

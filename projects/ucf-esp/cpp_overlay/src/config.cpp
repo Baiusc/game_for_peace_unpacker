@@ -24,6 +24,11 @@ bool save_settings(const Settings& s, const char* path) {
     fprintf(f, "aim_dead=%d\n", s.aim_dead ? 1 : 0);
     fprintf(f, "aim_visible_only=%d\n", s.aim_visible_only ? 1 : 0);
     fprintf(f, "aim_lock_prevent=%d\n", s.aim_lock_prevent ? 1 : 0);
+    fprintf(f, "input_sim_enabled=%d\n", s.input_sim_enabled ? 1 : 0);
+    fprintf(f, "input_sim_aim_key=%d\n", s.input_sim_aim_key);
+    fprintf(f, "input_sim_fire_key=%d\n", s.input_sim_fire_key);
+    fprintf(f, "input_sim_tolerance_px=%.3f\n", s.input_sim_tolerance_px);
+    fprintf(f, "input_sim_jitter_px=%d\n", s.input_sim_jitter_px);
     fprintf(f, "fov_deg=%.3f\n",      s.fov_deg);
     fprintf(f, "show_target_ray=%d\n", s.show_target_ray ? 1 : 0);
     fprintf(f, "ray_from_bottom=%d\n", s.ray_from_bottom ? 1 : 0);
@@ -89,6 +94,11 @@ bool load_settings(Settings& s, const char* path) {
         else if (!std::strcmp(key, "aim_dead"))       s.aim_dead = std::atoi(val) != 0;
         else if (!std::strcmp(key, "aim_visible_only")) s.aim_visible_only = std::atoi(val) != 0;
         else if (!std::strcmp(key, "aim_lock_prevent")) s.aim_lock_prevent = std::atoi(val) != 0;
+        else if (!std::strcmp(key, "input_sim_enabled")) s.input_sim_enabled = std::atoi(val) != 0;
+        else if (!std::strcmp(key, "input_sim_aim_key")) s.input_sim_aim_key = std::atoi(val);
+        else if (!std::strcmp(key, "input_sim_fire_key")) s.input_sim_fire_key = std::atoi(val);
+        else if (!std::strcmp(key, "input_sim_tolerance_px")) s.input_sim_tolerance_px = std::atof(val);
+        else if (!std::strcmp(key, "input_sim_jitter_px")) s.input_sim_jitter_px = std::atoi(val);
         else if (!std::strcmp(key, "fov_deg"))        s.fov_deg        = std::atof(val);
         else if (!std::strcmp(key, "show_target_ray")) s.show_target_ray = std::atoi(val) != 0;
         else if (!std::strcmp(key, "ray_from_bottom")) s.ray_from_bottom = std::atoi(val) != 0;
@@ -134,6 +144,8 @@ bool load_settings(Settings& s, const char* path) {
     if (s.responsiveness > 1.0f) s.responsiveness = 1.0f;
     if (s.max_distance < 0.0f) s.max_distance = 0.0f;
     if (s.aim_max_distance < 0.0f) s.aim_max_distance = 0.0f;
+    if (s.input_sim_tolerance_px < 0.0f) s.input_sim_tolerance_px = 0.0f;
+    if (s.input_sim_jitter_px < 0) s.input_sim_jitter_px = 0;
     if (s.dev_record_max_frames < 0) s.dev_record_max_frames = 0;
     if (s.dev_record_every < 1) s.dev_record_every = 1;
     if (s.dev_record_duration < 0.0f) s.dev_record_duration = 0.0f;

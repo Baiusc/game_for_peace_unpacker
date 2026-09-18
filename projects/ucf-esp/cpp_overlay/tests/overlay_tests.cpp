@@ -2,6 +2,7 @@
 #include "overlay_viz.hpp"
 #include "smooth.hpp"
 #include "config.hpp"
+#include "input_sim/input_sim.hpp"
 
 #include <cmath>
 #include <cstdio>
@@ -14,6 +15,43 @@ static int failures = 0;
 
 static int approx(float a, float b, float eps = 1e-3f) {
     return std::fabs(a - b) <= eps;
+}
+
+struct MockInputSender final : ucf::input_sim::Sender {
+    int moves = 0;
+    int downs = 0;
+    int ups = 0;
+    void move(int, int) override { ++moves; }
+    void button_down(int) override { ++downs; }
+    void button_up(int) override { ++ups; }
+};
+
+static void test_input_sim() {
+    MockInputSender mock;
+    ucf::input_sim::LocalInputSim sim(&mock);
+    ucf::input_sim::Config cfg{};
+    cfg.enabled = true;
+    cfg.align_tolerance_px = 4.0f;
+    cfg.jitter_px = 0;
+    sim.set_config(cfg);
+    const ucf::input_sim::ScreenPoint far{10.0f, 0.0f};
+    const ucf::input_sim::ScreenPoint near{2.0f, 0.0f};
+    const ucf::input_sim::ScreenPoint center{0.0f, 0.0f};
+    sim.update(true, far, center, ucf::TargetState::Normal);
+    CHECK(mock.moves == 1 && mock.downs == 0 && mock.ups == 0);
+    sim.update(true, far, center, ucf::TargetState::Normal);
+    CHECK(mock.moves == 2 && mock.downs == 0 && mock.ups == 0);
+    sim.update(false, far, center, ucf::TargetState::Normal);
+    sim.update(true, near, center, ucf::TargetState::Normal);
+    CHECK(mock.downs == 1 && mock.ups == 1);
+    const int moves_before_blocked = mock.moves;
+    sim.update(true, near, center, ucf::TargetState::Blocked);
+    CHECK(mock.moves == moves_before_blocked && mock.downs == 1 && mock.ups == 1);
+
+    MockInputSender off_mock;
+    ucf::input_sim::LocalInputSim off(&off_mock);
+    off.update(true, near, center, ucf::TargetState::Normal);
+    CHECK(off_mock.moves == 0 && off_mock.downs == 0 && off_mock.ups == 0);
 }
 
 static void test_draw_list() {
@@ -88,6 +126,13 @@ static void test_smooth() {
 
     ucf::Candidate state_candidate{};
     state_candidate.hp = 100;
+    ucf::PlayerState player{};
+    player.pos[0] = 1.0f;
+    CHECK(ucf::is_target_visible(player));
+    player.pos[0] = 0.0f;
+    CHECK(!ucf::is_target_visible(player));
+    player.bones[10].valid = true;
+    CHECK(ucf::is_target_visible(player));
     CHECK(ucf::target_state(state_candidate) == ucf::TargetState::Normal);
     state_candidate.visible = false;
     CHECK(ucf::target_state(state_candidate) == ucf::TargetState::Blocked);
@@ -161,6 +206,8 @@ static void test_config_roundtrip() {
     s.show_fov_circle = true;
     s.aim_selection_mode = 1; s.aim_point_mode = 3; s.aim_bone_id = 15;
     s.aim_lock_prevent = true;
+    s.input_sim_enabled = true; s.input_sim_aim_key = 6; s.input_sim_fire_key = 5;
+    s.input_sim_tolerance_px = 6.0f; s.input_sim_jitter_px = 3;
     s.exit_delete_config = true;
     CHECK(ucf::save_settings(s, "settings_test.txt"));
     ucf::Settings r{};
@@ -174,6 +221,8 @@ static void test_config_roundtrip() {
     CHECK(r.show_fov_circle);
     CHECK(r.aim_selection_mode == 1 && r.aim_point_mode == 3 && r.aim_bone_id == 15);
     CHECK(r.aim_lock_prevent);
+    CHECK(r.input_sim_enabled && r.input_sim_aim_key == 6 && r.input_sim_fire_key == 5);
+    CHECK(approx(r.input_sim_tolerance_px, 6.0f) && r.input_sim_jitter_px == 3);
     CHECK(r.exit_delete_config && !r.exit_delete_log);
     std::remove("settings_test.txt");
 }
@@ -185,6 +234,7 @@ int main() {
     test_select_target();
     test_transport_roundtrip();
     test_config_roundtrip();
+    test_input_sim();
     if (failures == 0) { printf("  all passed\n"); return 0; }
     printf("  %d check(s) failed\n", failures);
     return 1;

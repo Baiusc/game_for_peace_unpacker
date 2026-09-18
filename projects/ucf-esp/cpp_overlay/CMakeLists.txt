@@ -23,6 +23,7 @@ add_library(ucf_overlay_core
     src/shared_state.cpp
     src/overlay_viz.cpp
     src/smooth.cpp
+    src/input_sim/input_sim.cpp
     src/config.cpp)
 target_include_directories(ucf_overlay_core PUBLIC src)
 target_link_libraries(ucf_overlay_core PUBLIC ucf_projection)

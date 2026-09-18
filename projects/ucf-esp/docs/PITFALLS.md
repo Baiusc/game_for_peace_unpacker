@@ -158,3 +158,10 @@
 - **防抖**：`aim_lock_prevent` 开启且本地激活状态保持时，上一个目标变为死亡、阻挡或无效并切换到新目标时只跳过一次重锁定；状态松开后复位。
 - **显示**：异常状态的选中射线使用黄色；该逻辑只生成 DrawList，不调用鼠标、键盘、视角写入或任何输入 API。
 - **配置**：`aim_lock_prevent` 已加入 key=value 保存/加载和 Win32 菜单，并由 `overlay_tests` 覆盖状态、一次性跳过与 round-trip。
+
+### 2026-09-18：本地输入模拟模块隔离
+
+- **结构**：输入模拟只放在 `cpp_overlay/src/input_sim/`，`smooth.cpp` 和 `select_screen_target()` 不依赖 Win32 输入 API。
+- **默认**：`input_sim_enabled=false`；关闭时主循环不产生本地输入事件，现有只读角度输出行为保持不变。
+- **语义**：按键上升沿执行一次 tap move/对齐开火，后续按住帧只执行 trace move；异常目标状态直接作为硬门，不产生 move 或开火事件。
+- **测试**：Linux 核心使用 `Sender` mock 覆盖默认关闭、tap/hold、容差开火和异常状态门；Windows 后端使用 `SendInput`，需由 Actions/MSVC 验证编译。

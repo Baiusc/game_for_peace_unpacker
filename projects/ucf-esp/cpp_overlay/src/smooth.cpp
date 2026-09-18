@@ -43,6 +43,19 @@ static float dot(const Vec3& a, const Vec3& b) {
     return a.x * b.x + a.y * b.y + a.z * b.z;
 }
 
+bool is_target_visible(const PlayerState& player) {
+    const bool finite = std::isfinite(player.pos[0]) &&
+                        std::isfinite(player.pos[1]) &&
+                        std::isfinite(player.pos[2]);
+    if (!finite) return false;
+    const bool pos_zero = player.pos[0] == 0.0f && player.pos[1] == 0.0f &&
+                          player.pos[2] == 0.0f;
+    if (!pos_zero) return true;
+    for (int i = 0; i < MAX_BONES; ++i)
+        if (player.bones[i].valid) return true;
+    return false;
+}
+
 TargetState target_state(const Candidate& candidate) {
     if (candidate.dead || candidate.hp <= 0) return TargetState::Dead;
     if (!candidate.valid) return TargetState::Invalid;

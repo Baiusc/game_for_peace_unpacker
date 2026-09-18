@@ -14,6 +14,7 @@
 #include "config.hpp"
 #include "shared_state.hpp"
 #include "smooth.hpp"
+#include "input_sim/input_sim.hpp"
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -61,6 +62,8 @@ static std::chrono::steady_clock::time_point g_record_started;
 static bool                     g_record_open_failed = false;
 static bool                     g_flip_used = false;   // 交换链实际用的模型（诊断 HUD 用）
 static bool                     g_clear_transparent = true;  // 清屏是否透明(alpha=0)；BLT colorkey 时为不透明黑
+static ucf::input_sim::LocalInputSim g_input_sim{};
+static bool g_input_sim_was_enabled = false;
 
 // ImGui_ImplWin32_WndProcHandler 已在 <imgui_impl_win32.h> 中声明，直接调用即可。
 static LRESULT CALLBACK wndproc(HWND h, UINT m, WPARAM w, LPARAM l) {
@@ -462,7 +465,7 @@ static void frame() {
 
     ucf::DrawList dl{};
 
-    // 目标选择与角度平滑只产生诊断结果，不写鼠标、不写输入。
+    // 目标选择与角度平滑保持纯计算；本地输入模拟是独立模块且默认关闭。
     static ucf::Angles output_angles{};
     static ucf::LockPreventState lock_prevent{};
     int target = -1;
@@ -485,10 +488,10 @@ static void frame() {
             candidates[i].hp = p.hp;
             candidates[i].team = p.team;
             candidates[i].dead = p.isDead || p.hp <= 0;
-            candidates[i].visible = point_screen_valid;
+            candidates[i].visible = point_screen_valid && ucf::is_target_visible(p);
             screen_candidates[i].x = screen_x;
             screen_candidates[i].y = screen_y;
-            screen_candidates[i].valid = point_world_valid && point_screen_valid;
+            screen_candidates[i].valid = point_world_valid && candidates[i].visible;
             if (!point_world_valid ||
                 (!g_settings.aim_teammates && p.team == f.local.team) ||
                 (!g_settings.aim_dead && candidates[i].dead) ||
@@ -522,6 +525,34 @@ static void frame() {
         }
     } else {
         ucf::lock_prevent_should_skip(lock_prevent, nullptr, 0, -1, false, false);
+    }
+
+    if (g_settings.input_sim_enabled) {
+        ucf::input_sim::Config input_cfg{};
+        input_cfg.enabled = true;
+        input_cfg.aim_key = g_settings.input_sim_aim_key;
+        input_cfg.fire_key = g_settings.input_sim_fire_key;
+        input_cfg.align_tolerance_px = g_settings.input_sim_tolerance_px;
+        input_cfg.jitter_px = g_settings.input_sim_jitter_px;
+        g_input_sim.set_config(input_cfg);
+        const bool key_down = (GetAsyncKeyState(input_cfg.aim_key) & 0x8000) != 0;
+        ucf::input_sim::ScreenPoint target_point{};
+        const ucf::input_sim::ScreenPoint crosshair{
+            float(f.width) * 0.5f, float(f.height) * 0.5f};
+        const int player_count = std::max(0, std::min(f.playerCount, ucf::MAX_PLAYERS));
+        const bool point_ok = target >= 0 && target < player_count &&
+            aim_point_screen(g_settings, g_marks[target + 1],
+                             target_point.x, target_point.y);
+        if (point_ok && selected_state == ucf::TargetState::Normal) {
+            g_input_sim.update(key_down, target_point, crosshair, selected_state);
+        } else {
+            // 异常目标状态是硬门；松开内部边沿状态但不产生任何输入事件。
+            g_input_sim.update(false, target_point, crosshair, selected_state);
+        }
+        g_input_sim_was_enabled = true;
+    } else if (g_input_sim_was_enabled) {
+        g_input_sim.reset_lock();
+        g_input_sim_was_enabled = false;
     }
 
     if (g_settings.esp_enabled && g_settings.esp_visible) {

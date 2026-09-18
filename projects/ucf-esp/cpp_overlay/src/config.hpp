@@ -21,6 +21,11 @@ struct Settings {
     bool  aim_dead        = false;
     bool  aim_visible_only = true;
     bool  aim_lock_prevent = false;
+    bool  input_sim_enabled = false;
+    int   input_sim_aim_key = 0x06;  // VK_XBUTTON2
+    int   input_sim_fire_key = 0x05; // VK_XBUTTON1（触发键配置；输出为左键）
+    float input_sim_tolerance_px = 4.0f;
+    int   input_sim_jitter_px = 2;
     float fov_deg         = 90.0f;
     bool  show_target_ray = true;
     bool  ray_from_bottom = true;
