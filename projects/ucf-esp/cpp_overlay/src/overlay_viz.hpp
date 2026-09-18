@@ -28,16 +28,21 @@ struct Viewport {
     float sx = 1, sy = 1;              // 帧坐标 -> 像素 的缩放
 };
 
-struct BoxPrim   { float x, y, w, h; float r, g, b; float thickness = 2.0f; };
+struct BoxPrim   { float x, y, w, h; float r, g, b; float thickness = 2.0f; bool selected = false; };
 struct BarPrim   { float x, y, w, h; float ratio; float r, g, b; };
 struct LabelPrim { float x, y; float r, g, b; char text[64]; };
-struct BoneLinePrim { float x1, y1, x2, y2; float r, g, b; float thickness = 1.5f; };
+struct BoneLinePrim {
+    float x1, y1, x2, y2; float r, g, b; float thickness = 1.5f;
+    bool selected = false;
+};
+struct RayPrim { float x1, y1, x2, y2; float r, g, b; float thickness = 1.5f; };
 
 struct DrawList {
     BoxPrim   boxes[64];   int boxCount = 0;
     BarPrim   bars[64];    int barCount = 0;
     LabelPrim labels[64];  int labelCount = 0;
     BoneLinePrim boneLines[MAX_BONES * 64]; int boneLineCount = 0;
+    RayPrim rays[1];        int rayCount = 0;
 };
 
 struct DrawStyle {
@@ -48,6 +53,9 @@ struct DrawStyle {
     bool show_local = false;
     bool show_teammate = true;
     bool show_enemy = true;
+    int target_index = -1;
+    bool show_target_ray = false;
+    bool ray_from_bottom = true;
     float max_distance = 250.0f;
     float line_thickness = 2.0f;
     float local[3] = {0.22f, 0.83f, 0.33f};

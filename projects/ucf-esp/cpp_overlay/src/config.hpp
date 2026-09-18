@@ -21,6 +21,8 @@ struct Settings {
     bool  aim_dead        = false;
     bool  aim_visible_only = true;
     float fov_deg         = 90.0f;
+    bool  show_target_ray = true;
+    bool  ray_from_bottom = true;
     int   target_mode     = 0;          // 0=最近, 1=最低血量, 2=准星最近
     float aim_max_distance = 250.0f;
     float responsiveness  = 0.35f;      // 平滑系数（0..1]

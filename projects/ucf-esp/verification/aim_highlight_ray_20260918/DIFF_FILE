@@ -1,0 +1,56 @@
+diff --git a/projects/ucf-esp/verification/aim_highlight_ray_20260918/ORIGINAL_FILE b/projects/ucf-esp/verification/aim_highlight_ray_20260918/MODIFIED_FILE
+index b841ea7..fa85f56 100755
+--- a/projects/ucf-esp/verification/aim_highlight_ray_20260918/ORIGINAL_FILE
++++ b/projects/ucf-esp/verification/aim_highlight_ray_20260918/MODIFIED_FILE
+@@ -33,13 +33,18 @@ static void health_color(float ratio, float out[3]) {
+     }
+ }
+
++static void dim_color(float color[3]) {
++    const float luminance = color[0] * 0.299f + color[1] * 0.587f + color[2] * 0.114f;
++    for (int i = 0; i < 3; ++i) color[i] = luminance * 0.35f + color[i] * 0.15f;
++}
++
+ void build_draw_list(const Viewport& vp, const ScreenMark* marks, int n, DrawList& out) {
+     build_draw_list(vp, marks, n, DrawStyle{}, out);
+ }
+
+ void build_draw_list(const Viewport& vp, const ScreenMark* marks, int n,
+                      const DrawStyle& style, DrawList& out) {
+-    out.boxCount = out.barCount = out.labelCount = out.boneLineCount = 0;
++    out.boxCount = out.barCount = out.labelCount = out.boneLineCount = out.rayCount = 0;
+
+     const float BOX_W = 40.0f, BOX_H = 60.0f;
+     float bw = BOX_W * vp.sx;  if (bw < 6)  bw = 6;
+@@ -57,12 +62,15 @@ void build_draw_list(const Viewport& vp, const ScreenMark* marks, int n,
+         float px = vp.x + m.sx * vp.sx;
+         float py = vp.y + m.sy * vp.sy;
+         float col[3]; kind_color(m.kind, style, col);
++        const bool selected = (i == style.target_index);
++        if (!selected) dim_color(col);
+
+         if (style.show_box && out.boxCount < 64) {
+             BoxPrim& b = out.boxes[out.boxCount++];
+             b.x = px - bw / 2; b.y = py - bh / 2; b.w = bw; b.h = bh;
+             b.r = col[0]; b.g = col[1]; b.b = col[2];
+             b.thickness = style.line_thickness;
++            b.selected = selected;
+         }
+         if (style.show_health && out.barCount < 64) {
+             BarPrim& bar = out.bars[out.barCount++];
+@@ -96,8 +104,16 @@ void build_draw_list(const Viewport& vp, const ScreenMark* marks, int n,
+                 line.x2 = vp.x + b.sx * vp.sx; line.y2 = vp.y + b.sy * vp.sy;
+                 line.r = col[0]; line.g = col[1]; line.b = col[2];
+                 line.thickness = style.line_thickness * 0.75f;
++                line.selected = selected;
+             }
+         }
++        if (selected && style.show_target_ray && out.rayCount < 1) {
++            RayPrim& ray = out.rays[out.rayCount++];
++            ray.x1 = vp.x + vp.w * 0.5f;
++            ray.y1 = style.ray_from_bottom ? vp.y + vp.h : vp.y + vp.h * 0.5f;
++            ray.x2 = px; ray.y2 = py;
++            ray.r = col[0]; ray.g = col[1]; ray.b = col[2];
++        }
+     }
+ }

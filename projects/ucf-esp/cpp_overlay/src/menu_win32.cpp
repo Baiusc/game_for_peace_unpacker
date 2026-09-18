@@ -83,6 +83,8 @@ void draw_menu(Settings& s, bool& show_menu, bool& request_exit,
     if (ImGui::TreeNode("Aimbot（仅输出角度）")) {
         ImGui::Checkbox("Aimbot 开关", &s.aimbot_enabled);
         ImGui::SliderFloat("瞄准 FOV", &s.fov_deg, 5.0f, 180.0f);
+        ImGui::Checkbox("显示目标射线", &s.show_target_ray);
+        ImGui::Checkbox("射线从屏幕底部", &s.ray_from_bottom);
         ImGui::SliderFloat("瞄准最大距离", &s.aim_max_distance, 0.0f, 1000.0f, "%.0f m");
         ImGui::Combo("目标选择", &s.target_mode, "最近目标\0最低血量\0准星最近\0");
         ImGui::Checkbox("允许队友", &s.aim_teammates);

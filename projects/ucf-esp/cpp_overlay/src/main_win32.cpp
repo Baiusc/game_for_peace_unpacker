@@ -424,29 +424,14 @@ static void frame() {
     ucf::Viewport vp{0, 0, cw, ch, cw / fw, ch / fh};
 
     ucf::DrawList dl{};
-    if (g_settings.esp_enabled && g_settings.esp_visible) {
-        ucf::DrawStyle style{};
-        style.show_box = g_settings.show_box;
-        style.show_skeleton = g_settings.show_skeleton;
-        style.show_health = g_settings.show_health;
-        style.show_distance = g_settings.show_distance;
-        style.show_local = g_settings.show_local;
-        style.show_teammate = g_settings.show_teammate;
-        style.show_enemy = g_settings.show_enemy;
-        style.max_distance = g_settings.max_distance;
-        style.line_thickness = g_settings.line_thickness;
-        std::copy(g_settings.color_local, g_settings.color_local + 3, style.local);
-        std::copy(g_settings.color_teammate, g_settings.color_teammate + 3, style.teammate);
-        std::copy(g_settings.color_enemy, g_settings.color_enemy + 3, style.enemy);
-        ucf::build_draw_list(vp, g_marks, n, style, dl);
-    }
 
     // 目标选择与角度平滑只产生诊断结果，不写鼠标、不写输入。
     static ucf::Angles output_angles{};
     int target = -1;
     if (g_settings.aimbot_enabled && f.inGame) {
         ucf::Candidate candidates[ucf::MAX_PLAYERS]{};
-        for (int i = 0; i < f.playerCount && i < ucf::MAX_PLAYERS; ++i) {
+        const int player_count = std::max(0, std::min(f.playerCount, ucf::MAX_PLAYERS));
+        for (int i = 0; i < player_count; ++i) {
             const auto& p = f.players[i];
             const float dx = p.pos[0] - f.local.pos[0];
             const float dy = p.pos[1] - f.local.pos[1];
@@ -464,7 +449,7 @@ static void frame() {
                 candidates[i].valid = false;
             }
         }
-        target = ucf::select_target({0, 0, 1}, candidates, f.playerCount,
+        target = ucf::select_target({0, 0, 1}, candidates, player_count,
                                     g_settings.fov_deg, g_settings.target_mode);
         if (target >= 0) {
             output_angles = ucf::smooth_angles(output_angles,
@@ -473,10 +458,30 @@ static void frame() {
         }
     }
 
+    if (g_settings.esp_enabled && g_settings.esp_visible) {
+        ucf::DrawStyle style{};
+        style.show_box = g_settings.show_box;
+        style.show_skeleton = g_settings.show_skeleton;
+        style.show_health = g_settings.show_health;
+        style.show_distance = g_settings.show_distance;
+        style.show_local = g_settings.show_local;
+        style.show_teammate = g_settings.show_teammate;
+        style.show_enemy = g_settings.show_enemy;
+        style.target_index = target >= 0 ? target + 1 : -1;
+        style.show_target_ray = g_settings.show_target_ray;
+        style.ray_from_bottom = g_settings.ray_from_bottom;
+        style.max_distance = g_settings.max_distance;
+        style.line_thickness = g_settings.line_thickness;
+        std::copy(g_settings.color_local, g_settings.color_local + 3, style.local);
+        std::copy(g_settings.color_teammate, g_settings.color_teammate + 3, style.teammate);
+        std::copy(g_settings.color_enemy, g_settings.color_enemy + 3, style.enemy);
+        ucf::build_draw_list(vp, g_marks, n, style, dl);
+    }
+
     ImDrawList* bdl = ImGui::GetBackgroundDrawList();
-    if (g_settings.show_fov_circle && g_settings.aimbot_enabled) {
+    if (g_settings.show_fov_circle) {
         const float fov = std::max(1.0f, std::min(180.0f, g_settings.fov_deg));
-        const float radius = std::tan(fov * 0.5f * 0.0174532925f) * (vp.h * 0.5f);
+        const float radius = (fov / 90.0f) * (std::min(vp.w, vp.h) * 0.5f);
         bdl->AddCircle(ImVec2(vp.x + vp.w * 0.5f, vp.y + vp.h * 0.5f),
                        radius, IM_COL32(255, 220, 80, 180), 96, 1.0f);
     }

@@ -134,12 +134,43 @@ static ImU32 rgb(float r, float g, float b) {
     return IM_COL32(std::uint8_t(r*255), std::uint8_t(g*255), std::uint8_t(b*255), 255);
 }
 
+static void add_corner_box(ImDrawList* dl, float x, float y, float w, float h,
+                           ImU32 color, float thickness) {
+    const float cx = w * 0.25f, cy = h * 0.25f;
+    dl->AddLine({x, y}, {x + cx, y}, color, thickness);
+    dl->AddLine({x, y}, {x, y + cy}, color, thickness);
+    dl->AddLine({x + w, y}, {x + w - cx, y}, color, thickness);
+    dl->AddLine({x + w, y}, {x + w, y + cy}, color, thickness);
+    dl->AddLine({x, y + h}, {x + cx, y + h}, color, thickness);
+    dl->AddLine({x, y + h}, {x, y + h - cy}, color, thickness);
+    dl->AddLine({x + w, y + h}, {x + w - cx, y + h}, color, thickness);
+    dl->AddLine({x + w, y + h}, {x + w, y + h - cy}, color, thickness);
+}
+
+static void add_dashed_line(ImDrawList* dl, ImVec2 a, ImVec2 b, ImU32 color,
+                            float thickness, float dash = 6.0f) {
+    const float dx = b.x - a.x, dy = b.y - a.y;
+    const float length = std::sqrt(dx * dx + dy * dy);
+    if (length < 1.0f) return;
+    const float ux = dx / length, uy = dy / length;
+    for (float t = 0.0f; t < length; t += dash * 2.0f) {
+        const float end = std::min(t + dash, length);
+        dl->AddLine({a.x + ux * t, a.y + uy * t},
+                    {a.x + ux * end, a.y + uy * end}, color, thickness);
+    }
+}
+
 void render_draw_list(ImDrawList* dl, const DrawList& d) {
     for (int i = 0; i < d.boxCount; ++i) {
         const BoxPrim& b = d.boxes[i];
-        dl->AddRectFilled(ImVec2(b.x, b.y), ImVec2(b.x + b.w, b.y + b.h), IM_COL32(0, 0, 0, 24));
-        dl->AddRect(ImVec2(b.x, b.y), ImVec2(b.x + b.w, b.y + b.h), IM_COL32(0, 0, 0, 230), 0, 0, b.thickness + 2.0f);
-        dl->AddRect(ImVec2(b.x, b.y), ImVec2(b.x + b.w, b.y + b.h), rgb(b.r, b.g, b.b), 0, 0, b.thickness);
+        const ImU32 color = rgb(b.r, b.g, b.b);
+        if (b.selected) {
+            dl->AddRectFilled(ImVec2(b.x, b.y), ImVec2(b.x + b.w, b.y + b.h), IM_COL32(0, 0, 0, 24));
+            dl->AddRect(ImVec2(b.x, b.y), ImVec2(b.x + b.w, b.y + b.h), IM_COL32(0, 0, 0, 230), 0, 0, b.thickness + 2.0f);
+            dl->AddRect(ImVec2(b.x, b.y), ImVec2(b.x + b.w, b.y + b.h), color, 0, 0, b.thickness);
+        } else {
+            add_corner_box(dl, b.x, b.y, b.w, b.h, color, b.thickness);
+        }
     }
     for (int i = 0; i < d.barCount; ++i) {
         const BarPrim& bar = d.bars[i];
@@ -156,8 +187,16 @@ void render_draw_list(ImDrawList* dl, const DrawList& d) {
     }
     for (int i = 0; i < d.boneLineCount; ++i) {
         const BoneLinePrim& line = d.boneLines[i];
-        dl->AddLine(ImVec2(line.x1, line.y1), ImVec2(line.x2, line.y2),
-                    rgb(line.r, line.g, line.b), line.thickness);
+        const ImU32 color = rgb(line.r, line.g, line.b);
+        if (line.selected) {
+            dl->AddLine(ImVec2(line.x1, line.y1), ImVec2(line.x2, line.y2), color, line.thickness);
+        } else {
+            add_dashed_line(dl, {line.x1, line.y1}, {line.x2, line.y2}, color, line.thickness * 0.9f);
+        }
+    }
+    for (int i = 0; i < d.rayCount; ++i) {
+        const RayPrim& ray = d.rays[i];
+        dl->AddLine({ray.x1, ray.y1}, {ray.x2, ray.y2}, rgb(ray.r, ray.g, ray.b), ray.thickness);
     }
 }
 

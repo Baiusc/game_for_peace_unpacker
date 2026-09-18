@@ -24,6 +24,8 @@ bool save_settings(const Settings& s, const char* path) {
     fprintf(f, "aim_dead=%d\n", s.aim_dead ? 1 : 0);
     fprintf(f, "aim_visible_only=%d\n", s.aim_visible_only ? 1 : 0);
     fprintf(f, "fov_deg=%.3f\n",      s.fov_deg);
+    fprintf(f, "show_target_ray=%d\n", s.show_target_ray ? 1 : 0);
+    fprintf(f, "ray_from_bottom=%d\n", s.ray_from_bottom ? 1 : 0);
     fprintf(f, "target_mode=%d\n",    s.target_mode);
     fprintf(f, "aim_max_distance=%.3f\n", s.aim_max_distance);
     fprintf(f, "responsiveness=%.3f\n", s.responsiveness);
@@ -83,6 +85,8 @@ bool load_settings(Settings& s, const char* path) {
         else if (!std::strcmp(key, "aim_dead"))       s.aim_dead = std::atoi(val) != 0;
         else if (!std::strcmp(key, "aim_visible_only")) s.aim_visible_only = std::atoi(val) != 0;
         else if (!std::strcmp(key, "fov_deg"))        s.fov_deg        = std::atof(val);
+        else if (!std::strcmp(key, "show_target_ray")) s.show_target_ray = std::atoi(val) != 0;
+        else if (!std::strcmp(key, "ray_from_bottom")) s.ray_from_bottom = std::atoi(val) != 0;
         else if (!std::strcmp(key, "target_mode"))    s.target_mode    = std::atoi(val);
         else if (!std::strcmp(key, "aim_max_distance")) s.aim_max_distance = std::atof(val);
         else if (!std::strcmp(key, "responsiveness")) s.responsiveness = std::atof(val);

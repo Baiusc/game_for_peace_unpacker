@@ -44,6 +44,21 @@ static void test_draw_list() {
     ucf::build_draw_list(vp, marks, 1, limited, dl);
     CHECK(dl.boxCount == 0); // 0m means zero range, not unlimited
 
+    marks[1].on_screen = true;
+    ucf::DrawStyle highlight{};
+    highlight.target_index = 0;
+    highlight.show_target_ray = true;
+    highlight.show_skeleton = true;
+    for (int i = 0; i < ucf::MAX_BONES; ++i) {
+        marks[0].bones[i].valid = true;
+        marks[1].bones[i].valid = true;
+        marks[0].bones[i].sx = marks[1].bones[i].sx = 400.0f + float(i % 3);
+        marks[0].bones[i].sy = marks[1].bones[i].sy = 300.0f + float(i % 4);
+    }
+    ucf::build_draw_list(vp, marks, 2, highlight, dl);
+    CHECK(dl.boxCount == 2 && dl.boxes[0].selected && !dl.boxes[1].selected);
+    CHECK(dl.rayCount == 1 && dl.boneLineCount == 36);
+
     ucf::DrawStyle style{};
     style.show_box = false;
     style.show_skeleton = true;
