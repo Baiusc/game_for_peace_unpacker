@@ -95,3 +95,10 @@
 - **触发**：菜单按钮与 `VK_END` 都设置统一的退出请求；退出前保存配置并记录步骤。
 - **资源**：`SharedTransport` 使用持有对象，退出时显式析构，始终执行 `UnmapViewOfFile + CloseHandle`；Windows 不执行共享内存删除。
 - **验证**：核心配置 round-trip 检查默认不删除；Windows 完整路径需 Actions/MSVC 验证文件保留/删除结果。
+
+### 2026-09-18：DEV JSONL 录制与 DEBUG 菜单
+
+- **决策**：录制点放在 Python `on_message()` 的原始 Frame 分支、C++ 共享内存读取之后，均早于投影，避免把投影结果误当作数据源。
+- **格式**：逐行 JSONL，`schema_version=2`；回放按行解析，损坏行跳过并报告行号。
+- **限制**：C++ 菜单负责实时录制和调试显示，完整 JSONL 回放/统计由 `tools/replay.py` 离线完成，避免在 Win32 渲染层引入 JSON 依赖。
+- **验证**：`test_record_replay.py` 覆盖采样间隔、最大帧数、骨骼统计与 JSONL 读取；Windows D3D11 菜单需 Actions/MSVC 验证。

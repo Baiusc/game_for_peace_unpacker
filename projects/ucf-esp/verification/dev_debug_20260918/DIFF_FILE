@@ -1,0 +1,146 @@
+diff --git a/projects/ucf-esp/verification/dev_debug_20260918/ORIGINAL_FILE b/projects/ucf-esp/verification/dev_debug_20260918/MODIFIED_FILE
+index fcfa400..6ef91db 100755
+--- a/projects/ucf-esp/verification/dev_debug_20260918/ORIGINAL_FILE
++++ b/projects/ucf-esp/verification/dev_debug_20260918/MODIFIED_FILE
+@@ -47,6 +47,7 @@ import json
+ import time
+ import subprocess
+ import argparse
++import atexit
+
+ import esp_core
+ import frida_probe
+@@ -63,11 +64,88 @@ LAST_MSG_TS = 0.0   # 最近一次收到 send 帧的时间，用于“静默看
+ LAST_PRINT_TS = 0.0  # 控制台打印节流（20Hz 收帧 -> 2Hz 打印）
+ PRINT_THROTTLE_S = 0.5
+ WARNED_ONCE = {}  # 同类错误只报一次，避免 20Hz 刷屏
++RECORDER = None
+ DEFAULT_WAIT_MODULE = 20.0  # 等 GameAssembly.dll 载入的最长秒数
+ DEFAULT_GAME_NAME = "UnityCrossFire.exe"
+ DEFAULT_LEVEL = 4  # 默认全量档（见 frida_dump.js 顶部的 LEVEL 说明）
+
+
++class FrameRecorder:
++    """把收到的原始 Frame 追加写成 JSONL；失败只影响录制，不影响采样。"""
++
++    def __init__(self, path, max_frames=0, duration=0.0, every=1,
++                 include_bones=True, include_name=True):
++        self.path = os.path.abspath(os.path.expanduser(path))
++        parent = os.path.dirname(self.path)
++        if parent:
++            os.makedirs(parent, exist_ok=True)
++        self.file = open(self.path, "a", encoding="utf-8")
++        self.max_frames = max(0, int(max_frames))
++        self.duration = max(0.0, float(duration))
++        self.every = max(1, int(every))
++        self.include_bones = bool(include_bones)
++        self.include_name = bool(include_name)
++        self.started = time.monotonic()
++        self.seen = 0
++        self.count = 0
++        self.active = True
++        self.error_reported = False
++
++    def write(self, frame):
++        if not self.active:
++            return
++        self.seen += 1
++        if self.seen % self.every != 0:
++            return
++        elapsed = time.monotonic() - self.started
++        if (self.duration and elapsed >= self.duration) or \
++                (self.max_frames and self.count >= self.max_frames):
++            self.active = False
++            return
++        record = dict(frame)
++        record["schema_version"] = 2
++        record["seq"] = self.count
++        record["timestamp"] = time.time()
++        if isinstance(record.get("local"), dict):
++            record["local"] = dict(record["local"])
++        if isinstance(record.get("players"), list):
++            record["players"] = [dict(p) if isinstance(p, dict) else p
++                                  for p in record["players"]]
++        if not self.include_bones:
++            for player in [record.get("local")] + record.get("players", []):
++                if isinstance(player, dict):
++                    player.pop("bones", None)
++        if not self.include_name:
++            for player in [record.get("local")] + record.get("players", []):
++                if isinstance(player, dict):
++                    player.pop("name", None)
++        try:
++            json.dump(record, self.file, ensure_ascii=False, separators=(",", ":"))
++            self.file.write("\n")
++            self.file.flush()
++            self.count += 1
++        except Exception as exc:
++            self.active = False
++            if not self.error_reported:
++                self.error_reported = True
++                print(f"[record] 写入失败，已停止录制: {exc}")
++
++    def close(self):
++        if getattr(self, "file", None) is not None:
++            self.file.flush()
++            self.file.close()
++            self.file = None
++        self.active = False
++
++
++def close_recorder():
++    if RECORDER is not None:
++        RECORDER.close()
++
++
++atexit.register(close_recorder)
++
++
+ def build_script_source(js, level=DEFAULT_LEVEL, interval_ms=50, discover=False,
+                         probe=False, allow_get_instance=False, allow_is_dead=False,
+                         main_thread=True):
+@@ -247,6 +325,8 @@ def on_message(message, data):
+         return
+     if not isinstance(frame, dict) or frame.get("type") != "frame":
+         return
++    if RECORDER is not None:
++        RECORDER.write(frame)
+     LAST_MSG_TS = time.time()
+
+     # 不在对局 / 还没拿到矩阵：JS 会照常发帧（inGame:false），这里只需清屏。
+@@ -579,11 +659,18 @@ def run_live(game, use_overlay, auto=False, no_launch=False, force_launch=False,
+
+
+ def main():
++    global RECORDER
+     ap = argparse.ArgumentParser(description="UCF-ESP frida 宿主（按 INS 触发注入）")
+     ap.add_argument("--game", default=DEFAULT_GAME_NAME,
+                     help="游戏 exe：完整路径 / 裸文件名均可（默认 UnityCrossFire.exe，"
+                          "会在已知安装目录与环境变量 UCF_GAME 里找）")
+     ap.add_argument("--replay", default=None, help="离线模式：加载 JSON 帧样本")
++    ap.add_argument("--record", default=None, help="把原始 Frame 追加录制为 JSONL")
++    ap.add_argument("--record-max-frames", type=int, default=0, help="录制最大帧数，0 不限制")
++    ap.add_argument("--record-duration", type=float, default=0.0, help="录制最大秒数，0 不限制")
++    ap.add_argument("--record-every", type=int, default=1, help="每隔 N 个原始帧写一帧")
++    ap.add_argument("--record-no-bones", action="store_true", help="录制时省略骨骼")
++    ap.add_argument("--record-no-name", action="store_true", help="录制时省略玩家名称")
+     ap.add_argument("--no-overlay", action="store_true", help="不创建叠加窗口，仅打印")
+     ap.add_argument("--auto", action="store_true", help="启动即注入，不等待 INS（旧行为）")
+     ap.add_argument("--no-launch", action="store_true", help="不启动游戏，附加到已手动运行的进程")
+@@ -631,6 +718,16 @@ def main():
+                     help="不隐藏叠加层（默认游戏不在前台/最小化时隐藏，避免画到别的窗口上）")
+     args = ap.parse_args()
+
++    if args.record:
++        try:
++            RECORDER = FrameRecorder(args.record, args.record_max_frames,
++                                     args.record_duration, args.record_every,
++                                     not args.record_no_bones, not args.record_no_name)
++            print(f"[record] 写入 {RECORDER.path}")
++        except Exception as exc:
++            print(f"[record] 打开失败: {exc}")
++            return
++
+     OVERLAY_CFG["fit"] = args.overlay_fit
+     OVERLAY_CFG["clip"] = not args.no_overlay_clip
+     if args.overlay_rect:

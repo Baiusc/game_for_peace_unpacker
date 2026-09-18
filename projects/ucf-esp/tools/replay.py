@@ -37,8 +37,23 @@ GOLDEN = {
 
 
 def load_frames(path):
-    with open(_resolve(path), encoding="utf-8") as f:
-        data = json.load(f)
+    path = _resolve(path)
+    with open(path, encoding="utf-8") as f:
+        text = f.read()
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        data = []
+        for lineno, line in enumerate(text.splitlines(), 1):
+            if not line.strip():
+                continue
+            try:
+                value = json.loads(line)
+            except json.JSONDecodeError as exc:
+                print(f"[replay] 忽略损坏行 {lineno}: {exc}")
+                continue
+            if isinstance(value, dict) and value.get("type", "frame") == "frame":
+                data.append(value)
     if isinstance(data, list):
         return data
     if isinstance(data, dict):
@@ -47,6 +62,26 @@ def load_frames(path):
         if "type" in data:
             return [data]
     return []
+
+
+def frame_stats(frames):
+    total_players = 0
+    bone_valid = bone_total = 0
+    timestamps = []
+    for frame in frames:
+        total_players += int(frame.get("playerCount", len(frame.get("players", []))))
+        timestamps.append(frame.get("timestamp"))
+        for player in [frame.get("local", {})] + frame.get("players", []):
+            for bone in player.get("bones", []) if isinstance(player, dict) else []:
+                bone_total += 1
+                bone_valid += bool(bone.get("valid"))
+    numeric_ts = [t for t in timestamps if isinstance(t, (int, float))]
+    duration = (max(numeric_ts) - min(numeric_ts)) if len(numeric_ts) > 1 else 0.0
+    return {"frames": len(frames), "players": total_players,
+            "avg_players": total_players / len(frames) if frames else 0.0,
+            "bone_valid": bone_valid, "bone_total": bone_total,
+            "bone_rate": bone_valid / bone_total if bone_total else 0.0,
+            "duration": duration}
 
 
 def check_golden(marks, verbose=True):
@@ -77,12 +112,18 @@ def main():
     ap.add_argument("--html", default=None, help="生成 SVG 预览路径")
     ap.add_argument("--width", type=int, default=None)
     ap.add_argument("--height", type=int, default=None)
+    ap.add_argument("--summary", action="store_true", help="输出整个 JSON/JSONL 的统计")
+    ap.add_argument("--limit", type=int, default=1, help="打印前 N 帧，0 表示全部")
     args = ap.parse_args()
 
     frames = load_frames(args.path)
     if not frames:
         print("no frames found in", args.path)
         sys.exit(1)
+
+    if args.summary:
+        stats = frame_stats(frames)
+        print("summary:", json.dumps(stats, ensure_ascii=False))
 
     frame = frames[0]
     w = args.width or frame.get("width", 1280)
@@ -106,6 +147,12 @@ def main():
     if args.html:
         drawn = render_html.render_preview(marks, w, h, args.html, vp)
         print(f"\nSVG preview -> {args.html}  ({drawn} 个屏幕内标记)")
+
+    if len(frames) > 1:
+        limit = len(frames) if args.limit == 0 else min(len(frames), max(1, args.limit))
+        for index, replay_frame in enumerate(frames[1:limit], 1):
+            _, replay_marks = esp_core.project_frame(replay_frame)
+            print(f"frame #{index} players={len(replay_marks)}")
 
     print("\nreplay: DONE")
 

@@ -20,9 +20,20 @@ struct OverlayStatus {
     int           target = -1;
     float         target_yaw = 0.0f;
     float         target_pitch = 0.0f;
+    float         target_delta = 0.0f;
+    int           bones_valid = 0;
+    int           bones_total = 0;
+    int           frame_index = 0;
+    float         read_ms = 0.0f;
+    float         project_ms = 0.0f;
+    float         draw_ms = 0.0f;
+    int           recorded_frames = 0;
+    bool          recording = false;
 };
 
 MenuRect query_menu_rect();
-void draw_menu(Settings& s, bool& show_menu, bool& request_exit, const OverlayStatus& st);
+void draw_menu(Settings& s, bool& show_menu, bool& request_exit,
+               bool& request_record_start, bool& request_record_stop,
+               const OverlayStatus& st);
 }
 #endif

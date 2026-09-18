@@ -31,6 +31,21 @@ bool save_settings(const Settings& s, const char* path) {
     fprintf(f, "esp_visible=%d\n",    s.esp_visible ? 1 : 0);
     fprintf(f, "exit_delete_config=%d\n", s.exit_delete_config ? 1 : 0);
     fprintf(f, "exit_delete_log=%d\n", s.exit_delete_log ? 1 : 0);
+    fprintf(f, "dev_record_enabled=%d\n", s.dev_record_enabled ? 1 : 0);
+    fprintf(f, "dev_record_bones=%d\n", s.dev_record_bones ? 1 : 0);
+    fprintf(f, "dev_record_name=%d\n", s.dev_record_name ? 1 : 0);
+    fprintf(f, "dev_record_max_frames=%d\n", s.dev_record_max_frames);
+    fprintf(f, "dev_record_every=%d\n", s.dev_record_every);
+    fprintf(f, "dev_record_duration=%.3f\n", s.dev_record_duration);
+    fprintf(f, "dev_replay_speed=%.3f\n", s.dev_replay_speed);
+    fprintf(f, "dev_record_path=%s\n", s.dev_record_path);
+    fprintf(f, "debug_show_log=%d\n", s.debug_show_log ? 1 : 0);
+    fprintf(f, "debug_log_paused=%d\n", s.debug_log_paused ? 1 : 0);
+    fprintf(f, "debug_show_projection=%d\n", s.debug_show_projection ? 1 : 0);
+    fprintf(f, "debug_show_bones=%d\n", s.debug_show_bones ? 1 : 0);
+    fprintf(f, "debug_show_angles=%d\n", s.debug_show_angles ? 1 : 0);
+    fprintf(f, "debug_show_performance=%d\n", s.debug_show_performance ? 1 : 0);
+    fprintf(f, "debug_show_annotations=%d\n", s.debug_show_annotations ? 1 : 0);
     fprintf(f, "color_local=%.3f,%.3f,%.3f\n",
             s.color_local[0], s.color_local[1], s.color_local[2]);
     fprintf(f, "color_teammate=%.3f,%.3f,%.3f\n",
@@ -74,6 +89,24 @@ bool load_settings(Settings& s, const char* path) {
         else if (!std::strcmp(key, "esp_visible"))    s.esp_visible    = std::atoi(val) != 0;
         else if (!std::strcmp(key, "exit_delete_config")) s.exit_delete_config = std::atoi(val) != 0;
         else if (!std::strcmp(key, "exit_delete_log")) s.exit_delete_log = std::atoi(val) != 0;
+        else if (!std::strcmp(key, "dev_record_enabled")) s.dev_record_enabled = std::atoi(val) != 0;
+        else if (!std::strcmp(key, "dev_record_bones")) s.dev_record_bones = std::atoi(val) != 0;
+        else if (!std::strcmp(key, "dev_record_name")) s.dev_record_name = std::atoi(val) != 0;
+        else if (!std::strcmp(key, "dev_record_max_frames")) s.dev_record_max_frames = std::atoi(val);
+        else if (!std::strcmp(key, "dev_record_every")) s.dev_record_every = std::atoi(val);
+        else if (!std::strcmp(key, "dev_record_duration")) s.dev_record_duration = std::atof(val);
+        else if (!std::strcmp(key, "dev_replay_speed")) s.dev_replay_speed = std::atof(val);
+        else if (!std::strcmp(key, "dev_record_path")) {
+            std::strncpy(s.dev_record_path, val, sizeof(s.dev_record_path) - 1);
+            s.dev_record_path[sizeof(s.dev_record_path) - 1] = 0;
+        }
+        else if (!std::strcmp(key, "debug_show_log")) s.debug_show_log = std::atoi(val) != 0;
+        else if (!std::strcmp(key, "debug_log_paused")) s.debug_log_paused = std::atoi(val) != 0;
+        else if (!std::strcmp(key, "debug_show_projection")) s.debug_show_projection = std::atoi(val) != 0;
+        else if (!std::strcmp(key, "debug_show_bones")) s.debug_show_bones = std::atoi(val) != 0;
+        else if (!std::strcmp(key, "debug_show_angles")) s.debug_show_angles = std::atoi(val) != 0;
+        else if (!std::strcmp(key, "debug_show_performance")) s.debug_show_performance = std::atoi(val) != 0;
+        else if (!std::strcmp(key, "debug_show_annotations")) s.debug_show_annotations = std::atoi(val) != 0;
         else if (!std::strcmp(key, "color_local"))    std::sscanf(val, "%f,%f,%f", &s.color_local[0], &s.color_local[1], &s.color_local[2]);
         else if (!std::strcmp(key, "color_teammate")) std::sscanf(val, "%f,%f,%f", &s.color_teammate[0], &s.color_teammate[1], &s.color_teammate[2]);
         else if (!std::strcmp(key, "color_enemy"))    std::sscanf(val, "%f,%f,%f", &s.color_enemy[0], &s.color_enemy[1], &s.color_enemy[2]);
@@ -87,6 +120,10 @@ bool load_settings(Settings& s, const char* path) {
     if (s.responsiveness > 1.0f) s.responsiveness = 1.0f;
     if (s.max_distance < 0.0f) s.max_distance = 0.0f;
     if (s.aim_max_distance < 0.0f) s.aim_max_distance = 0.0f;
+    if (s.dev_record_max_frames < 0) s.dev_record_max_frames = 0;
+    if (s.dev_record_every < 1) s.dev_record_every = 1;
+    if (s.dev_record_duration < 0.0f) s.dev_record_duration = 0.0f;
+    if (s.dev_replay_speed < 0.1f) s.dev_replay_speed = 0.1f;
     return true;
 }
 

@@ -27,6 +27,8 @@
 #include <cmath>
 #include <algorithm>
 #include <memory>
+#include <chrono>
+#include <cstdarg>
 #include <imgui.h>
 #include <imgui_impl_win32.h>
 #include <imgui_impl_dx11.h>
@@ -46,6 +48,12 @@ static ucf::SyntheticSource     g_synth{};
 static std::unique_ptr<ucf::SharedTransport> g_shm;
 static ucf::ScreenMark          g_marks[ucf::MAX_PLAYERS + 1]{};
 static bool                     g_exit_requested = false;
+static bool                     g_record_start_requested = false;
+static bool                     g_record_stop_requested = false;
+static FILE*                    g_record_file = nullptr;
+static int                      g_recorded_frames = 0;
+static int                      g_record_sample_counter = 0;
+static std::chrono::steady_clock::time_point g_record_started;
 static bool                     g_flip_used = false;   // 交换链实际用的模型（诊断 HUD 用）
 static bool                     g_clear_transparent = true;  // 清屏是否透明(alpha=0)；BLT colorkey 时为不透明黑
 
@@ -62,6 +70,101 @@ static void append_debug_log(const char* message) {
     std::fprintf(lf, "%s\n", message);
     std::fflush(lf);
     std::fclose(lf);
+}
+
+static void json_text(FILE* f, const char* text) {
+    std::fputc('"', f);
+    for (const unsigned char* p = reinterpret_cast<const unsigned char*>(text ? text : ""); *p; ++p) {
+        if (*p == '"' || *p == '\\') std::fprintf(f, "\\%c", *p);
+        else if (*p == '\n') std::fputs("\\n", f);
+        else if (*p == '\r') std::fputs("\\r", f);
+        else if (*p == '\t') std::fputs("\\t", f);
+        else if (*p >= 0x20) std::fputc(*p, f);
+    }
+    std::fputc('"', f);
+}
+
+static void write_bones_json(FILE* f, const ucf::PlayerState& p, bool include_bones) {
+    if (!include_bones) { std::fputs("[]", f); return; }
+    std::fputc('[', f);
+    for (int i = 0; i < ucf::MAX_BONES; ++i) {
+        if (i) std::fputc(',', f);
+        const auto& b = p.bones[i];
+        std::fprintf(f, "{\"pos\":[%.6g,%.6g,%.6g],\"valid\":%s}",
+                     b.pos[0], b.pos[1], b.pos[2], b.valid ? "true" : "false");
+    }
+    std::fputc(']', f);
+}
+
+static void write_player_json(FILE* f, const ucf::PlayerState& p, bool include_bones, bool include_name) {
+    std::fprintf(f, "{\"pos\":[%.6g,%.6g,%.6g],\"team\":%d,\"hp\":%d,\"maxHp\":%d,\"isDead\":%s",
+                 p.pos[0], p.pos[1], p.pos[2], p.team, p.hp, p.maxHp, p.isDead ? "true" : "false");
+    if (include_name) { std::fputs(",\"name\":", f); json_text(f, p.name); }
+    std::fputs(",\"bones\":", f); write_bones_json(f, p, include_bones);
+    std::fputc('}', f);
+}
+
+static void close_recording() {
+    if (!g_record_file) return;
+    std::fflush(g_record_file);
+    std::fclose(g_record_file);
+    g_record_file = nullptr;
+    append_debug_log("dev: recording stopped");
+}
+
+static void open_recording() {
+    close_recording();
+    g_record_file = std::fopen(g_settings.dev_record_path, "a");
+    g_recorded_frames = 0;
+    g_record_sample_counter = 0;
+    g_record_started = std::chrono::steady_clock::now();
+    if (g_record_file) append_debug_log("dev: recording started");
+    else append_debug_log("dev: recording open failed");
+}
+
+static void record_frame(const ucf::Frame& f) {
+    if (g_record_stop_requested) {
+        close_recording();
+        g_record_stop_requested = false;
+    }
+    if (g_record_start_requested) {
+        open_recording();
+        g_record_start_requested = false;
+    }
+    if (!g_settings.dev_record_enabled) { close_recording(); return; }
+    if (!g_record_file) open_recording();
+    if (!g_record_file) return;
+    ++g_record_sample_counter;
+    const int every = g_settings.dev_record_every < 1 ? 1 : g_settings.dev_record_every;
+    if (g_record_sample_counter % every != 0) return;
+    const double elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - g_record_started).count();
+    if (g_settings.dev_record_duration > 0.0f && elapsed >= g_settings.dev_record_duration) {
+        g_settings.dev_record_enabled = false;
+        close_recording();
+        return;
+    }
+    if (g_settings.dev_record_max_frames > 0 && g_recorded_frames >= g_settings.dev_record_max_frames) {
+        g_settings.dev_record_enabled = false;
+        close_recording();
+        return;
+    }
+    std::fprintf(g_record_file, "{\"schema_version\":2,\"seq\":%d,\"timestamp\":%.6f,\"type\":\"frame\",\"w2c\":[",
+                 g_recorded_frames, elapsed);
+    for (int i = 0; i < 16; ++i) std::fprintf(g_record_file, "%s%.9g", i ? "," : "", f.w2c[i]);
+    std::fputs("],\"proj\":[", g_record_file);
+    for (int i = 0; i < 16; ++i) std::fprintf(g_record_file, "%s%.9g", i ? "," : "", f.proj[i]);
+    std::fprintf(g_record_file, "],\"width\":%d,\"height\":%d,\"inGame\":%s,\"local\":",
+                 f.width, f.height, f.inGame ? "true" : "false");
+    write_player_json(g_record_file, f.local, g_settings.dev_record_bones, g_settings.dev_record_name);
+    std::fputs(",\"players\":[", g_record_file);
+    const int count = (f.playerCount < 0) ? 0 : (f.playerCount > ucf::MAX_PLAYERS ? ucf::MAX_PLAYERS : f.playerCount);
+    for (int i = 0; i < count; ++i) {
+        if (i) std::fputc(',', g_record_file);
+        write_player_json(g_record_file, f.players[i], g_settings.dev_record_bones, g_settings.dev_record_name);
+    }
+    std::fprintf(g_record_file, "],\"playerCount\":%d}\n", count);
+    std::fflush(g_record_file);
+    ++g_recorded_frames;
 }
 
 static void cleanup_render_target() {
@@ -254,6 +357,7 @@ static void frame() {
     ImGui::NewFrame();
 
     ucf::Frame f{};
+    const auto read_begin = std::chrono::steady_clock::now();
     if (!g_shm) g_shm = std::make_unique<ucf::SharedTransport>("UcfFrame");
     bool have_data = g_shm->ok();
     if (have_data) {
@@ -262,9 +366,15 @@ static void frame() {
         have_data = (f.width > 0 && f.height > 0);
     }
     if (!have_data) g_synth.update(f);          // 无有效共享内存：自演
+    const float read_ms = std::chrono::duration<float, std::milli>(
+        std::chrono::steady_clock::now() - read_begin).count();
+    record_frame(f);
 
     int n = 0;
+    const auto project_begin = std::chrono::steady_clock::now();
     ucf::project_frame(f, g_marks, n);
+    const float project_ms = std::chrono::duration<float, std::milli>(
+        std::chrono::steady_clock::now() - project_begin).count();
 
     RECT rc; GetClientRect(g_hwnd, &rc);
     float cw = float(rc.right - rc.left), ch = float(rc.bottom - rc.top);
@@ -320,7 +430,38 @@ static void frame() {
     }
 
     ImDrawList* bdl = ImGui::GetBackgroundDrawList();
+    const auto draw_begin = std::chrono::steady_clock::now();
     ucf::render_draw_list(bdl, dl);
+    const float draw_ms = std::chrono::duration<float, std::milli>(
+        std::chrono::steady_clock::now() - draw_begin).count();
+
+    if (g_settings.debug_show_annotations || g_settings.debug_show_bones) {
+        static const char* bone_names[] = {
+            "Hips", "Spine", "Chest", "UpperChest", "Neck", "Head",
+            "LeftShoulder", "LeftUpperArm", "LeftLowerArm", "LeftHand",
+            "RightShoulder", "RightUpperArm", "RightLowerArm", "RightHand",
+            "LeftUpperLeg", "LeftLowerLeg", "LeftFoot", "RightUpperLeg", "RightLowerLeg"
+        };
+        for (int i = 0; i < n + 1; ++i) {
+            const auto& mark = g_marks[i];
+            const float x = vp.x + mark.sx * vp.sx;
+            const float y = vp.y + mark.sy * vp.sy;
+            char text[96]{};
+            if (g_settings.debug_show_annotations && mark.on_screen) {
+                std::snprintf(text, sizeof(text), "P%d d=%.1fm hp=%d", i, mark.dist, mark.hp);
+                bdl->AddText(ImVec2(x + 4.0f, y - 14.0f), IM_COL32(255, 255, 0, 230), text);
+            }
+            if (g_settings.debug_show_bones) {
+                for (int b = 0; b < ucf::MAX_BONES; ++b) {
+                    if (!mark.bones[b].valid) continue;
+                    const float bx = vp.x + mark.bones[b].sx * vp.sx;
+                    const float by = vp.y + mark.bones[b].sy * vp.sy;
+                    std::snprintf(text, sizeof(text), "%d:%s", b, bone_names[b]);
+                    bdl->AddText(ImVec2(bx + 2.0f, by), IM_COL32(180, 220, 255, 220), text);
+                }
+            }
+        }
+    }
 
     // 诊断信息收进菜单（透明窗口验证通过后，移除全屏 HUD 与强制红框，避免遮挡画面）。
     static unsigned long last_present_hr = 0;
@@ -333,7 +474,24 @@ static void frame() {
     st.target = target;
     st.target_yaw = output_angles.yaw;
     st.target_pitch = output_angles.pitch;
-    ucf::draw_menu(g_settings, g_show_menu, g_exit_requested, st);
+    st.target_delta = target >= 0 ? ucf::angle_distance(output_angles,
+        ucf::angles_from_direction({f.players[target].pos[0] - f.local.pos[0],
+                                    f.players[target].pos[1] - f.local.pos[1],
+                                    f.players[target].pos[2] - f.local.pos[2]})) : 0.0f;
+    st.bones_total = n * ucf::MAX_BONES;
+    st.bones_valid = 0;
+    for (int i = 0; i < n; ++i)
+        for (int b = 0; b < ucf::MAX_BONES; ++b)
+            if (g_marks[i].bones[b].valid) ++st.bones_valid;
+    static int frame_index = 0;
+    st.frame_index = frame_index++;
+    st.read_ms = read_ms;
+    st.project_ms = project_ms;
+    st.draw_ms = draw_ms;
+    st.recorded_frames = g_recorded_frames;
+    st.recording = g_record_file != nullptr;
+    ucf::draw_menu(g_settings, g_show_menu, g_exit_requested,
+                   g_record_start_requested, g_record_stop_requested, st);
 
     ImGui::Render();
     // flip 透明路径：清空 (0,0,0,0)；BLT colorkey 路径：清空不透明黑 (0,0,0,255)。
@@ -432,6 +590,8 @@ int WINAPI WinMain(HINSTANCE hinst, HINSTANCE, LPSTR, int) {
     }
 
     append_debug_log("exit: saving settings");
+    close_recording();
+    append_debug_log("exit: recording closed");
     ucf::save_settings(g_settings, "ucf_overlay.ini");
     append_debug_log("exit: settings saved");
 

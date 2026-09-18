@@ -4,6 +4,9 @@
 #include <imgui.h>
 #include <windows.h>
 #include <cstring>
+#include <cstdio>
+#include <string>
+#include <vector>
 
 namespace ucf {
 
@@ -14,7 +17,29 @@ MenuRect g_menu_rect;
 
 MenuRect query_menu_rect() { return g_menu_rect; }
 
-void draw_menu(Settings& s, bool& show_menu, bool& request_exit, const OverlayStatus& st) {
+static void draw_log_tail(bool paused) {
+    ImGui::BeginChild("debug-log", ImVec2(620, 150), true);
+    if (paused) {
+        ImGui::TextUnformatted("日志滚动已暂停");
+    } else {
+        FILE* f = std::fopen("ucf_debug.log", "r");
+        if (!f) {
+            ImGui::TextUnformatted("ucf_debug.log 尚未生成");
+        } else {
+            std::vector<std::string> lines;
+            char line[512];
+            while (std::fgets(line, sizeof(line), f)) lines.emplace_back(line);
+            std::fclose(f);
+            const size_t begin = lines.size() > 12 ? lines.size() - 12 : 0;
+            for (size_t i = begin; i < lines.size(); ++i) ImGui::TextUnformatted(lines[i].c_str());
+        }
+    }
+    ImGui::EndChild();
+}
+
+void draw_menu(Settings& s, bool& show_menu, bool& request_exit,
+               bool& request_record_start, bool& request_record_stop,
+               const OverlayStatus& st) {
     if (!show_menu) { g_menu_rect.valid = false; return; }
 
     const Settings before = s;
@@ -59,6 +84,51 @@ void draw_menu(Settings& s, bool& show_menu, bool& request_exit, const OverlaySt
     ImGui::ColorEdit3("本地颜色",   s.color_local);
     ImGui::ColorEdit3("队友颜色",   s.color_teammate);
     ImGui::ColorEdit3("敌人颜色",   s.color_enemy);
+    ImGui::Separator();
+    if (ImGui::TreeNode("DEV 开发者")) {
+        const bool was_recording = s.dev_record_enabled;
+        ImGui::Checkbox("录制真实帧", &s.dev_record_enabled);
+        if (s.dev_record_enabled != was_recording) {
+            if (s.dev_record_enabled) request_record_start = true;
+            else request_record_stop = true;
+        }
+        ImGui::InputText("录制文件", s.dev_record_path, sizeof(s.dev_record_path));
+        ImGui::InputInt("最大帧数(0=不限)", &s.dev_record_max_frames);
+        ImGui::InputInt("每N帧录制", &s.dev_record_every);
+        ImGui::InputFloat("最大时长(秒,0=不限)", &s.dev_record_duration);
+        ImGui::Checkbox("录制骨骼", &s.dev_record_bones);
+        ImGui::Checkbox("录制名称", &s.dev_record_name);
+        ImGui::InputFloat("回放速度", &s.dev_replay_speed, 0.1f, 1.0f, "%.2fx");
+        if (ImGui::Button("开始录制")) { s.dev_record_enabled = true; request_record_start = true; }
+        ImGui::SameLine();
+        if (ImGui::Button("停止录制")) { s.dev_record_enabled = false; request_record_stop = true; }
+        ImGui::Text("状态:%s 帧数:%d 文件:%s", st.recording ? "录制中" : "停止",
+                    st.recorded_frames, s.dev_record_path);
+        ImGui::TextUnformatted("回放/评估：使用 tools/replay.py 的 JSONL 离线流程");
+        ImGui::TreePop();
+    }
+    if (ImGui::TreeNode("DEBUG 调试")) {
+        ImGui::Checkbox("显示日志流", &s.debug_show_log);
+        ImGui::Checkbox("暂停日志滚动", &s.debug_log_paused);
+        ImGui::Checkbox("显示投影数据", &s.debug_show_projection);
+        ImGui::Checkbox("显示骨骼数据", &s.debug_show_bones);
+        ImGui::Checkbox("显示角度平滑", &s.debug_show_angles);
+        ImGui::Checkbox("显示性能", &s.debug_show_performance);
+        ImGui::Checkbox("显示ESP调试标注", &s.debug_show_annotations);
+        if (s.debug_show_log) draw_log_tail(s.debug_log_paused);
+        if (s.debug_show_projection)
+            ImGui::Text("frame:%d players:%d bones:%d/%d", st.frame_index, st.players,
+                        st.bones_valid, st.bones_total);
+        if (s.debug_show_bones)
+            ImGui::Text("骨骼有效率: %d/%d", st.bones_valid, st.bones_total);
+        if (s.debug_show_angles)
+            ImGui::Text("当前目标:%d yaw=%.3f pitch=%.3f delta=%.3f",
+                        st.target, st.target_yaw, st.target_pitch, st.target_delta);
+        if (s.debug_show_performance)
+            ImGui::Text("耗时 read=%.2fms project=%.2fms draw=%.2fms FPS=%.1f",
+                        st.read_ms, st.project_ms, st.draw_ms, ImGui::GetIO().Framerate);
+        ImGui::TreePop();
+    }
     ImGui::Separator();
     if (ImGui::TreeNode("退出设置")) {
         ImGui::Checkbox("退出时删除配置 (ucf_overlay.ini)", &s.exit_delete_config);

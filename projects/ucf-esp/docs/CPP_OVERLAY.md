@@ -179,3 +179,13 @@ init: flip_hr=0x887A0001 used=0 blt_hr=0x00000000 dwm_hr=0x00000000 clear=black-
 - `smooth` 的目标选择支持距离、最低血量、准星角度三种模式；主循环只计算并显示 yaw/pitch，未调用任何鼠标或输入 API。
 - `PlayerState.bones[19]` 使用固定 Humanoid 槽位；无效骨骼用 `valid=false`，C++ 只连接两端都成功投影的骨骼。真实读取链是 `characterAnimator -> GetBoneTransform -> position_Injected`。
 - 退出路径默认保留 `ucf_overlay.ini` 和 `ucf_debug.log`；END/菜单按钮会保存配置、销毁窗口与 ImGui/D3D11，并让 `SharedTransport` 析构执行 `UnmapViewOfFile + CloseHandle`。只有用户勾选对应退出选项时才删除配置或日志。
+
+## DEV / DEBUG 菜单
+
+菜单的 `DEV 开发者` 区域可即时启停 C++ 侧原始 `Frame` JSONL 录制，设置路径、采样间隔、
+最大帧数、最大时长以及是否写骨骼/名称。`DEBUG 调试` 区域显示日志尾部、帧/玩家/骨骼计数、
+目标 yaw/pitch/差值和读帧/投影/绘制耗时；开启调试标注后，ESP 标记旁显示距离/血量，
+骨骼旁显示槽位名称。角度调试仍只输出诊断值，不调用任何鼠标或输入 API。
+
+Python 侧录制适合真实 Frida 数据，C++ 侧录制适合共享内存联调；两者都使用 JSONL，
+可用 `tools/replay.py --summary` 离线评估。

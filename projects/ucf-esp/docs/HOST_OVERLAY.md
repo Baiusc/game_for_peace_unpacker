@@ -540,3 +540,17 @@ python tests/test_overlay_geometry.py     # 12 组离线用例，假 Tk + 假 us
 - 骨骼/更精细包围盒：从 `Transform` 层次读更多关节。
 - 性能：把 `overlay_tk` 换成 D3D/OpenGL 注入式 overlay（低延迟），适合最终版。
 - 真机校准：拿到真实矩阵后，对照已知世界点微调 FOV / 宽高，消除投影偏差。
+
+## DEV 真实帧录制与离线回放
+
+`frida_host.py` 在收到 Frida 原始 `Frame` 后、投影前写入 JSONL，不改动采样帧：
+
+```bash
+python tools/frida_host.py --record dev_frames/session.jsonl \
+  --record-max-frames 1000 --record-duration 60 --record-every 1
+python tools/replay.py dev_frames/session.jsonl --summary --limit 0
+```
+
+每行包含 `schema_version=2`、序号、时间戳、矩阵、窗口尺寸、`local`、`players`、
+`playerCount` 与骨骼数组。写盘失败只停止录制，不停止主采样循环；`--record-no-bones`
+和 `--record-no-name` 可减小文件。回放工具不连接游戏，损坏 JSONL 行会报告行号并跳过。
