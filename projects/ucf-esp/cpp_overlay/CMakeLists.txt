@@ -10,6 +10,8 @@ endif()
 # 可直接拷到裸 Win11 虚拟机运行（GitHub Actions 也用此配置）。
 if(MSVC)
   set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+  # 源码是 UTF-8：无此选项时 L"中文" 宽字面量会被按 ANSI 转换，弹窗乱码
+  add_compile_options(/utf-8)
 endif()
 
 # 复用父目录的投影数学（列主序约定与 esp_core.py / src/projection.cpp 一致）

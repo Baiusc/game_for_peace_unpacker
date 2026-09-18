@@ -110,20 +110,29 @@ static bool init_d3d11(HWND hwnd) {
         if (FAILED(hr)) { ucf_show_hr("D3D11CreateDevice(WARP)", hr); factory->Release(); return false; }
     }
 
-    // 3) 交换链：HWND 模式 + DISCARD（虚拟机对 FLIP 支持差），透明靠 DwmExtendFrameIntoClientArea。
+    // 3) 交换链：先试 FLIP_DISCARD + PREMULTIPLIED（flip 模型才支持 alpha 透明），
+    //    虚拟机若不支持 flip，回退 DISCARD + UNSPECIFIED（透明靠 DWM 扩边）。
     DXGI_SWAP_CHAIN_DESC1 sd{};
-    sd.Width      = 0;
-    sd.Height     = 0;
     sd.Format     = DXGI_FORMAT_B8G8R8A8_UNORM;
     sd.SampleDesc.Count   = 1;
     sd.BufferUsage        = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-    sd.BufferCount        = 1;
-    sd.Scaling            = DXGI_SCALING_NONE;
-    sd.SwapEffect         = DXGI_SWAP_EFFECT_DISCARD;
-    sd.AlphaMode          = DXGI_ALPHA_MODE_PREMULTIPLIED;   // 透明叠加关键
     sd.Flags              = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
 
+    // 方案 A：flip 模型 + 预乘 alpha，原生逐像素透明。
+    sd.BufferCount = 2;                       // flip 模型要求 >= 2
+    sd.Scaling     = DXGI_SCALING_NONE;
+    sd.SwapEffect  = DXGI_SWAP_EFFECT_FLIP_DISCARD;
+    sd.AlphaMode   = DXGI_ALPHA_MODE_PREMULTIPLIED;
     hr = factory->CreateSwapChainForHwnd(g_device, hwnd, &sd, nullptr, nullptr, &g_swap);
+
+    if (FAILED(hr)) {
+        // 方案 B 回退：blt 模型，兼容性最好；透明由 DwmExtendFrameIntoClientArea 实现。
+        sd.BufferCount = 1;
+        sd.Scaling     = DXGI_SCALING_STRETCH;
+        sd.SwapEffect  = DXGI_SWAP_EFFECT_DISCARD;
+        sd.AlphaMode   = DXGI_ALPHA_MODE_UNSPECIFIED;
+        hr = factory->CreateSwapChainForHwnd(g_device, hwnd, &sd, nullptr, nullptr, &g_swap);
+    }
     factory->Release();
     if (FAILED(hr)) { ucf_show_hr("CreateSwapChainForHwnd", hr); return false; }
 
