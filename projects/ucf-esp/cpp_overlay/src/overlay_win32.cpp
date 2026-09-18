@@ -4,6 +4,11 @@
 #include <imgui.h>
 #include <cmath>
 #include <cstring>
+#include <cctype>
+#include <cstdlib>
+#include <cstdio>
+#include <string>
+#include <vector>
 #include <array>
 
 namespace ucf {
@@ -207,6 +212,249 @@ void render_draw_list(ImDrawList* dl, const DrawList& d) {
         const RayPrim& ray = d.rays[i];
         dl->AddLine({ray.x1, ray.y1}, {ray.x2, ray.y2}, rgb(ray.r, ray.g, ray.b), ray.thickness);
     }
+}
+
+// ---------------------------------------------------------------------------
+// 录制回放数据源 RecordedSource：从 JSONL 录制文件回放真实帧。
+// 录制的写出格式见 main_win32.cpp 的 record_frame()（schema_version 2）。
+// 这里用一个最小 JSON 解析器按已知 schema 反序列化，不引入第三方 JSON 库。
+// ---------------------------------------------------------------------------
+namespace {
+
+struct JVal {
+    enum Type { NUL, BOOL, NUM, STR, ARR, OBJ } type = NUL;
+    bool b = false;
+    double num = 0.0;
+    std::string str;
+    std::vector<JVal> arr;
+    std::vector<std::pair<std::string, JVal>> obj;
+    const JVal* find(const char* k) const {
+        if (type != OBJ) return nullptr;
+        for (const auto& kv : obj) if (kv.first == k) return &kv.second;
+        return nullptr;
+    }
+};
+
+struct JsonParser {
+    const char* p = nullptr;
+    const char* end = nullptr;
+    bool ok = true;
+
+    static int hexval(char c) {
+        if (c >= '0' && c <= '9') return c - '0';
+        if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+        if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+        return 0;
+    }
+    void skip() { while (p < end && (*p == ' ' || *p == '\n' || *p == '\r' || *p == '\t')) ++p; }
+    JVal parse() { skip(); return parseValue(); }
+
+    JVal parseValue() {
+        skip();
+        if (p >= end) { ok = false; return {}; }
+        const char c = *p;
+        if (c == '{') return parseObject();
+        if (c == '[') return parseArray();
+        if (c == '"') { JVal v; v.type = JVal::STR; v.str = parseString(); return v; }
+        if (c == 't' || c == 'f') return parseBool();
+        if (c == 'n') { p += 4; return {}; }
+        return parseNumber();
+    }
+    JVal parseObject() {
+        JVal v; v.type = JVal::OBJ; ++p;
+        skip();
+        if (p < end && *p == '}') { ++p; return v; }
+        while (true) {
+            skip();
+            if (p >= end || *p != '"') { ok = false; return v; }
+            std::string key = parseString();
+            skip();
+            if (p >= end || *p != ':') { ok = false; return v; }
+            ++p;
+            JVal val = parseValue();
+            v.obj.emplace_back(std::move(key), std::move(val));
+            skip();
+            if (p >= end) { ok = false; return v; }
+            if (*p == ',') { ++p; continue; }
+            if (*p == '}') { ++p; break; }
+            ok = false; break;
+        }
+        return v;
+    }
+    JVal parseArray() {
+        JVal v; v.type = JVal::ARR; ++p;
+        skip();
+        if (p < end && *p == ']') { ++p; return v; }
+        while (true) {
+            JVal val = parseValue();
+            v.arr.push_back(std::move(val));
+            skip();
+            if (p >= end) { ok = false; return v; }
+            if (*p == ',') { ++p; continue; }
+            if (*p == ']') { ++p; break; }
+            ok = false; break;
+        }
+        return v;
+    }
+    JVal parseBool() {
+        JVal v; v.type = JVal::BOOL;
+        if (std::strncmp(p, "true", 4) == 0) { v.b = true; p += 4; }
+        else if (std::strncmp(p, "false", 5) == 0) { v.b = false; p += 5; }
+        else ok = false;
+        return v;
+    }
+    JVal parseNumber() {
+        JVal v; v.type = JVal::NUM;
+        const char* start = p;
+        while (p < end && (std::isdigit((unsigned char)*p) || *p == '-' || *p == '+' ||
+                           *p == '.' || *p == 'e' || *p == 'E')) ++p;
+        v.num = std::strtod(start, nullptr);
+        return v;
+    }
+    std::string parseString() {
+        ++p; // 跳过开头的 "
+        std::string out;
+        while (p < end) {
+            const char c = *p;
+            if (c == '"') { ++p; return out; }
+            if (c == '\\') {
+                ++p;
+                if (p >= end) { ok = false; return out; }
+                const char e = *p++;
+                switch (e) {
+                    case '"': out += '"'; break;
+                    case '\\': out += '\\'; break;
+                    case '/': out += '/'; break;
+                    case 'b': out += '\b'; break;
+                    case 'f': out += '\f'; break;
+                    case 'n': out += '\n'; break;
+                    case 'r': out += '\r'; break;
+                    case 't': out += '\t'; break;
+                    case 'u': {
+                        if (p + 4 > end) { ok = false; return out; }
+                        int cp = 0;
+                        for (int i = 0; i < 4; ++i) cp = cp * 16 + hexval(*p++);
+                        if (cp < 0x80) out += (char)cp;
+                        else if (cp < 0x800) {
+                            out += (char)(0xC0 | (cp >> 6));
+                            out += (char)(0x80 | (cp & 0x3F));
+                        } else {
+                            out += (char)(0xE0 | (cp >> 12));
+                            out += (char)(0x80 | ((cp >> 6) & 0x3F));
+                            out += (char)(0x80 | (cp & 0x3F));
+                        }
+                        break;
+                    }
+                    default: ok = false; return out;
+                }
+            } else {
+                out += c; ++p;
+            }
+        }
+        ok = false; return out;
+    }
+};
+
+void read_floats(const JVal& v, float* dst, int n) {
+    if (v.type != JVal::ARR) return;
+    for (int i = 0; i < n && i < (int)v.arr.size(); ++i)
+        if (v.arr[i].type == JVal::NUM) dst[i] = (float)v.arr[i].num;
+}
+
+void parse_player(const JVal& j, PlayerState& p) {
+    if (j.type != JVal::OBJ) return;
+    if (const JVal* a = j.find("pos"))    read_floats(*a, p.pos, 3);
+    if (const JVal* a = j.find("team"))   if (a->type == JVal::NUM) p.team = (int)a->num;
+    if (const JVal* a = j.find("hp"))     if (a->type == JVal::NUM) p.hp = (int)a->num;
+    if (const JVal* a = j.find("maxHp"))  if (a->type == JVal::NUM) p.maxHp = (int)a->num;
+    if (const JVal* a = j.find("isDead")) if (a->type == JVal::BOOL) p.isDead = a->b;
+    if (const JVal* a = j.find("visible")) if (a->type == JVal::BOOL) p.visible = a->b;
+    if (const JVal* a = j.find("name"))   if (a->type == JVal::STR) {
+        std::strncpy(p.name, a->str.c_str(), sizeof(p.name) - 1);
+        p.name[sizeof(p.name) - 1] = 0;
+    }
+    if (const JVal* a = j.find("bones")) {
+        if (a->type == JVal::ARR) {
+            for (int i = 0; i < MAX_BONES && i < (int)a->arr.size(); ++i) {
+                const JVal& b = a->arr[i];
+                if (b.type != JVal::OBJ) continue;
+                if (const JVal* pos = b.find("pos")) read_floats(*pos, p.bones[i].pos, 3);
+                if (const JVal* valid = b.find("valid")) if (valid->type == JVal::BOOL) p.bones[i].valid = valid->b;
+            }
+        }
+    }
+}
+
+void parse_frame(const JVal& j, Frame& f) {
+    if (j.type != JVal::OBJ) return;
+    if (const JVal* a = j.find("w2c"))    read_floats(*a, f.w2c, 16);
+    if (const JVal* a = j.find("proj"))   read_floats(*a, f.proj, 16);
+    if (const JVal* a = j.find("width"))  if (a->type == JVal::NUM) f.width = (int)a->num;
+    if (const JVal* a = j.find("height")) if (a->type == JVal::NUM) f.height = (int)a->num;
+    if (const JVal* a = j.find("inGame")) if (a->type == JVal::BOOL) f.inGame = a->b;
+    if (const JVal* a = j.find("local"))  parse_player(*a, f.local);
+    if (const JVal* a = j.find("players")) {
+        if (a->type == JVal::ARR) {
+            int n = 0;
+            for (const auto& pl : a->arr) {
+                if (n >= MAX_PLAYERS) break;
+                parse_player(pl, f.players[n]);
+                ++n;
+            }
+            f.playerCount = n;
+        }
+    }
+    if (const JVal* a = j.find("playerCount")) if (a->type == JVal::NUM) f.playerCount = (int)a->num;
+}
+
+} // namespace
+
+size_t RecordedSource::load(const char* path, size_t cap) {
+    frames_.clear();
+    cursor_ = 0.0;
+    FILE* f = std::fopen(path, "rb");
+    if (!f) return 0;
+    std::fseek(f, 0, SEEK_END);
+    const long sz = std::ftell(f);
+    std::fseek(f, 0, SEEK_SET);
+    std::string content;
+    if (sz > 0) { content.resize((size_t)sz); std::fread(&content[0], 1, (size_t)sz, f); }
+    std::fclose(f);
+    if (content.empty()) return 0;
+
+    std::vector<Frame> loaded;
+    loaded.reserve(512);
+    size_t start = 0;
+    while (start < content.size()) {
+        size_t nl = content.find('\n', start);
+        if (nl == std::string::npos) nl = content.size();
+        size_t s = start, e = nl;
+        while (s < e && (content[s] == ' ' || content[s] == '\r' || content[s] == '\t')) ++s;
+        while (e > s && (content[e - 1] == ' ' || content[e - 1] == '\r' || content[e - 1] == '\t')) --e;
+        if (e > s) {
+            JsonParser p{content.c_str() + s, content.c_str() + e};
+            const JVal root = p.parse();
+            if (p.ok && root.type == JVal::OBJ) {
+                Frame fr{};
+                parse_frame(root, fr);
+                if (fr.width > 0 && fr.height > 0) loaded.push_back(fr);
+            }
+        }
+        start = nl + 1;
+    }
+    if (loaded.empty()) return 0;
+    if (loaded.size() > cap) loaded.erase(loaded.begin(), loaded.begin() + (loaded.size() - cap));
+    frames_ = std::move(loaded);
+    return frames_.size();
+}
+
+void RecordedSource::update(Frame& out, float speed) {
+    if (frames_.empty()) { out = Frame{}; return; }
+    if (speed < 0.01f) speed = 1.0f;
+    const size_t idx = (size_t)cursor_ % frames_.size();
+    out = frames_[idx];
+    cursor_ += double(speed);
+    if (cursor_ >= double(frames_.size())) cursor_ -= double(frames_.size());
 }
 
 } // namespace ucf

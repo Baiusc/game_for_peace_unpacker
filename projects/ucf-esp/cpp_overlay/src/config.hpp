@@ -43,10 +43,11 @@ struct Settings {
     bool  dev_record_enabled = false;
     bool  dev_record_bones = true;
     bool  dev_record_name = true;
-    int   dev_record_max_frames = 0;
+    int   dev_record_max_frames = 500;   // 单次录制默认封顶 500 帧
     int   dev_record_every = 1;
     float dev_record_duration = 0.0f;
     float dev_replay_speed = 1.0f;
+    bool  dev_replay_enabled = true;     // 不连游戏时，用录制文件回放（替代 synth 假数据）
     char  dev_record_path[260] = "dev_frames.jsonl";
     bool  debug_show_log = true;
     bool  debug_log_paused = false;

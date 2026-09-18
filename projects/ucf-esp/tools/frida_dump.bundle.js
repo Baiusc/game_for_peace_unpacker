@@ -3539,6 +3539,12 @@ ${this.isEnum ? `enum` : this.isStruct ? `struct` : this.isInterface ? `interfac
       const Physics = findPhysicsClass();
       if (!Physics) console.log("[!] UnityEngine.Physics \u672A\u627E\u5230\uFF1A\u906E\u6321\u68C0\u6D4B\u5173\u95ED\uFF08visible \u56DE\u9000 true\uFF09");
       else console.log("[*] \u906E\u6321\u68C0\u6D4B Physics \u7C7B\u5DF2\u5B9A\u4F4D\uFF08" + (Physics.image ? Physics.image.name : "assembly") + "\uFF09");
+      const VISIBILITY = !!Physics && CFG.visibility !== false;
+      const VIS_REFRESH_MS = Number.isFinite(CFG.visRefreshMs) ? CFG.visRefreshMs : 150;
+      let visCache = /* @__PURE__ */ Object.create(null);
+      let visLastRefresh = -1e9;
+      let visDoRefreshThisFrame = false;
+      if (!VISIBILITY) console.log("[*] \u906E\u6321\u68C0\u6D4B\u5DF2\u5173\u95ED\uFF08CFG.visibility=false \u6216 Physics \u672A\u627E\u5230\uFF09\uFF1Avisible \u6052\u4E3A true");
       const GameManager = asmImage.class("GameManager");
       discover(Camera, "Camera");
       discover(GameManager, "GameManager");
@@ -3858,7 +3864,15 @@ ${this.isEnum ? `enum` : this.isStruct ? `struct` : this.isInterface ? `interfac
         try {
           const t = callMethod(p, "get_transform", 0);
           out.pos = t ? readPosOf(t) : null;
-          out.visible = t ? readVisibilityOf(t) : null;
+          if (!VISIBILITY || !t) {
+            out.visible = null;
+          } else if (visDoRefreshThisFrame) {
+            out.visible = out.hp !== null && out.hp !== void 0 && out.hp <= 0 ? false : readVisibilityOf(t);
+            visCache[t.handle.toString()] = out.visible;
+          } else {
+            const k = t.handle.toString();
+            out.visible = k in visCache ? visCache[k] : null;
+          }
         } catch (e) {
           out.pos = null;
         }
@@ -3927,6 +3941,17 @@ ${this.isEnum ? `enum` : this.isStruct ? `struct` : this.isInterface ? `interfac
       const frameTick = () => {
         tick++;
         const now = Date.now();
+        if (VISIBILITY) {
+          if (now - visLastRefresh >= VIS_REFRESH_MS) {
+            visCache = /* @__PURE__ */ Object.create(null);
+            visLastRefresh = now;
+            visDoRefreshThisFrame = true;
+          } else {
+            visDoRefreshThisFrame = false;
+          }
+        } else {
+          visDoRefreshThisFrame = false;
+        }
         let M;
         try {
           M = grabMatrices();

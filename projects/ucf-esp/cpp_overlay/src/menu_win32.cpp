@@ -9,6 +9,9 @@
 #include <string>
 #include <vector>
 
+// 由 main_win32.cpp 定义（全局命名空间，非 ucf 内）：菜单“重新加载回放”按钮置位，frame() 消费。
+extern bool g_replay_reload_requested;
+
 namespace ucf {
 
 namespace {
@@ -116,11 +119,17 @@ void draw_menu(Settings& s, bool& show_menu, bool& request_exit,
         ImGui::Checkbox("录制骨骼", &s.dev_record_bones);
         ImGui::Checkbox("录制名称", &s.dev_record_name);
         ImGui::InputFloat("回放速度", &s.dev_replay_speed, 0.1f, 1.0f, "%.2fx");
+        ImGui::Checkbox("不连游戏时回放录制", &s.dev_replay_enabled);
         if (ImGui::Button("开始录制")) { s.dev_record_enabled = true; request_record_start = true; }
         ImGui::SameLine();
         if (ImGui::Button("停止录制")) { s.dev_record_enabled = false; request_record_stop = true; }
+        ImGui::SameLine();
+        if (ImGui::Button("重新加载回放")) { g_replay_reload_requested = true; }
         ImGui::Text("状态:%s 帧数:%d 文件:%s", st.recording ? "录制中" : "停止",
                     st.recorded_frames, s.dev_record_path);
+        ImGui::Text("回放源: %s  帧数:%d", s.dev_replay_enabled
+                    ? (st.replay_frames > 0 ? "已加载" : "无可用录制(将自演)")
+                    : "已关闭(将自演)", st.replay_frames);
         ImGui::TextUnformatted("回放/评估：使用 tools/replay.py 的 JSONL 离线流程");
         ImGui::TreePop();
     }

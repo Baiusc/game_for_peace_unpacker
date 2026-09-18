@@ -52,6 +52,10 @@ static ucf::Settings            g_settings{};
 static bool                     g_show_menu = true;
 static ucf::SyntheticSource     g_synth{};
 static std::unique_ptr<ucf::SharedTransport> g_shm;
+static std::unique_ptr<ucf::RecordedSource> g_replay;   // 不连游戏时回放真实录制
+static const char*          g_src = "synth";            // 当前数据源标签：shm / replay / synth
+static int                  g_replay_frames = 0;       // 回放已加载帧数
+bool                        g_replay_reload_requested = false;  // 菜单“重新加载回放”置位，frame() 消费
 static ucf::ScreenMark          g_marks[ucf::MAX_PLAYERS + 1]{};
 static bool                     g_exit_requested = false;
 static bool                     g_record_start_requested = false;
@@ -216,6 +220,18 @@ static void close_recording() {
     append_debug_log("dev: recording stopped");
 }
 
+// 从录制文件加载回放数据源（供“不连游戏时回放真实帧”使用）。
+// 与录制写同一份 dev_record_path：录完一轮后调用即可让新 clip 立即变成回放源。
+static void reload_replay() {
+    if (!g_settings.dev_replay_enabled) { g_replay.reset(); g_replay_frames = 0; return; }
+    if (!g_replay) g_replay = std::make_unique<ucf::RecordedSource>();
+    resolve_record_path();
+    const size_t n = g_replay->load(g_settings.dev_record_path, 1000);
+    g_replay_frames = int(n);
+    if (n > 0) append_debug_log("dev: replay loaded");
+    else { g_replay.reset(); g_replay_frames = 0; }
+}
+
 static void open_recording() {
     if (g_record_open_failed) return;
     close_recording();
@@ -223,7 +239,7 @@ static void open_recording() {
     std::error_code ec;
     const std::filesystem::path path(g_settings.dev_record_path);
     if (path.has_parent_path()) std::filesystem::create_directories(path.parent_path(), ec);
-    g_record_file = std::fopen(g_settings.dev_record_path, "a");
+    g_record_file = std::fopen(g_settings.dev_record_path, "w");  // 截断：每次录制为干净的一段 clip
     g_recorded_frames = 0;
     g_record_sample_counter = 0;
     g_record_started = std::chrono::steady_clock::now();
@@ -244,6 +260,8 @@ static void record_frame(const ucf::Frame& f) {
     if (g_record_stop_requested) {
         close_recording();
         g_record_stop_requested = false;
+        // 录制停止：刚写好的 clip 立即变成“不连游戏时回放”的源（若开启回放）。
+        if (g_settings.dev_replay_enabled) reload_replay();
     }
     if (g_record_start_requested) {
         g_record_open_failed = false;
@@ -523,6 +541,9 @@ static void frame() {
     poll_hotkeys();
     update_click_through();
 
+    // 菜单“重新加载回放”请求：重新读取录制文件（录制停止后也会自动触发，见 record_frame）。
+    if (g_replay_reload_requested) { reload_replay(); g_replay_reload_requested = false; }
+
     ImGui_ImplDX11_NewFrame();
     ImGui_ImplWin32_NewFrame();
     ImGui::NewFrame();
@@ -536,7 +557,15 @@ static void frame() {
         // 共享内存可能已存在但尚无生产者写入（全零 Frame）-> 尺寸非法，回退自演
         have_data = (f.width > 0 && f.height > 0);
     }
-    if (!have_data) g_synth.update(f);          // 无有效共享内存：自演
+    if (have_data) {
+        g_src = "shm";                          // 实时共享内存（游戏在跑）
+    } else if (g_replay && g_replay->available()) {
+        g_replay->update(f, g_settings.dev_replay_speed);  // 不连游戏：回放真实录制
+        g_src = "replay";
+    } else {
+        g_synth.update(f);                      // 既无 shm 也无录制：合成自演（最后兜底）
+        g_src = "synth";
+    }
     const float read_ms = std::chrono::duration<float, std::milli>(
         std::chrono::steady_clock::now() - read_begin).count();
     record_frame(f);
@@ -756,6 +785,7 @@ static void frame() {
     st.draw_ms = draw_ms;
     st.recorded_frames = g_recorded_frames;
     st.recording = g_record_file != nullptr;
+    st.replay_frames = g_replay_frames;
     ucf::draw_menu(g_settings, g_show_menu, g_exit_requested,
                    g_record_start_requested, g_record_stop_requested, st);
 
@@ -780,7 +810,7 @@ static void frame() {
                         g_settings.aimbot_enabled ? 1 : 0, target,
                         int(cw), int(ch), f.width, f.height,
                         n, int(vp.x), int(vp.y), int(vp.w), int(vp.h), vp.sx, vp.sy,
-                        fit_name(), have_data ? "shm" : "synth",
+                        fit_name(), g_src,
                         g_clear_transparent ? "transp" : "black",
                         (unsigned long)present_hr);
                 fclose(lf);
@@ -845,6 +875,8 @@ int WINAPI WinMain(HINSTANCE hinst, HINSTANCE, LPSTR, int) {
     if (g_settings.menu_hotkey == 0x2D /*VK_INSERT*/)    // 旧 ini 存的是 INSERT：迁移为 HOME
         g_settings.menu_hotkey = VK_HOME;
     resolve_record_path();
+    // 不连游戏时回放真实录制（替代 synth 假数据）；默认开启，找不到文件则回退 synth。
+    if (g_settings.dev_replay_enabled) reload_replay();
     ShowWindow(g_hwnd, SW_SHOW);
     append_debug_log("startup: overlay initialized");
 

@@ -129,7 +129,7 @@ python tools/frida_host.py --list          # 只看进程：哪些同名进程�
 
 ### 共享内存路线 B 排错
 
-- C++ 心跳中的 `src=synth` 表示没有读到有效的 `UcfFrame`；`src=shm` 表示已经切到宿主写入的真实帧。先启动 `python tools\\frida_host.py --shm`，再启动 C++ exe；也可以先用 `cpp_overlay\\tools\\shm_writer.py` 造帧验证纯共享内存链路。
+- C++ 心跳中的 `src` 表示当前数据源：`shm`=宿主写入的真实帧；`replay`=无游戏时回放录制文件（`dev_frames.jsonl`，`RecordedSource`）；`synth`=既无 shm 又无录制时的合成自演（13 个假玩家，仅联机验证用）。优先顺序 shm > replay > synth。先启动 `python tools\\frida_host.py --shm`，再启动 C++ exe；也可以先用 `cpp_overlay\\tools\\shm_writer.py` 造帧验证纯共享内存链路。
 - 共享内存名必须严格为 `UcfFrame`，名称区分大小写。`--shm-name` 只有在 C++ 端同步修改名称时才使用；名称或大小不一致时，宿主会在打开/写入处报错，C++ 会继续显示 `src=synth`。
 - `frame_bytes=23804` 是单个 `Frame`，单槽描述为 `slot_bytes=23808`（当前索引 4 字节加一个 Frame）；实际双缓冲共享区必须是 `shm_bytes=47612`，即当前索引加两个完整 Frame。写端先写后台槽，最后才翻转索引。
 - Ctrl+C 后宿主会关闭 Python 映射；若排查仍疑似有残留句柄，可用 Sysinternals `handle.exe UcfFrame` 查询持有者，或在任务管理器结束对应宿主进程后重试。

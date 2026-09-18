@@ -194,6 +194,19 @@ Il2Cpp.perform(() => {
   if (!Physics) console.log("[!] UnityEngine.Physics 未找到：遮挡检测关闭（visible 回退 true）");
   else console.log("[*] 遮挡检测 Physics 类已定位（" +
                    (Physics.image ? Physics.image.name : "assembly") + "）");
+
+  // 遮挡检测总开关 + 节流配置。
+  // Physics.Linecast 是跑在 Unity 主线程的真实物理射线，每帧对每个玩家各调一次
+  // （30 人 × 125Hz ≈ 每秒 3750 次）会严重拖垮游戏本帧 FPS——这就是“进对局掉帧、
+  // 且隐藏 ESP 也掉”的真凶（瓶颈在游戏进程，不在 C++ 叠层）。
+  // 改为按墙钟节流：默认每 ~150ms 整批重算一次，结果按玩家 handle 缓存复用
+  // （遮挡变化很慢，~7Hz 足够）。CFG.visibility=false 可彻底关闭（visible 恒为 true）。
+  const VISIBILITY = !!Physics && CFG.visibility !== false;
+  const VIS_REFRESH_MS = Number.isFinite(CFG.visRefreshMs) ? CFG.visRefreshMs : 150;
+  let visCache = Object.create(null);   // handle 字符串 -> bool
+  let visLastRefresh = -1e9;
+  let visDoRefreshThisFrame = false;     // frameTick 每帧只判定一次
+  if (!VISIBILITY) console.log("[*] 遮挡检测已关闭（CFG.visibility=false 或 Physics 未找到）：visible 恒为 true");
   const GameManager = asmImage.class("GameManager");
   discover(Camera, "Camera");
   discover(GameManager, "GameManager");
@@ -569,7 +582,19 @@ Il2Cpp.perform(() => {
     try {
       const t = callMethod(p, "get_transform", 0);
       out.pos = t ? readPosOf(t) : null;
-      out.visible = t ? readVisibilityOf(t) : null;
+      if (!VISIBILITY || !t) {
+        out.visible = null;                 // 关闭遮挡检测 / 无 transform：全部视为可见
+      } else if (visDoRefreshThisFrame) {
+        // 真正的主线程 Physics.Linecast，仅在“重算帧”执行（每 ~150ms 一次）。
+        // 死亡玩家不需要射线（隔墙也无关紧要），直接判可见=false 省一次检测。
+        out.visible = (out.hp !== null && out.hp !== undefined && out.hp <= 0)
+          ? false : readVisibilityOf(t);
+        visCache[t.handle.toString()] = out.visible;
+      } else {
+        // 非重算帧：复用上次缓存，避免每帧 30 次物理射线拖垮游戏 FPS。
+        const k = t.handle.toString();
+        out.visible = (k in visCache) ? visCache[k] : null;
+      }
     } catch (e) { out.pos = null; }
     out.team = readTeamOf(p);
     try { out.isMyPlayer = callMethod(p, "get_isMyPlayer", 0); } catch (e) { out.isMyPlayer = null; }
@@ -632,6 +657,19 @@ Il2Cpp.perform(() => {
   const frameTick = () => {
     tick++;
     const now = Date.now();
+
+    // 遮挡检测节流：每 ~VIS_REFRESH_MS 整批重算一次，整帧只判定一次，结果按玩家缓存复用。
+    if (VISIBILITY) {
+      if ((now - visLastRefresh) >= VIS_REFRESH_MS) {
+        visCache = Object.create(null);
+        visLastRefresh = now;
+        visDoRefreshThisFrame = true;
+      } else {
+        visDoRefreshThisFrame = false;
+      }
+    } else {
+      visDoRefreshThisFrame = false;
+    }
 
     let M;
     try {

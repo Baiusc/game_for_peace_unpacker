@@ -27,7 +27,7 @@ cmake -S . -B build
 cmake --build build --config Release
 build\Release\ucf_overlay_win32.exe
 ```
-- 默认：无共享内存时退回 `SyntheticSource` 自演（绕相机旋转的虚拟玩家），验证透明窗口 + ImGui 菜单。
+- 默认：无共享内存时优先从录制文件（`dev_frames.jsonl`，`RecordedSource` 回放真实帧）载入；文件缺失/空才退回 `SyntheticSource` 自演（绕相机旋转的虚拟玩家），验证透明窗口 + ImGui 菜单。回放在 DEV 面板可关（`不连游戏时回放录制`）。
 - 接真实数据：先运行 `python tools/shm_writer.py`（或把 `frida_host.py` 输出打包进共享内存），
   C++ 端 `SharedTransport("UcfFrame")` 自动读取。
 - **HOME** 显隐菜单，**DELETE** 显隐 ESP 绘制层；启动默认菜单显示、ESP 隐藏。
@@ -115,7 +115,7 @@ init: flip_hr=0x887A0001 used=0 blt_hr=0x00000000 dwm_hr=0x00000000 clear=black-
 ### ② scale=inf（早前已修）
 无有效共享内存时 `frame.width/height` 可能为 0/负，视口缩放 `cw/fw` 分母=0 → `inf`。
 修法：`fw = (f.width>0)? f.width : 1280.0f`（分母兜底），并校验 `f.width>0 && f.height>0`
-才认为有数据，否则退回 `SyntheticSource` 自演。
+才认为有数据，否则优先回放录制（`RecordedSource`），录制缺失才退回 `SyntheticSource` 自演。
 
 ### ③ 诊断三宝（验证渲染管线是否真的画到屏）
 - **强制红框**：`bdl->AddRectFilled(ImVec2(100,100), ImVec2(600,500), IM_COL32(255,0,0,255));`

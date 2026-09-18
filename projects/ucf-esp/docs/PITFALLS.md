@@ -220,3 +220,12 @@
 - **修法**：用 `findPhysicsClass()` 多程序集容错查找（`UnityEngine.PhysicsModule`→`UnityEngine.CoreModule`→`UnityEngine`），找不到只降级（`visible` 回退 true），**绝不中断初始化**；`readVisibilityOf` 开头加 `if (!Physics) return null;` 守卫；`Linecast` 的 layerMask 用 `-1`(Everything)，命中距离偏移用 `0x18`(RaycastHit.m_Distance)。改源码后**必须重打包 bundle**（`esbuild --bundle --format=iife --platform=neutral`），运行加载的是 bundle 不是源码。
 - **判读**：宿主日志 `[*] 遮挡检测 Physics 类已定位` = 遮挡链路通；`[!] UnityEngine.Physics 未找到` = 该游戏不含 Physics 模块，遮挡关闭（仍按可见处理，不崩溃）。
 - **验证**：bundle 重打包后 `node --check` 通过、旧抛错行消失、新查找存在；C++ 侧 `is_target_visible(player)` 早已正确读 `PlayerState.visible`，遮挡对自动瞄准（排除 BLOCKED）与橙色虚线框生效。
+
+### 2026-09-19：遮挡检测 `Physics.Linecast` 在主线程每帧跑会严重掉帧（进对局、隐藏 ESP 也掉）
+
+- **现象**：修好 Physics 初始化后遮挡检测真正跑起来了，但用户反馈“INS 注入进对局后游戏本帧掉很多，且**就算隐藏 ESP 覆盖层也掉帧**”。瓶颈在**游戏进程**（frida 注入侧），不在 C++ 叠层——隐藏叠层只停它的渲染，不影响游戏进程。
+- **根因**：`buildFrame` 对每个玩家（最多 30 个）都调 `readVisibilityOf`→`Physics.Linecast`，而帧生产跑在 Unity 主线程（`callOnMainThread(frameTick)`）。采样间隔默认 8ms（125Hz）→ 主线程每秒 ~3750 次物理射线，生化大场景 collider 多时直接拖垮游戏 FPS。这是“真实帧变 synth 自演”修好后**新引入的回归**（遮挡是 6acad4c 加的，之前因崩溃从未真正运行）。
+- **排查要点**：区分“游戏进程掉帧”与“叠层掉帧”——前者是 frida 主线程重活（Linecast/GetBoneTransform），后者只是 C++ 渲染。隐藏 ESP 仍掉帧 ⇒ 必是 frida 侧。坐标/team/血量/`get_transform`/`GetBoneTransform` 在“好用的旧版本”就每帧跑且未掉帧，不是回归点，勿误改。
+- **修法（frida_dump.js）**：遮挡检测按墙钟节流——`frameTick` 每帧只判定一次 `visDoRefreshThisFrame`（每 `VIS_REFRESH_MS`≈150ms 整批重算），结果按玩家 handle 缓存复用；非重算帧走缓存，不再每帧射线。死亡玩家（`hp<=0`）跳过射线直接判 `visible=false`。`CFG.visibility=false` 可彻底关闭（visible 恒 true）。改源码后**必须重打包 bundle**。
+- **代价与权衡**：遮挡状态 ~7Hz 刷新（150ms），对“隔墙虚线框/自动瞄准排除 BLOCKED”完全够用（墙体不会 150ms 内瞬移）。若仍觉卡，调大 `CFG.visRefreshMs`（如 250）或关 `visibility`。
+- **回放替代 synth**：不连游戏时，C++ 叠加层优先从录制文件（`dev_record_path`，默认 `dev_frames.jsonl`，与 `record_frame` 写出同格式 schema_version 2）回放真实帧（`RecordedSource`，JSONL 逐行解析、循环播放、按 `dev_replay_speed` 推进）；文件缺失/空才退回 `SyntheticSource` 的 13 个假玩家。默认 `dev_replay_enabled=true`。录制默认封顶 `dev_record_max_frames=500` 帧、每次录制截断为干净一段 clip。

@@ -29,6 +29,7 @@ struct OverlayStatus {
     float         draw_ms = 0.0f;
     int           recorded_frames = 0;
     bool          recording = false;
+    int           replay_frames = 0;     // 回放数据源已加载帧数（0=无可用录制）
 };
 
 MenuRect query_menu_rect();

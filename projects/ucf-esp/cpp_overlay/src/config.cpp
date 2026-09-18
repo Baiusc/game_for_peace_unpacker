@@ -50,6 +50,7 @@ bool save_settings(const Settings& s, const char* path) {
     fprintf(f, "dev_record_every=%d\n", s.dev_record_every);
     fprintf(f, "dev_record_duration=%.3f\n", s.dev_record_duration);
     fprintf(f, "dev_replay_speed=%.3f\n", s.dev_replay_speed);
+    fprintf(f, "dev_replay_enabled=%d\n", s.dev_replay_enabled ? 1 : 0);
     fprintf(f, "dev_record_path=%s\n", s.dev_record_path);
     fprintf(f, "debug_show_log=%d\n", s.debug_show_log ? 1 : 0);
     fprintf(f, "debug_log_paused=%d\n", s.debug_log_paused ? 1 : 0);
@@ -120,6 +121,7 @@ bool load_settings(Settings& s, const char* path) {
         else if (!std::strcmp(key, "dev_record_every")) s.dev_record_every = std::atoi(val);
         else if (!std::strcmp(key, "dev_record_duration")) s.dev_record_duration = std::atof(val);
         else if (!std::strcmp(key, "dev_replay_speed")) s.dev_replay_speed = std::atof(val);
+        else if (!std::strcmp(key, "dev_replay_enabled")) s.dev_replay_enabled = std::atoi(val) != 0;
         else if (!std::strcmp(key, "dev_record_path")) {
             std::strncpy(s.dev_record_path, val, sizeof(s.dev_record_path) - 1);
             s.dev_record_path[sizeof(s.dev_record_path) - 1] = 0;
