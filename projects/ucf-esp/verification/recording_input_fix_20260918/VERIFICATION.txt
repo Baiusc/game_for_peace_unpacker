@@ -1,0 +1,10 @@
+BASELINE command: ctest --test-dir projects/ucf-esp/cpp_overlay/build --output-on-failure
+BASELINE output: prior core ctest passed
+BASELINE exit: 0
+MODIFIED command: python3 projects/ucf-esp/tests/test_bone_name_order.py && python3 projects/ucf-esp/tests/test_record_replay.py
+MODIFIED output: bone name slot order: PASS; DEV JSONL recorder/replay: PASS
+MODIFIED exit: 0
+ROLLBACK command: projects/ucf-esp/verification/recording_input_fix_20260918/ROLLBACK.sh
+ROLLBACK output: rollback restored
+ROLLBACK exit: 0
+RESTORED result: ROLLBACK_TEST_COPY restored to ORIGINAL_FILE

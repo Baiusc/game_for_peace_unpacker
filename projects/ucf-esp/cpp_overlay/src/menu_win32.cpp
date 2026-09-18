@@ -18,21 +18,30 @@ MenuRect g_menu_rect;
 MenuRect query_menu_rect() { return g_menu_rect; }
 
 static void draw_log_tail(bool paused) {
-    ImGui::BeginChild("debug-log", ImVec2(620, 150), true);
-    if (paused) {
-        ImGui::TextUnformatted("日志滚动已暂停");
-    } else {
+    static std::vector<char> log_buffer(8192, 0);
+    static int refresh_counter = 0;
+    if (!paused && (refresh_counter++ % 30 == 0)) {
+        std::vector<std::string> lines;
         FILE* f = std::fopen("ucf_debug.log", "r");
-        if (!f) {
-            ImGui::TextUnformatted("ucf_debug.log 尚未生成");
-        } else {
-            std::vector<std::string> lines;
+        if (f) {
             char line[512];
             while (std::fgets(line, sizeof(line), f)) lines.emplace_back(line);
             std::fclose(f);
-            const size_t begin = lines.size() > 12 ? lines.size() - 12 : 0;
-            for (size_t i = begin; i < lines.size(); ++i) ImGui::TextUnformatted(lines[i].c_str());
+            const size_t begin = lines.size() > 24 ? lines.size() - 24 : 0;
+            std::string joined;
+            for (size_t i = begin; i < lines.size(); ++i) joined += lines[i];
+            std::memset(log_buffer.data(), 0, log_buffer.size());
+            std::strncpy(log_buffer.data(), joined.c_str(), log_buffer.size() - 1);
         }
+    }
+    ImGui::BeginChild("debug-log", ImVec2(620, 150), true);
+    if (paused) {
+        ImGui::TextUnformatted("日志滚动已暂停");
+    } else if (log_buffer[0] == 0) {
+        ImGui::TextUnformatted("ucf_debug.log 尚未生成");
+    } else {
+        ImGui::InputTextMultiline("##debug-log-text", log_buffer.data(), log_buffer.size(),
+                                  ImVec2(-1, 130), ImGuiInputTextFlags_ReadOnly);
     }
     ImGui::EndChild();
 }
@@ -150,6 +159,11 @@ void draw_menu(Settings& s, bool& show_menu, bool& request_exit,
     // 配置项在菜单中修改后立即持久化；按钮仍保留给用户显式保存。
     if (std::memcmp(&before, &s, sizeof(Settings)) != 0)
         save_settings(s, "ucf_overlay.ini");
+
+    if (std::strcmp(before.dev_record_path, s.dev_record_path) != 0) {
+        request_record_stop = true;
+        if (s.dev_record_enabled) request_record_start = true;
+    }
 
     if (!show_menu) g_menu_rect.valid = false;   // 点了右上角 X 关闭
 }

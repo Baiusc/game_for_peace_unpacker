@@ -189,3 +189,10 @@ init: flip_hr=0x887A0001 used=0 blt_hr=0x00000000 dwm_hr=0x00000000 clear=black-
 
 Python 侧录制适合真实 Frida 数据，C++ 侧录制适合共享内存联调；两者都使用 JSONL，
 可用 `tools/replay.py --summary` 离线评估。
+
+### 录制失败与菜单输入排错
+
+录制路径会解析到 exe 目录；父目录不存在时自动创建。打开失败会记录一次 `errno` 和最终路径，
+并停止本次录制，重新点击“开始录制”后才重试。DEBUG 日志使用只读多行输入框，可选择文本并用
+Ctrl+C 复制。菜单交互态会同时移除点击穿透和 `WS_EX_NOACTIVATE`，保证 `InputText`、`InputInt`
+和 `InputFloat` 能获得键盘焦点。

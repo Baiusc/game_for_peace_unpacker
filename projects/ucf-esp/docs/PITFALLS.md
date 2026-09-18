@@ -102,3 +102,11 @@
 - **格式**：逐行 JSONL，`schema_version=2`；回放按行解析，损坏行跳过并报告行号。
 - **限制**：C++ 菜单负责实时录制和调试显示，完整 JSONL 回放/统计由 `tools/replay.py` 离线完成，避免在 Win32 渲染层引入 JSON 依赖。
 - **验证**：`test_record_replay.py` 覆盖采样间隔、最大帧数、骨骼统计与 JSONL 读取；Windows D3D11 菜单需 Actions/MSVC 验证。
+
+### 2026-09-18：录制失败退避与 Win32 菜单键盘输入
+
+- **录制失败**：`fopen` 失败时设置 `g_record_open_failed` 并关闭录制开关；只有用户再次点击开始录制或修改路径后才清除，避免每帧重试刷日志。
+- **路径**：启动时将相对录制路径解析到 exe 所在目录，并自动创建父目录；失败日志包含 `errno` 和最终路径。
+- **输入焦点**：点击穿透不仅要移除 `WS_EX_TRANSPARENT`，还要临时移除 `WS_EX_NOACTIVATE` 并设置窗口焦点，否则 ImGui `InputText` 光标可见但收不到键盘字符/复制快捷键。
+- **日志选择**：日志尾部改为低频刷新到只读 `InputTextMultiline`，支持鼠标选择与 Ctrl+C，同时避免每帧打开日志文件。
+- **骨骼名称**：调试名称数组必须严格按 `HumanBodyBones` 数值槽位排列，不能按人体展示顺序重排。
