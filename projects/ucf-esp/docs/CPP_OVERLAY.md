@@ -14,7 +14,7 @@
 cd projects/ucf-esp/cpp_overlay
 cmake -S . -B build
 cmake --build build
-ctest --test-dir build --output-on-failure     # 可视化/平滑/目标选择/传输/配置
+(cd build && ctest --output-on-failure)     # 可视化/平滑/目标选择/传输/配置
 ```
 核心库（投影契约、可视化、平滑、共享内存双缓冲、配置）**不依赖 D3D/Win32**，
 因此可在 Linux 编译并跑测试。Windows 渲染层被 `if(WIN32)` 隔离，不影响上述构建。
@@ -30,7 +30,8 @@ build\Release\ucf_overlay_win32.exe
 - 默认：无共享内存时退回 `SyntheticSource` 自演（绕相机旋转的虚拟玩家），验证透明窗口 + ImGui 菜单。
 - 接真实数据：先运行 `python tools/shm_writer.py`（或把 `frida_host.py` 输出打包进共享内存），
   C++ 端 `SharedTransport("UcfFrame")` 自动读取。
-- 按 **INSERT** 显隐菜单，菜单里调开关 / 颜色 / FOV / 平滑系数 / 目标选择。
+- **HOME** 显隐菜单，**DELETE** 显隐 ESP 绘制层；启动默认菜单显示、ESP 隐藏。
+  菜单里调开关 / 颜色 / FOV / 平滑系数 / 目标选择，底部有 mode/src/players/present_hr 诊断行。
 - 需 `d3d11.lib / dxgi.lib / d3dcompiler.lib / dwmapi.lib / user32.lib / gdi32.lib`（Windows SDK）+ C++20。
 
 > 产物静态链接（`/MT`），可直接拷到裸 Win11 虚拟机运行，无需装 VS / SDK / VC++ 运行库。
@@ -63,7 +64,7 @@ shared_state.*   Frame/PlayerState 契约 + 双缓冲传输（Local / Shared）
 overlay_viz.*    build_draw_list() 视口映射 + 框/血条/标签原语
 smooth.*         smooth_angles() / select_target()（只算角度，不注入）
 config.*         key=value 配置持久化（ucf_overlay.ini）
-menu_win32.*     ImGui 菜单（INSERT 切换）
+menu_win32.*     ImGui 菜单（HOME/DELETE 切换；缓存菜单矩形给点击穿透命中判定）
 ```
 
 ---
@@ -121,6 +122,9 @@ init: flip_hr=0x887A0001 used=0 blt_hr=0x00000000 dwm_hr=0x00000000 clear=black-
 - **高对比 HUD**：黑底（`IM_COL32(0,0,0,230)`）+ 白字（`IM_COL32(255,255,255,255)`）。
 - **每帧 `present_hr`** 写入 `ucf_debug.log` 心跳行，确认 `Present` 没失败。
 
+> 2026-09-18：透明窗口在 VM 里验证通过后，全屏 HUD 与强制红框已从代码移除，
+> 诊断信息收进菜单窗口底部；需要复测时临时加回即可。
+
 ### ④ 判别清单（在虚拟机里看）
 | 看什么 | 期望 | 说明 |
 |---|---|---|
@@ -132,6 +136,30 @@ init: flip_hr=0x887A0001 used=0 blt_hr=0x00000000 dwm_hr=0x00000000 clear=black-
 
 - `used=1` 且看到红方块 → 透明 OK。
 - `used=0 clear=black-colorkey` 且仍看不见 → BLT colorkey 在你的 VM 没生效，把 `init:` 与几行心跳发回，改 BLT 用 `LWA_ALPHA` 不透明兜底。
+
+### ⑤ 菜单点不中，点到背后的窗口（点击穿透）
+**现象**：透明窗口跑通后，点击菜单按钮落到了背后的文件管理器。
+
+**根因**：窗口常开 `WS_EX_TRANSPARENT` → 整窗对鼠标不可见，所有点击（包括菜单上）
+都穿透到底下窗口。
+
+**为什么不 `WM_NCHITTEST` 返回 `HTTRANSPARENT`**：它只保证**同线程**窗口间的穿透，
+跨进程（游戏 / 文件管理器）不可靠，标准做法是动态切换 ex-style。
+
+**修法**（`update_click_through()`，每帧执行）：
+1. `draw_menu` 缓存 ImGui 菜单窗口矩形（`MenuRect`，有一帧延迟，可接受）；
+2. 主循环 `GetCursorPos` 轮询，光标落在菜单矩形（外扩 8px）内 → **移除** `WS_EX_TRANSPARENT`；
+3. `ImGui::IsAnyMouseDown()` 为真（拖滑块）→ 保持可交互，避免拖到矩形外被断掉；
+4. 其余时间恢复穿透；切换时补 `SWP_FRAMECHANGED` 让系统重算命中。
+
+**注意**：带 `WS_EX_TRANSPARENT` 时收不到任何鼠标消息，所以「光标进入菜单」只能靠
+轮询 `GetCursorPos` 探测，不能等 `WM_MOUSEMOVE`。
+
+### ⑥ 菜单文字全显示 `????`（ImGui 默认字体无 CJK）
+**现象**：菜单里中文标签全变 `????`。
+**根因**：ImGui 默认字体（proggyClean 等）不含 CJK 字形，`/utf-8` 只解决源码编码，不解决字形。
+**修法**：菜单 / 屏上标签一律用 ASCII 文案；要中文需另加载 CJK 字体（stb_truetype 合并字库），
+体积与首帧开销都不小，暂不引入。
 
 ---
 

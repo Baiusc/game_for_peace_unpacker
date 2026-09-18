@@ -47,7 +47,7 @@ void build_draw_list(const Viewport& vp, const ScreenMark* marks, int n, DrawLis
             L.r = col[0]; L.g = col[1]; L.b = col[2];
             const char* kn = (m.kind == Kind::Local) ? "local"
                            : (m.kind == Kind::Teammate) ? "teammate" : "enemy";
-            int off = snprintf(L.text, sizeof(L.text), "%s t", kn);
+            int off = snprintf(L.text, sizeof(L.text), "%s ", kn);
             if (m.max_hp > 0 && off < (int)sizeof(L.text))
                 off += snprintf(L.text + off, sizeof(L.text) - off, "%d/%d", m.hp, m.max_hp);
             if (m.dist > 0 && off < (int)sizeof(L.text))

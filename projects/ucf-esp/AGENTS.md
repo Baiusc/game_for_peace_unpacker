@@ -36,7 +36,7 @@ projects/ucf-esp/
 | `src/smooth.hpp/.cpp` | 相机角度指数平滑 + 目标选择（**只算角度，不注入鼠标**） | 核心 |
 | `src/config.hpp/.cpp` | key=value 配置持久化 | 核心 |
 | `src/overlay_win32.*` | Frame→屏幕标记投影（复刻 `esp_core`）+ 合成数据源 `SyntheticSource` + `render_draw_list` 画到 ImGui 背景层 | WIN32 |
-| `src/menu_win32.*` | ImGui 菜单（INSERT 切换） | WIN32 |
+| `src/menu_win32.*` | ImGui 菜单（HOME/DELETE 切换；动态点击穿透） | WIN32 |
 | `src/main_win32.cpp` | 分层透明窗口 + D3D11 + ImGui 主循环 | WIN32 |
 
 构建 / 运行 / 数据契约见 `cpp_overlay/README.md`；
@@ -46,7 +46,8 @@ projects/ucf-esp/
 
 1. 改数据契约 → 同步 `shared_state.hpp` + `esp_core.py` + `frida_dump.js` + `STATIC_REFERENCE.md`，
    跑 `tests/test_dump_contract.py` 与 cpp_overlay ctest。
-2. 改 C++ 逻辑 → 本地 `cmake -S . -B build && ctest`（Linux 可验证核心库）；Windows 渲染层靠 Actions 编。
+2. 改 C++ 逻辑 → 本地 `cmake -S . -B build && cmake --build build && (cd build && ctest --output-on-failure)`
+   （Linux 可验证核心库；注意 ctest 要在 build 目录内跑，`--test-dir` 在本机版本下不可靠）；Windows 渲染层靠 Actions 编。
 3. 提交：`commit` → `git push`（SSH）。**不要**把 PAT 写进 remote URL / `.git/config`。
 4. 构建失败时，等用户贴回 Actions 红色日志，据 `error Cxxxx` 自修。
 

@@ -30,7 +30,7 @@ cpp_overlay/
     smooth.hpp/.cpp       # 相机角度平滑 + 目标选择
     config.hpp/.cpp       # 配置（开关/颜色/FOV/平滑）最小 key=value 持久化
     overlay_win32.*      # WIN32：投影 Frame -> 屏幕标记；合成数据源；渲染到 ImGui 背景层
-    menu_win32.*         # WIN32：ImGui 菜单（INSERT 切换）
+    menu_win32.*         # WIN32：ImGui 菜单（HOME 切换；动态点击穿透）
     main_win32.cpp       # WIN32：分层透明窗口 + D3D11 + ImGui 主循环
   tests/overlay_tests.cpp# 核心逻辑单测
   tools/shm_writer.py     # Windows：把帧写入命名共享内存 "UcfFrame"（供 C++ 读）
@@ -42,7 +42,7 @@ cpp_overlay/
 cd projects/ucf-esp/cpp_overlay
 cmake -S . -B build
 cmake --build build
-ctest --test-dir build --output-on-failure     # 可视化/平滑/目标选择/传输/配置
+(cd build && ctest --output-on-failure)     # 可视化/平滑/目标选择/传输/配置
 ```
 
 核心库（投影契约、可视化、平滑、共享内存双缓冲、配置）**不依赖 D3D/Win32**，
@@ -64,7 +64,8 @@ build\Release\ucf_overlay_win32.exe
   用来验证透明窗口 + ImGui 菜单是否出来；
 - 接真实数据：先运行 `python tools/shm_writer.py`（或把你的 `frida_host.py`
   输出打包进共享内存），C++ 端 `SharedTransport("UcfFrame")` 自动读取；
-- 按 **INSERT** 显隐菜单，菜单里调开关 / 颜色 / FOV / 平滑系数 / 目标选择。
+- **HOME** 显隐菜单，**DELETE** 显隐 ESP 绘制层（键位在 `ucf_overlay.ini` 可配；菜单里调开关 / 颜色 / FOV / 平滑系数 / 目标选择）。启动默认：菜单显示、ESP 隐藏。
+- 菜单可交互、其余区域点击穿透：每帧轮询光标，悬停菜单矩形时动态移除 `WS_EX_TRANSPARENT`。
 
 需要 `d3d11.lib / dxgi.lib / d3dcompiler.lib / dwmapi.lib / user32.lib / gdi32.lib`
 （Windows SDK 自带）与 C++20（MSVC 或 MinGW-w64）。链接库已在 CMakeLists 里列好。

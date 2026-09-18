@@ -11,6 +11,7 @@
 
 | 日期 | 改动 | 原因 | 详见 |
 | --- | --- | --- | --- |
+| 2026-09-18 | UI 修复：菜单 HOME / ESP 绘制层 DELETE（旧 ini 的 INSERT 自动迁移）；点击穿透动态开关；移除诊断红框/全屏 HUD（收进菜单）；菜单标签 ASCII 化 | INSERT 与注入键冲突；`WS_EX_TRANSPARENT` 常开导致菜单点不中；默认字体无 CJK 字形 | `CPP_OVERLAY.md` §4⑤/⑥ |
 | 2026-09-18 | C++ 透明窗口：去掉 `WS_EX_LAYERED`，flip+PREMULTIPLIED / BLT+colorkey 兜底；加诊断红框+HUD+present_hr 日志 | `WS_EX_LAYERED` 让窗口整体不可见且阻断 flip（0x887A0001） | `CPP_OVERLAY.md` §3/§4① |
 | 2026-09-18 | `scale=inf` 修复：视口缩放分母兜底 1280x720 + 校验 frame 尺寸 | 无共享内存时 frame 尺寸非法 → 分母 0 | `CPP_OVERLAY.md` §4② |
 | 2026-09-17 | 投影加 NDC 裁剪（`NDC_CLIP=3.0`）；`world_to_screen` 保留原始值 | 本地玩家压相机头，透视除 w 极小，屏幕坐标放大几十倍 | `HOST_OVERLAY.md` 「屏幕坐标离谱」 |
@@ -50,6 +51,9 @@
 | `scale=inf` | 无数据时 frame 尺寸非法，视口缩放分母=0 | 分母兜底 1280x720 + 校验 `width>0 && height>0` |
 | 透明窗口是黑块 / 不透明 | BLT+UNSPECIFIED 缓冲不透明，没走 colorkey | BLT 路径：清屏不透明黑 + `LWA_COLORKEY` 抠纯黑 |
 | 看不到内容（怀疑渲染没输出） | 先加强制红框 + 黑底白字 HUD 验证管线 | 见 `CPP_OVERLAY.md` §4③ |
+| 菜单按钮点不中，点到背后窗口 | `WS_EX_TRANSPARENT` 常开 → 整窗穿透 | 每帧轮询 `GetCursorPos`，悬停菜单矩形时动态移除该样式；**不要**用 `HTTRANSPARENT`（跨进程不可靠） |
+| 菜单中文全显示 `????` | ImGui 默认字体无 CJK 字形 | 菜单/标签一律 ASCII；要中文须另加载 CJK 字体 |
+| INSERT 切菜单与注入键冲突 | 键位占用 | 菜单=HOME、ESP 绘制层=DELETE，`ucf_overlay.ini` 可配；旧 ini 的 INSERT 启动时自动迁移 |
 
 ### 数据契约 / 投影（`STATIC_REFERENCE.md`）
 | 现象 | 根因 | 修法 |

@@ -18,6 +18,8 @@ bool save_settings(const Settings& s, const char* path) {
     fprintf(f, "target_mode=%d\n",    s.target_mode);
     fprintf(f, "responsiveness=%.3f\n", s.responsiveness);
     fprintf(f, "menu_hotkey=%d\n",    s.menu_hotkey);
+    fprintf(f, "esp_hotkey=%d\n",     s.esp_hotkey);
+    fprintf(f, "esp_visible=%d\n",    s.esp_visible ? 1 : 0);
     fprintf(f, "color_local=%.3f,%.3f,%.3f\n",
             s.color_local[0], s.color_local[1], s.color_local[2]);
     fprintf(f, "color_teammate=%.3f,%.3f,%.3f\n",
@@ -48,6 +50,8 @@ bool load_settings(Settings& s, const char* path) {
         else if (!std::strcmp(key, "target_mode"))    s.target_mode    = std::atoi(val);
         else if (!std::strcmp(key, "responsiveness")) s.responsiveness = std::atof(val);
         else if (!std::strcmp(key, "menu_hotkey"))   s.menu_hotkey    = std::atoi(val);
+        else if (!std::strcmp(key, "esp_hotkey"))     s.esp_hotkey     = std::atoi(val);
+        else if (!std::strcmp(key, "esp_visible"))    s.esp_visible    = std::atoi(val) != 0;
         else if (!std::strcmp(key, "color_local"))    std::sscanf(val, "%f,%f,%f", &s.color_local[0], &s.color_local[1], &s.color_local[2]);
         else if (!std::strcmp(key, "color_teammate")) std::sscanf(val, "%f,%f,%f", &s.color_teammate[0], &s.color_teammate[1], &s.color_teammate[2]);
         else if (!std::strcmp(key, "color_enemy"))    std::sscanf(val, "%f,%f,%f", &s.color_enemy[0], &s.color_enemy[1], &s.color_enemy[2]);

@@ -4,7 +4,8 @@
 //     交换链用 FLIP_DISCARD + PREMULTIPLIED，靠 swap chain 自身的 alpha 透出。
 //     【注意】flip 交换链禁止与 WS_EX_LAYERED 同用，否则 CreateSwapChain 报 0x887A0001。
 //   - BLT 回退（虚拟机不支持 flip 时）：补加 WS_EX_LAYERED + 黑色 colorkey，纯黑=透明。
-//   - TRANSPARENT -> 整窗不吃鼠标（点击穿透到下面的游戏）；TOPMOST -> 永远盖在游戏之上。
+//   - TRANSPARENT -> 点击穿透（动态开关：光标悬停菜单时移除，让菜单可交互）；
+//     TOPMOST -> 永远盖在游戏之上。
 // 数据来自 SharedTransport（Python 宿主写入）；没有共享内存时退回 SyntheticSource 自演。
 //
 // 仅在 WIN32 下编译/运行。Linux 上这个文件不参与构建（见 CMakeLists.txt）。
@@ -66,6 +67,52 @@ static void ucf_show_hr(const char* stage, HRESULT hr) {
     wchar_t buf[256];
     swprintf(buf, 256, L"%hs 失败: 0x%08X", stage, (unsigned long)hr);
     MessageBoxW(nullptr, buf, L"UCF Overlay", MB_OK | MB_ICONERROR);
+}
+
+// 热键轮询（edge 触发，键位可在 ucf_overlay.ini 配置）：
+//   HOME   -> 切换菜单显隐；DELETE -> 切换 ESP 绘制层显隐。
+// GetAsyncKeyState 不需要窗口焦点，无焦点的叠加层也能收到。
+static void poll_hotkeys() {
+    auto pressed = [](int vk) -> bool {
+        static bool down[256] = {};
+        if (vk < 0 || vk > 255) return false;
+        bool now  = (GetAsyncKeyState(vk) & 0x8000) != 0;
+        bool edge = now && !down[vk];
+        down[vk] = now;
+        return edge;
+    };
+    if (pressed(g_settings.menu_hotkey)) g_show_menu = !g_show_menu;
+    if (pressed(g_settings.esp_hotkey))  g_settings.esp_visible = !g_settings.esp_visible;
+}
+
+// 点击穿透动态开关：
+//   常态带 WS_EX_TRANSPARENT（整窗不吃鼠标，点击落到游戏/桌面）；
+//   光标进入菜单窗口矩形（或 ImGui 正在拖拽控件）时临时移除，让菜单可交互。
+// 为什么不用 WM_NCHITTEST 返回 HTTRANSPARENT：它只保证同线程窗口间的穿透，
+// 跨进程（文件管理器/游戏）不可靠；动态 WS_EX_TRANSPARENT 是标准做法。
+// 注意：带 WS_EX_TRANSPARENT 时收不到任何鼠标消息，因此只能每帧轮询 GetCursorPos。
+static void update_click_through() {
+    bool interactive = false;
+    if (g_show_menu) {
+        const ucf::MenuRect r = ucf::query_menu_rect();
+        POINT pt{};
+        RECT wr{};
+        if (r.valid && GetCursorPos(&pt) && GetWindowRect(g_hwnd, &wr)) {
+            const float lx = float(pt.x - wr.left), ly = float(pt.y - wr.top);
+            const float pad = 8.0f;
+            interactive = (lx >= r.x - pad && lx <= r.x + r.w + pad &&
+                           ly >= r.y - pad && ly <= r.y + r.h + pad);
+        }
+    }
+    if (ImGui::IsAnyMouseDown()) interactive = true;   // 拖拽滑块过程中保持可交互
+    const LONG_PTR ex   = GetWindowLongPtrW(g_hwnd, GWL_EXSTYLE);
+    const LONG_PTR want = interactive ? (ex & ~(LONG_PTR)WS_EX_TRANSPARENT)
+                                      : (ex | (LONG_PTR)WS_EX_TRANSPARENT);
+    if (want != ex) {
+        SetWindowLongPtrW(g_hwnd, GWL_EXSTYLE, want);
+        SetWindowPos(g_hwnd, nullptr, 0, 0, 0, 0,
+                     SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+    }
 }
 
 static bool init_d3d11(HWND hwnd) {
@@ -183,6 +230,9 @@ static bool init_d3d11(HWND hwnd) {
 }
 
 static void frame() {
+    poll_hotkeys();
+    update_click_through();
+
     ImGui_ImplDX11_NewFrame();
     ImGui_ImplWin32_NewFrame();
     ImGui::NewFrame();
@@ -207,33 +257,21 @@ static void frame() {
     ucf::Viewport vp{0, 0, cw, ch, cw / fw, ch / fh};
 
     ucf::DrawList dl{};
-    if (g_settings.esp_enabled) ucf::build_draw_list(vp, g_marks, n, dl);
+    if (g_settings.esp_enabled && g_settings.esp_visible)
+        ucf::build_draw_list(vp, g_marks, n, dl);
 
     ImDrawList* bdl = ImGui::GetBackgroundDrawList();
     ucf::render_draw_list(bdl, dl);
 
-    // 诊断 HUD：始终绘制，确认渲染管线上线（不依赖菜单显隐）。
-    {
-        char hud[256];
-        std::snprintf(hud, sizeof(hud),
-                     "UCF Overlay  mode:%s  menu:%s\n"
-                     "win:%dx%d  frame:%dx%d\n"
-                     "players:%d  scale:%.2f  src:%s  clear:%s",
-                     g_flip_used ? "FLIP" : "BLT",
-                     g_show_menu ? "ON" : "OFF",
-                     int(cw), int(ch), f.width, f.height,
-                     n, cw / fw,
-                     have_data ? "shm" : "synth",
-                     g_clear_transparent ? "transp" : "black");
-        ImVec2 p(12, 12);
-        bdl->AddRectFilled(p, ImVec2(p.x + 360, p.y + 72), IM_COL32(0, 0, 0, 230));   // 不透明黑底
-        bdl->AddText(ImVec2(p.x + 6, p.y + 6), IM_COL32(255, 255, 255, 255), hud);   // 白字高对比
-    }
-
-    // 强制红框：验证渲染管线是否真的画到屏幕（诊断用，稳定后可删）。
-    bdl->AddRectFilled(ImVec2(100, 100), ImVec2(600, 500), IM_COL32(255, 0, 0, 255));
-
-    ucf::draw_menu(g_settings, g_show_menu);
+    // 诊断信息收进菜单（透明窗口验证通过后，移除全屏 HUD 与强制红框，避免遮挡画面）。
+    static unsigned long last_present_hr = 0;
+    ucf::OverlayStatus st{};
+    st.flip = g_flip_used;
+    st.shm = have_data;
+    st.players = n;
+    st.scale = cw / fw;
+    st.present_hr = last_present_hr;
+    ucf::draw_menu(g_settings, g_show_menu, st);
 
     ImGui::Render();
     // flip 透明路径：清空 (0,0,0,0)；BLT colorkey 路径：清空不透明黑 (0,0,0,255)。
@@ -242,6 +280,7 @@ static void frame() {
     g_ctx->ClearRenderTargetView(g_rtv, clear);
     ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
     HRESULT present_hr = g_swap->Present(1, 0);
+    last_present_hr = (unsigned long)present_hr;
 
     // 心跳日志（相对 exe 目录）：每 120 帧写一行，便于远程确认程序在跑。
     {
@@ -249,9 +288,10 @@ static void frame() {
         if ((dbg_frames++ % 120) == 0) {
             FILE* lf = std::fopen("ucf_debug.log", "a");
             if (lf) {
-                fprintf(lf, "[%ld] mode=%s menu=%d win=%dx%d frame=%dx%d players=%d scale=%.2f src=%s clear=%s present_hr=0x%08X\n",
+                fprintf(lf, "[%ld] mode=%s menu=%d esp=%d win=%dx%d frame=%dx%d players=%d scale=%.2f src=%s clear=%s present_hr=0x%08X\n",
                         dbg_frames, g_flip_used ? "FLIP" : "BLT",
-                        g_show_menu ? 1 : 0, int(cw), int(ch), f.width, f.height,
+                        g_show_menu ? 1 : 0, g_settings.esp_visible ? 1 : 0,
+                        int(cw), int(ch), f.width, f.height,
                         n, cw / fw, have_data ? "shm" : "synth",
                         g_clear_transparent ? "transp" : "black",
                         (unsigned long)present_hr);
@@ -269,7 +309,8 @@ int WINAPI WinMain(HINSTANCE hinst, HINSTANCE, LPSTR, int) {
     wc.lpszClassName = L"UcfOverlay";
     RegisterClassExW(&wc);
 
-    // 全屏、无边框、永远置顶、点击穿透。
+    // 全屏、无边框、永远置顶。WS_EX_TRANSPARENT 是动态开关（见 update_click_through）：
+    // 光标悬停菜单时移除以让菜单可交互，其余时间保持点击穿透。
     // 注意：这里【不能】带 WS_EX_LAYERED —— flip 模型交换链与之互斥（会 0x887A0001）。
     // 透明由 flip 交换链的 alpha 或 BLT 回退时的 colorkey 提供。
     g_hwnd = CreateWindowExW(
@@ -288,6 +329,8 @@ int WINAPI WinMain(HINSTANCE hinst, HINSTANCE, LPSTR, int) {
     ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange;
 
     ucf::load_settings(g_settings, "ucf_overlay.ini");   // 失败则用默认值
+    if (g_settings.menu_hotkey == 0x2D /*VK_INSERT*/)    // 旧 ini 存的是 INSERT：迁移为 HOME
+        g_settings.menu_hotkey = VK_HOME;
     ShowWindow(g_hwnd, SW_SHOW);
 
     MSG msg{};
