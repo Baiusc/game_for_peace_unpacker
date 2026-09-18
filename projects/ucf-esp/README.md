@@ -34,6 +34,11 @@ python tests/test_projection_calibration.py  # 真实对局帧锁死投影数学
 python tests/test_overlay_geometry.py     # 叠加层映射/DPI/失焦隐藏/防闪烁/鼠标穿透，离线
 ```
 
+**C++ D3D11 + ImGui 叠加层（`cpp_overlay/`，性能/功能增强）**：把上面的 Python 叠加层换成 GPU 渲染。
+真实数据链路：`python tools\frida_host.py --game <游戏exe> --shm` 把帧写入 `UcfFrame` 共享内存，
+`ucf_overlay_win32.exe` 读取并渲染。无共享内存时退回合成源自演。详见 `cpp_overlay/README.md` 与
+`docs/REAL_GAME_TEST_GUIDE.md`。
+
 叠加层相关（位置偏移、画到别的窗口、闪烁、点击穿透）都有实测证据与修法记录，
 见 `docs/HOST_OVERLAY.md` 的「框位置和实际对不上 / 画到别的窗口 / 闪烁」一节；
 其中最关键的一条：宿主必须声明 **DPI 感知**（本机 250% 缩放下，

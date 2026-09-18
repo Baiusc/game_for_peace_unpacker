@@ -63,7 +63,7 @@ overlay_win32.*  project_frame()   复刻 esp_core 的列主序投影 + NDC 裁�
                   render_draw_list() 把 2D 原语画到 ImGui 背景绘制层
 shared_state.*   Frame/PlayerState 契约 + 双缓冲传输（Local / Shared）
 overlay_viz.*    build_draw_list() 视口映射 + 框/血条/标签原语
-smooth.*         smooth_angles() / select_target()（只算角度，不注入）
+smooth.*         smooth_angles() / select_target()（只算角度；不写游戏内存/不 Hook；本地输入模拟见根 AGENTS.md §0.1 独立模块，默认 OFF）
 config.*         key=value 配置持久化（ucf_overlay.ini）
 menu_win32.*     ImGui 菜单（HOME/DELETE 切换；缓存菜单矩形给点击穿透命中判定）
 ```

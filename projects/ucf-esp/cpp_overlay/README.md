@@ -61,9 +61,10 @@ build\Release\ucf_overlay_win32.exe
 ```
 
 - 默认：无共享内存时退回 `SyntheticSource` 自演（绕相机旋转的虚拟玩家），
-  用来验证透明窗口 + ImGui 菜单是否出来；
-- 接真实数据：先运行 `python tools/shm_writer.py`（或把你的 `frida_host.py`
-  输出打包进共享内存），C++ 端 `SharedTransport("UcfFrame")` 自动读取；
+  用来验证透明窗口 + ImGui 菜单是否出来（**路线 A，无需游戏**）；
+- 接真实数据（**路线 B**）：先跑 `python tools\frida_host.py --game <游戏exe> --shm`
+  把 Frida 真实帧写入 `UcfFrame`，C++ 端 `SharedTransport("UcfFrame")` 自动切换读取；
+  （`cpp_overlay/tools/shm_writer.py` 仅用于**合成源对齐验证**，不读游戏。）
 - **HOME** 显隐菜单，**DELETE** 显隐 ESP 绘制层（键位在 `ucf_overlay.ini` 可配；菜单里调开关 / 颜色 / FOV / 平滑系数 / 目标选择）。启动默认：菜单显示、ESP 隐藏。
 - 菜单可交互、其余区域点击穿透：每帧轮询光标，悬停菜单矩形时动态移除 `WS_EX_TRANSPARENT`。
 - ESP 子菜单提供独立的“显示方框”和“显示骨骼”；退出设置默认保留配置和日志，END 键或“退出程序 (END)”按钮触发清理退出。共享内存映射始终关闭，不执行共享内存删除。

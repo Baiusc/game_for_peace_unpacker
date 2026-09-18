@@ -2,7 +2,8 @@
 
 > 边界：本文件只分析 `3rd_project` 中 **ESP / Aimbot / 菜单** 三件的**通用算法与架构模式**，
 > **不记录**任何游戏专属偏移、特征码、封包或反作弊对抗手法（仓库约定，见 `AGENTS.md` 第 0 节）。
-> `ucf-esp` 服务自研单机游戏，Aimbot 仍只做目标选择 + 角度计算 + 可视化，**不注入鼠标/输入**。
+> `ucf-esp` 服务自研单机游戏，Aimbot 仍只做目标选择 + 角度计算 + 可视化；不写游戏内存/不 Hook。
+> 本地鼠标模拟（SendInput/mouse_event）按根 AGENTS.md §0.1 授权，为独立 `input_sim/` 模块、默认 OFF。
 
 ---
 
@@ -160,12 +161,13 @@ int select_screen_target(const ScreenCandidate* c, int n,
 - FOV 半径公式（可视化圆与选靶圆同一来源）：`main_win32.cpp:458`
   `fov_radius = (fov / 90.0f) * (min(w,h) * 0.5f)`，菜单 `FOV` 滑块直接驱动。
 - 过滤链（队伍/死亡/可见/最大距离）在调用前完成，与 3rd 通用做法一致。
-- 选靶后仍用**世界坐标**算只读 yaw/pitch（`smooth.cpp` 角度计算函数），不注入。
+- 选靶后仍用**世界坐标**算只读 yaw/pitch（`smooth.cpp` 角度计算函数）；不写游戏内存/不 Hook（本地鼠标模拟见根 AGENTS.md §0.1）。
 - 顺带：`smooth.cpp:60-70` 还保留了 `mode` 分支（0=准星角度最近 / 1=最低血量），说明我们代码同时具备**方案 A 的角度度量**能力，只是默认走方案 B。这是比 3rd 更灵活的一点（可作为菜单可选项）。
 
 ### 与 3rd 的差异（非缺陷，是符合本仓库定位的裁剪）
 - 不读游戏内存、不取 bone 偏移：`PlayerState` 当前是单点（无头/胸区分），取点固定——对自研单机游戏足够。
-- 不做任何注入/输入模拟：3rd 项目选靶后通常接鼠标写入；我们只做可视化与角度输出。
+- 不写游戏内存/不 Hook/不注入到游戏进程：3rd 项目选靶后通常接鼠标写入；我们只做可视化与角度输出。
+  本地鼠标模拟（SendInput/mouse_event，含 triggerbot 式自动左键）按根 AGENTS.md §0.1 授权，须为独立 `input_sim/` 模块、默认 OFF。
 - 不复制任何 3rd 的偏移/特征/反作弊逻辑，仅借鉴上述通用度量模式。
 
 ---
@@ -190,4 +192,4 @@ int select_screen_target(const ScreenCandidate* c, int n,
 - `aim_point_mode=2`：胸部 `bones[8]`；
 - `aim_point_mode=3`：指定 `aim_bone_id` 槽位。
 
-取点先参与过滤和选靶，再用于只读 yaw/pitch 计算；骨骼点无效时不会伪造目标点。整个流程仍不注入鼠标或输入。
+取点先参与过滤和选靶，再用于只读 yaw/pitch 计算；骨骼点无效时不会伪造目标点。整个流程不写游戏内存/不 Hook（本地鼠标模拟见根 AGENTS.md §0.1，独立模块、默认 OFF）。

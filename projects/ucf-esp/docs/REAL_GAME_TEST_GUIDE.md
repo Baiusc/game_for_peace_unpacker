@@ -1,105 +1,69 @@
 # 实机测试行动指南：C++ 叠加层 × UnityCrossFire
 
-> 目标：在 **Windows 虚拟机**里实机跑 `ucf_overlay_win32.exe`，验证 ESP / Aimbot（只读） / 菜单。
+> 目标：在 **Windows（Win11 真机 / 虚拟机）**里跑 `ucf_overlay_win32.exe`，验证 ESP / Aimbot（只读） / 菜单。
 > 不涉及旧的 Python(tkinter) 叠加层。
-> 适用范围：你拥有源码与授权的**单机**游戏 UnityCrossFire；不针对任何联机/第三方进程。
+> 适用：你拥有源码与授权的**单机**游戏 UnityCrossFire；不针对任何联机/第三方进程。
 
 ---
 
-## 0. 重要前提与现状（先读，避免白跑）
+## 0. 当前状态（2026-09-18 更新）
 
-1. **实机环境 = Windows（Win11 虚拟机）**。`ucf_overlay_win32.exe` 是 WIN32/D3D11 程序，
-   Linux 只能跑核心库 ctest（投影/选靶/传输单测），**不能渲染叠加层**。
-2. **真实数据链路当前尚未打通**（关键，决定路线）：
-   - 读端：`cpp_overlay/src/shared_state.cpp` 的 `SharedTransport("UcfFrame")` 已就绪；
-   - 写端：`cpp_overlay/tools/shm_writer.py` **只有合成数据源**（绕相机转的假玩家），不读游戏；
-   - `tools/frida_host.py` 只把帧推给 Python(tkinter) 叠加层，**没有写共享内存的路径**。
-   - 结论：**现在没有任何程序把真实游戏帧写进 `"UcfFrame"`**。
-3. 因此分两条路线（见 §1 / §2）。**§1 现在就能跑**（验证菜单/渲染/选靶逻辑，玩家是假的）；
-   **§2 需要 Codex 先接好 shm 桥**（见 §5 提示词）才能看真实玩家。
+- **shm 桥已代码层接通**：commit `cc2ccc2` 让 `frida_host.py --shm` 把真实帧写入 `UcfFrame`，
+  C++ 端 `SharedTransport` 自动读取；`tests/test_shm_bridge.py` 校验二进制布局。
+  ⇒ 路线 B 的"数据链路"代码已通，**只差你的实机验证**（真机/VM 跑一次确认画面正确）。
+- **路线 A（无游戏烟雾测试）已在 VM 跑通**：透明窗口 + 中文菜单 + HOME/DELETE 分键 +
+  点击穿透 + FOV 圆=选靶圆 + 选中高亮 + HUD 均验证过（合成源）。
+- **真实数据链路"写端"只有 frida_host --shm**：`shm_writer.py` 仍仅合成源，用于"先合成对齐"。
 
 ---
 
-## 1. 路线 A：无游戏烟雾测试（立刻，VM 内）
+## 1. 路线 A：无游戏烟雾测试（已验证，可复跑）
 
-验证透明窗口 + ImGui 菜单 + ESP 渲染 + 选靶逻辑是否正常工作（用内置合成源自演）。
-
-### 步骤
-1. 把 Actions 编出的 `ucf_overlay_win32.exe`（静态链接 `/MT`，VM 无需装 VS/VC++ 运行库）
-   拷到 Win11 虚拟机任意目录。
-2. 双击运行，或 `cmd` 里 `ucf_overlay_win32.exe`。
-3. 默认行为：菜单**显示**、ESP **隐藏**；无共享内存时自动退回 `SyntheticSource` 自演。
-
-### 预期与检查项（逐项对）
-- [ ] **中文正常**：菜单项显示中文（msyh.ttc 等候选加载失败则退回 ASCII 兜底）。
-- [ ] **HOME 切菜单**：按 HOME 显/隐菜单；**DELETE 切 ESP 绘制层**。
-- [ ] **点击穿透**：鼠标悬停菜单区 → 菜单可点/可拖/滑块可用；
-      鼠标在菜单外 → 点击穿透到桌面/游戏，不拦操作。
-- [ ] **ESP 框出现**（按 DELETE 后）：合成玩家绕相机转，框跟随；
-      本地绿 / 队友蓝 / 敌人红（颜色可在菜单调色板改）。
-- [ ] **FOV 圆 = 选靶圆**：菜单里拖 `FOV` 滑块，屏幕上画的 FOV 圈半径与选靶半径同公式
-      （`main_win32.cpp` 的 `fov_radius = (fov/90)*min(w,h)*0.5`）。
-- [ ] **选靶高亮**：在 FOV 圆内、距屏幕中心最近的合成玩家被标记为当前目标（Aimbot 只读可视化）。
-- [ ] **HUD 不重叠**：诊断行在右下角，不与菜单重叠；有 `FPS:xx.x`。
-- [ ] **配置持久化**：改开关/颜色后退出（END 或"退出程序"按钮），`ucf_overlay.ini` 被写出；
-      重开 exe 设置保留。
-
-### 局限
-玩家坐标是合成源，**不是真实游戏数据**。只能证明"渲染/菜单/选靶算法"通了。
+VM 里直接跑 `ucf_overlay_win32.exe`（无共享内存时自动 `SyntheticSource` 自演）。
+检查项：中文菜单、HOME 切菜单 / DELETE 切 ESP、点击穿透、FOV 圆=选靶圆、选中高亮、
+HUD 右下不重叠、配置写 `ucf_overlay.ini`。**局限：玩家是合成的**，只证渲染/菜单/选靶算法。
 
 ---
 
-## 2. 路线 B：接真实游戏数据（需先打通 shm 桥）
+## 2. 路线 B：接真实游戏（你今晚实机做）
 
-### 2.1 先让 Codex 接桥（见 §5 提示词）
-让 `frida_host.py` 在收到真实帧后，把 `w2c/proj/local/players` 用
-`shm_writer.build_frame` 的**同一二进制布局**写进命名共享内存 `"UcfFrame"`
-（双缓冲：写后台槽→翻转 `cur`）。C++ 端 `SharedTransport` 自动读取并切到真实帧。
+### 2.1 frida_host.py 仍必须跑；frida_probe.py 一般不用
+- C++ 叠加层是**纯消费端**，只从 `"UcfFrame"` 读 `Frame`，自己不碰游戏进程、不注入 frida。
+  所以**今天仍需要 `frida_host.py`**（注入+读游戏），只是它现在用 `--shm` 把帧写共享内存，
+  而不是只喂 tkinter。
+- `frida_probe.py` 是诊断"该注哪个进程"的辅助工具；昨天已跑通，**今晚不必每次跑**，
+  只有当出现"IL2CPP module not loaded / 注进空壳"时才用 `--list` / `--probe` 排查。
 
 ### 2.2 准备「关闭反作弊」的游戏构建（必须）
-- 你游戏内置 Anti-Cheat Toolkit（`InjectionDetector` / `WallHackDetector`）。
-- 开发期请用**关闭反作弊**的构建：在 Unity 工程里关掉这两个 Detector，
-  或用 `#if !DEVELOPMENT_BUILD` 包住初始化后重新构建，把 exe 拷到 VM。
-- 否则 Frida 注入会被检测误报（闪退/弹窗），与本工具无关。
+内置 Anti-Cheat Toolkit（`InjectionDetector` / `WallHackDetector`）。
+开发期用关闭反作弊的构建；否则 `--level 0` 闪退即被检测，**不要对抗**，回 Unity 工程关 Detector 重编。
 
-### 2.3 VM 启动顺序
+### 2.3 VM / 真机启动顺序
 ```powershell
-# 终端 1：启动游戏并注入 frida（注入后把真实帧写进 "UcfFrame"）
+# 终端 1：启动/附加游戏 + 注入 frida + 把真实帧写进 "UcfFrame"（默认关 tkinter 层）
 python tools\frida_host.py --game "C:\路径\UnityCrossFire.exe" --shm
-#   （先正常启动游戏；进入对局后按 INS 注入；Ctrl+C 退出时关闭共享内存映射）
+#   进对局后按 INS 注入；Ctrl+C 退出时关闭映射（不删除共享内存对象）
 
-# 终端 2：运行 C++ 叠加层（检测到 "UcfFrame" 即自动从合成源切到真实帧）
+# 终端 2：C++ 叠加层（检测到 "UcfFrame" 自动从合成源切到真实帧）
 ucf_overlay_win32.exe
 ```
-> 注：`--shm` 是 Codex 要新增的开关（见 §5）。在此之前，`shm_writer.py` 只是合成源，
-> 用它跑 C++ 叠层只能验证「Python↔C++ 二进制布局对齐」，看不到真实玩家。
 
 ### 2.4 验证清单
-**ESP（真实）**
-- [ ] 框跟随真实玩家；本地绿/队友蓝/敌人红正确。
-- [ ] 血条（`hp/maxHp`）、距离（`|local.pos - p.pos|`）正确显示。
-- [ ] 骨骼（若 `bones` 数据就绪）画出骨架。
-- [ ] 框位置与游戏内物体对得上（若游戏渲染分辨率 ≠ 桌面分辨率，可能有偏移，见 §3 隐患）。
-
-**Aimbot（只读，不注入）**
-- [ ] 菜单开「显示 FOV / 目标选择」。
-- [ ] FOV 圆内、距屏幕中心最近的目标被高亮为当前目标。
-- [ ] 选中后只读 yaw/pitch 计算并在 HUD/调试信息显示；**不移动鼠标、不注入输入**。
-
-**菜单（真实帧下）**
-- [ ] 所有开关/滑块在真实数据流下仍可用。
-- [ ] 中文、热键、点击穿透、配置保存全部正常。
+**ESP（真实）**：框跟随真实玩家（本地绿/队友蓝/敌人红）；血条、距离正确；骨骼（若数据就绪）画出；
+框位置与游戏内物体对得上（若游戏渲染分辨率 ≠ 桌面分辨率可能偏移，见 §3 隐患）。
+**Aimbot（只读）**：菜单开「显示 FOV / 目标选择」；FOV 圆内距屏心最近者高亮；只读 yaw/pitch 显示；
+不写游戏内存/不 Hook（本地鼠标模拟按根 AGENTS.md §0.1 授权，默认 OFF）。
+**菜单**：所有开关/滑块在真实数据流下可用；中文、热键、点击穿透、配置保存正常。
 
 ### 2.5 已知隐患 / 待校准（实测时留意）
-- **分辨率映射**：C++ 叠加层是全屏透明窗口，投影用 `Frame.width/height`
-  （你游戏实测 800×600）。若桌面分辨率 ≠ 游戏分辨率，框可能整体偏移/缩放。
-  建议先**窗口化、且游戏分辨率设为与桌面一致**跑第一轮；偏移校准是后续活。
-- **字体**：VM 若缺 `msyh.ttc/msyh.ttf/simhei.ttf/simsun.ttc`，菜单退回 ASCII 兜底。
-- **调试日志**：exe 同目录会写 `ucf_debug.log`（flip/BLT、present 返回值、每 120 帧心跳）；
+- **分辨率映射（最高优先）**：C++ 叠加层用 `Frame.width/height`（游戏渲染分辨率，实测 800×600）
+  投影到全屏 swapchain。若桌面分辨率 ≠ 游戏分辨率，框可能整体偏移/缩放。
+  第一轮建议**窗口化且游戏分辨率=桌面分辨率**；偏移校准见下方 §4 与 `HOST_OVERLAY.md`「框位置对不上」。
+- **字体**：VM/真机若缺 `msyh.ttc` 等，菜单退回 ASCII 兜底。
+- **调试日志**：exe 同目录 `ucf_debug.log`（flip/BLT、present 返回值、每 120 帧心跳）；
   菜单点不中或收不到数据时，把现象 + 该 log 发回分析。
-- **SharedTransport 未跨进程实测**：`SharedTransport` 只在 Windows 编译，Linux ctest 只覆盖
-  `LocalTransport` 进程内双缓冲。真实跨进程可能有对齐/字节序/槽语义细节 bug——
-  所以务必先做 §4 的「先合成、后真实」两段校验。
+- **SharedTransport 未跨进程实跑过**：Linux ctest 只覆盖 `LocalTransport` 进程内双缓冲；
+  真实跨进程可能有对齐/字节序/槽语义细节 bug——所以务必先做 §4 的「先合成、后真实」。
 
 ---
 
@@ -107,103 +71,102 @@ ucf_overlay_win32.exe
 
 | 现象 | 含义 | 处理 |
 |---|---|---|
-| `--level 0` 就闪退 | 注入本身被检测（ACTK `InjectionDetector`） | **不要对抗**；换关闭反作弊的构建 |
+| `--level 0` 就闪退 | 注入本身被检测（ACTK `InjectionDetector`） | 换关闭反作弊的构建 |
 | 注入前不注入也闪退 | 游戏自身问题 | 与本工具无关 |
-| `--level 2` 活、`--level 3` 崩 | 崩在取单例/遍历玩家/读坐标 | 看 `Player.log`，按 `--probe` 定位 |
-| `Player.log` 干净、进程静默消失 | 外部终止（反作弊 `Application.Quit`/taskkill） | 关反作弊 |
+| `--level 2` 活、`--level 3` 崩 | 崩在取单例/遍历玩家/读坐标 | 看 `Player.log`，`--probe` 定位 |
+| `Player.log` 干净、进程静默消失 | 外部终止（反作弊/ taskkill） | 关反作弊 |
 
-`Player.log` 路径：`%LOCALAPPDATA%\..\LocalLow\Alexander_GaGa\UnityCrossFire\Player.log`
-详细二分法见 `docs/HOST_OVERLAY.md` 的 `--level` / `--probe` 两节。
+`Player.log`：`%LOCALAPPDATA%\..\LocalLow\Alexander_GaGa\UnityCrossFire\Player.log`
+详细二分法见 `docs/HOST_OVERLAY.md` 的 `--level` / `--probe`。
 
 ---
 
 ## 4. 数据契约对齐校验（关键，避免读到乱帧）
 
-C++ 读到的字节必须和 Python 写出的**逐字节一致**，否则框会乱飞或崩溃。
+C++ 读到的字节必须和 Python 写出的**逐字节一致**。
 
 **两段验证法（强烈建议）：**
-1. **先合成对齐**：VM 上跑 `shm_writer.py`（合成源，自带）+ `ucf_overlay_win32.exe`，
-   确认 ESP 框出现且坐标合理（合成源坐标已知），证明二进制布局跨语言对齐。
-2. **后换真实**：再切到 `frida_host.py --shm` 的真实帧。
+1. **先合成对齐**：VM 上 `python cpp_overlay\tools\shm_writer.py`（合成源）+ `ucf_overlay_win32.exe`，
+   确认 ESP 框出现且坐标合理（合成源坐标已知），证跨语言布局对齐。
+2. **后换真实**：再 `frida_host.py --shm` 的真实帧。
 
-对齐要点：
-- Python 侧布局：`cpp_overlay/tools/shm_writer.py` 的 `FRAME_FMT` / `SLOT_FMT`
-  （`"<i" + Frame`，小端、4 字节对齐）。
-- C++ 侧布局：`cpp_overlay/src/shared_state.cpp` 的 `FrameSlots`
-  （`int cur + Frame`，列主序矩阵）。
-- 两者必须一致；改任一边的结构体都要同步另一边，并跑 `cpp_overlay` ctest 的传输用例。
+对齐要点：Python `shm_writer.FRAME_FMT` / `SLOT_FMT`（小端、4 字节对齐）<==> C++ `shared_state.cpp` 的
+`FrameSlots`（`int cur + Frame`）。改任一边都要同步并跑 cpp_overlay ctest 传输用例。
 
 ---
 
-## 5. 给 Codex 的提示词（接 shm 桥，打通真实数据）
+## 5. 给 Codex 的提示词（剩余工作，非"接桥"——桥已完成）
 
-> 把下面整段直接发给 Codex（或任何 coding agent）。只动 `frida_host.py`，
-> 复用 `shm_writer.py` 的二进制布局，**不要改 C++ 侧契约**。
+> 下面三段直接发给 Codex（或任一 coding agent）。**只动 cpp_overlay/ 与 tests/，不碰 frida/游戏进程。
+> Aimbot 角度计算与选靶保持纯计算（不写游戏内存/不 Hook）；本地鼠标模拟（SendInput/mouse_event）按根 AGENTS.md §0.1 授权，
+> 实现为独立 `input_sim/` 模块、菜单开关、**默认 OFF**，不混入纯计算模块**。
 
+### 5.1 高优先：C++ 叠加层视口映射校准（真实分辨率偏移）
 ```
-# 任务：把 frida_host.py 读到的真实游戏帧写进命名共享内存 "UcfFrame"，
-#       让 cpp_overlay 的 SharedTransport 自动读取（打通真实数据链路）。
-# 仓库：game_for_peace_unpacker / projects/ucf-esp
-# 边界：仅用于作者自研单机游戏 UnityCrossFire；不针对任何联机/第三方进程；
-#       本仓库 Aimbot 只做目标选择+角度计算+可视化，不注入鼠标/输入。
+任务：让 C++ 叠加层的 ESP 框在「游戏渲染分辨率 ≠ 桌面分辨率」时仍对齐游戏物体。
+仓库：game_for_peace_unpacker / projects/ucf-esp/cpp_overlay
+背景：overlay_win32 project_frame() 当前用 Frame.width/height（游戏内渲染分辨率，实测 800x600）
+      直接投影到全屏 D3D11 swapchain；桌面分辨率不同时框整体偏移/缩放。
+参考：Python 侧 tools/overlay_tk.py 的 compute_viewport() 已实现 letterbox/stretch 映射
+      （见 docs/HOST_OVERLAY.md「框位置对不上」）：按游戏窗口客户区算映射，
+      auto=宽高比一致走 stretch、否则 letterbox 等比居中（保留黑边）。
+要求：
+1. 在 overlay_win32 / overlay_viz 的 build_draw_list 视口映射处，引入与 Python 等价的映射：
+   已知 Frame.width/height 与 swapchain 的 cw/ch，计算 scale 与 offset（letterbox 等比居中）。
+   所有 ScreenMark 的屏幕坐标乘以 scale 再加 offset，使 ESP 框贴合游戏内物体。
+2. 菜单增加"overlay-fit"选项（auto/stretch/letterbox），默认 auto；可加 overlay-rect 手动指定。
+3. 不得破坏 NDC 裁剪、不得改投影数学（world_to_screen 保持原样，只改"屏幕坐标→swapchain 像素"的映射）。
+4. 单测：在 tests/ 加一个纯函数映射测试（compute_viewport 等价逻辑），覆盖 800x600→2880x2160 letterbox、
+   auto 阈值、强制 stretch 三种情形；Linux 可跑。
+验证：VM 上游戏窗口化且分辨率≠桌面，框与物体对齐；单测通过；Linux ctest 全过。
+```
 
-## 背景（必读）
-- cpp_overlay 已通过 SharedTransport("UcfFrame") 从 Windows 命名共享内存读帧。
-- 但写端 cpp_overlay/tools/shm_writer.py 只有合成数据源（不读游戏）；
-- tools/frida_host.py 只把帧推给 Python(tkinter) 叠加层，没有写共享内存的路径。
-- 需要新增一条「frida 真实帧 → "UcfFrame" 共享内存」的链路。
+### 5.2 实机反馈后的 bug 修复（通用模板）
+```
+任务：根据用户实机跑 C++ 叠加层的反馈修复问题（ESP/菜单/选靶/透明窗口相关）。
+仓库：game_for_peace_unpacker / projects/ucf-esp/cpp_overlay
+输入：用户会提供 (a) ucf_debug.log 日志片段 (b) 现象描述与截图 (c) 复现步骤。
+边界：仅用于自研单机游戏；Aimbot 角度/选靶纯计算（不写游戏内存/不 Hook）；不做任何反作弊对抗。
+      本地鼠标模拟按根 AGENTS.md §0.1 授权（独立 input_sim/ 模块、默认 OFF），不在本节默认启用。
+步骤：
+1. 先读 docs/CPP_OVERLAY.md（透明窗口/flip-blt/点击穿透/中文字体）与 docs/PITFALLS.md（跨模块踩坑表）定位已知坑。
+2. 若涉及"框位置偏移"→ 优先看 5.1 的视口映射是否未做；
+   若"菜单点不中"→ 看 update_click_through() 的菜单矩形轮询逻辑；
+   若"全屏黑/看不见"→ 看 init 日志 used=/clear= 判定 flip/blt 路径；
+   若"中文 ???? "→ 看 init_overlay_fonts() 字体候选。
+3. 改后必须：Linux 跑 cpp_overlay ctest 全过；Windows 渲染层改动走 Actions 重编（只改 cpp_overlay/** 触发）。
+4. 不擅自扩大范围；改动同步到对应 deep-doc 的「排错」并追加 PITFALLS.md 第二节。
+```
 
-## 二进制布局（严格复用，不得自创）
-- 复用 cpp_overlay/tools/shm_writer.py 里的 build_frame() / FRAME_FMT / SLOT_FMT /
-  PS_FMT / BONE_FMT / N_PLAYERS / N_BONES / SHM_NAME="UcfFrame" / SHM_SIZE。
-- 帧结构：int cur(4B) + Frame；Frame = w2c[16]f + proj[16]f + width i + height i
-  + inGame ? + 3x + local PlayerState + players[64] PlayerState + playerCount i。
-  PlayerState = pos[3]f + team i + hp i + maxHp i + isDead ? + name[32]s + 3x
-  + bones[19](pos[3]f + valid ? + 3x)。全部小端 <、4 字节对齐。
-- C++ 侧对应 cpp_overlay/src/shared_state.cpp 的 FrameSlots，必须逐字节一致。
+### 5.3 可选增强：框标签中文名 + 框随距离缩放（契约同步）
+```
+任务：增强 ESP 绘制（可选，非阻塞）。
+仓库：projects/ucf-esp/cpp_overlay
+1. 框标签显示玩家名：PlayerState.name[32] 已有字段；overlay_viz 当前用 ASCII 的 kind/hp/距离标签
+   是为保 overlay_tests 对标签格式的断言。若要显示中文名，需同步放宽/更新 tests 的标签断言，
+   并确认 name 在 frida_host --shm 的真实帧里被正确填充（查 shm_writer._ps_items 的 name 打包）。
+2. 框随距离缩放：当前框固定尺寸（overlay_tests 断言 boxes[0].w==40）。若要近大远小，
+   需先改 tests/overlay_tests.cpp 的断言再改 overlay_viz 的尺寸计算，保证 ctest 仍过。
+要求：两项都需"先改测试契约、再改实现"，并跑 Linux ctest 确认无回归。Aimbot 仍只读。
+```
 
-## 要做的改动（additive，不破坏现有行为）
-1. 给 tools/frida_host.py 增加 `--shm` 开关（默认关，保持现有 tkinter 叠加层路径不变）。
-2. 当 --shm 开启时：在 on_message 收到 frida 帧（已含 w2c[16]/proj[16]/local/players，
-   以及 Screen 的 width/height）后，调用 shm_writer 的 build_frame() 打包成 bytes，
-   用 mmap(-1, SHM_SIZE, tagname="UcfFrame") 打开（不存在则创建），
-   写入后台槽（slot = 1 - cur）后翻转 cur（与 shm_writer 的双缓冲语义一致）。
-3. 把 build_frame / FRAME_FMT 等抽取到一个双方 import 的共享模块
-   （如 tools/shm_frame.py），shm_writer.py 与 frida_host.py 都从它 import，
-   避免两份布局漂移。
-4. 退出（Ctrl+C）时关闭 mmap 映射、释放资源。共享内存对象本身不主动删除
-   （与 cpp_overlay 注释一致：映射始终关闭，不执行删除）。
-5. frida_host 已有的 --no-overlay / --level / --interval / --probe 等参数全部保留。
-
-## 验证（在 Windows VM 上）
-- 单元层：在 Linux 也能跑一个纯布局断言（import tools.shm_frame，打包一个已知帧，
-  断言 len == SHM_SIZE、与 shared_state.cpp 的 FrameSlots 大小一致）。
-- 集成层（VM）：
-  a. 先 `python cpp_overlay/tools/shm_writer.py`（合成源）+ ucf_overlay_win32.exe，
-     确认 C++ 框出现且坐标合理（证明跨语言布局对齐）。
-  b. 再 `python tools/frida_host.py --game <path> --shm`，进入对局按 INS 注入，
-     确认 C++ 叠加层从合成源切到真实帧、框跟随真实玩家。
-- 若 C++ 收不到数据：检查 "UcfFrame" 是否被创建、SHM_SIZE 是否 4+Frame、
-  字节序/对齐是否与 FrameSlots 一致（用 a 步的合成对齐先排查）。
-
-## 不要做
-- 不要修改 cpp_overlay/src 任何文件（契约已定）。
-- 不要引入新的网络/文件传输，只用 "UcfFrame" 命名共享内存。
-- 不要把 frida agent 注入任何非自有进程。
-
-## 交付
-- 改完跑：仓库根 `python projects/ucf-esp/tests/test_dump_contract.py` 仍过；
-  新增/复用的布局断言通过。
-- 给出 VM 上验证 a/b 两步的结果截图或日志摘要。
+### 5.4 可选：真实帧 fixtures 补全
+```
+任务：扩充真实帧回归样本。
+仓库：projects/ucf-esp
+做法：用 frida_host.py --dump-frame DIR --game <exe> --shm 在真实对局里落盘原始 Frame JSONL；
+      挑有代表性场景（多队友/多敌人/不同距离/骨骼齐全）的帧，转成 tests/fixtures/real_frame_*.json；
+      在 tests/test_projection_parity.py 中增加用例（阈值 1e-5，与 C++ world_to_screen 对齐）。
+注意：落盘的是原始 Frame，不是投影后的 marks；写临时文件后原子替换，避免半个 JSON。
 ```
 
 ---
 
 ## 6. 你现在（人）的最小行动清单
 
-1. 下载最新 `ucf_overlay_win32.exe`（Actions run #11+，已含中文/分键/穿透/选靶）。
-2. **路线 A**（无需游戏）：VM 里跑 exe，按 §1 清单逐项验证。把现象/截图发回。
-3. 若路线 A 有问题（尤其点击穿透、中文、FOV圆≠选靶圆）→ 发 `ucf_debug.log` + 截图。
-4. 想看真实玩家 → 先把 §5 提示词发给 Codex 接 shm 桥；桥通后再按 §2 跑真实对局，
-   重点核对 §4 的「先合成、后真实」两段校验。
-5. 真实游戏务必用**关闭反作弊**的构建；`--level 0` 闪退即说明反作弊还在。
+1. 下载最新 `ucf_overlay_win32.exe`（Actions 已含 --shm 链路）。
+2. **路线 A 复跑**（VM/真机均可，无需游戏）：核对 §1 清单，确认合成源下一切正常。
+3. **路线 B 实机**（今晚 Win11 真机）：按 §2.3 两条命令，重点核对 §4「先合成、后真实」，
+   并盯 §2.5 的分辨率映射隐患。
+4. 若框偏移 → 把现象+`ucf_debug.log` 发回，按 §5.2 让 Codex 修（很可能就是 §5.1 的视口映射未做）。
+5. 游戏务必用**关闭反作弊**构建；`--level 0` 闪退即反作弊还在。
