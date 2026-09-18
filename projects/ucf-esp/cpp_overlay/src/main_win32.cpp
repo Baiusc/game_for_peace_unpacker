@@ -19,6 +19,7 @@
 #include <dxgi1_3.h>           // CreateDXGIFactory2
 #include <dwmapi.h>
 #include <cwchar>               // swprintf
+#include <cstdio>               // snprintf / fopen（诊断日志）
 #include <imgui.h>
 #include <imgui_impl_win32.h>
 #include <imgui_impl_dx11.h>
@@ -36,6 +37,7 @@ static ucf::Settings            g_settings{};
 static bool                     g_show_menu = true;
 static ucf::SyntheticSource     g_synth{};
 static ucf::ScreenMark          g_marks[ucf::MAX_PLAYERS + 1]{};
+static bool                     g_flip_used = false;   // 交换链实际用的模型（诊断 HUD 用）
 
 // ImGui_ImplWin32_WndProcHandler 已在 <imgui_impl_win32.h> 中声明，直接调用即可。
 static LRESULT CALLBACK wndproc(HWND h, UINT m, WPARAM w, LPARAM l) {
@@ -116,7 +118,7 @@ static bool init_d3d11(HWND hwnd) {
     sd.Format     = DXGI_FORMAT_B8G8R8A8_UNORM;
     sd.SampleDesc.Count   = 1;
     sd.BufferUsage        = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-    sd.Flags              = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
+    sd.Flags              = 0;   // flip 模型不允许 ALLOW_MODE_SWITCH，否则 INVALID_CALL
 
     // 方案 A：flip 模型 + 预乘 alpha，原生逐像素透明。
     sd.BufferCount = 2;                       // flip 模型要求 >= 2
@@ -124,6 +126,7 @@ static bool init_d3d11(HWND hwnd) {
     sd.SwapEffect  = DXGI_SWAP_EFFECT_FLIP_DISCARD;
     sd.AlphaMode   = DXGI_ALPHA_MODE_PREMULTIPLIED;
     hr = factory->CreateSwapChainForHwnd(g_device, hwnd, &sd, nullptr, nullptr, &g_swap);
+    g_flip_used = SUCCEEDED(hr);
 
     if (FAILED(hr)) {
         // 方案 B 回退：blt 模型，兼容性最好；透明由 DwmExtendFrameIntoClientArea 实现。
@@ -167,6 +170,36 @@ static void frame() {
 
     ImDrawList* bdl = ImGui::GetBackgroundDrawList();
     ucf::render_draw_list(bdl, dl);
+
+    // 诊断 HUD：始终绘制，确认渲染管线上线（不依赖菜单显隐）。
+    {
+        char hud[256];
+        std::snprintf(hud, sizeof(hud),
+                     "UCF Overlay  mode:%s  menu:%s\n"
+                     "players:%d  scale:%.2f  shm:%s",
+                     g_flip_used ? "FLIP" : "BLT",
+                     g_show_menu ? "ON" : "OFF",
+                     n, cw / float(f.width),
+                     shm.ok() ? "yes" : "no(synth)");
+        ImVec2 p(12, 12);
+        bdl->AddRectFilled(p, ImVec2(p.x + 300, p.y + 54), IM_COL32(0, 0, 0, 150));
+        bdl->AddText(p + ImVec2(6, 6), IM_COL32(90, 255, 130, 255), hud);
+    }
+
+    // 心跳日志（相对 exe 目录）：每 120 帧写一行，便于远程确认程序在跑。
+    {
+        static long dbg_frames = 0;
+        if ((dbg_frames++ % 120) == 0) {
+            FILE* lf = std::fopen("ucf_debug.log", "a");
+            if (lf) {
+                fprintf(lf, "[%ld] mode=%s menu=%d players=%d scale=%.2f\n",
+                        dbg_frames, g_flip_used ? "FLIP" : "BLT",
+                        g_show_menu ? 1 : 0, n, cw / float(f.width));
+                fclose(lf);
+            }
+        }
+    }
+
     ucf::draw_menu(g_settings, g_show_menu);
 
     ImGui::Render();
