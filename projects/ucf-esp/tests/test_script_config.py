@@ -209,8 +209,12 @@ def test_perf_guards():
            "0x18 是 RaycastHit.m_FaceID，不能当作距离")
     expect("hitDistance <= 0.001" in src and "visible 暂按 true" in src,
            "无效 RaycastHit 距离必须 fail-open，不能把所有目标过滤掉")
-    expect("VIS_TARGET_COLLIDER_TOLERANCE = 1.5" in src,
-           "Linecast 目标末端必须保留碰撞体容差，不能把目标自身当墙")
+    expect("VIS_ROOT_COLLIDER_TOLERANCE = 1.5" in src,
+           "Linecast 根节点必须保留碰撞体容差，不能把目标自身当墙")
+    expect("VIS_BONE_COLLIDER_TOLERANCE = 0.35" in src,
+           "Linecast 骨位必须保留碰撞体容差")
+    expect("VISIBILITY_POINT_BONES = [11, 9, 0]" in src,
+           "Linecast 必须使用头胸髋多取点")
     print("  PASS 方法缓存 / 骨骼节流 / 分段计时锚点齐全，且骨骼不再每帧无条件读")
 
 

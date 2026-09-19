@@ -1,0 +1,439 @@
+diff --git a/projects/ucf-esp/docs/3RD_VISIBILITY_ANALYSIS.md b/projects/ucf-esp/docs/3RD_VISIBILITY_ANALYSIS.md
+new file mode 100644
+index 0000000..53db576
+--- /dev/null
++++ b/projects/ucf-esp/docs/3RD_VISIBILITY_ANALYSIS.md
+@@ -0,0 +1,80 @@
++# 3rd 可见性实现对照与 UCF 修复记录
++
++## 1. 参考过程
++
++本轮只读检查了以下实现，未复制项目专属偏移、地址或反作弊逻辑：
++
++| 项目 | 文件 | 可见性判定 |
++|---|---|---|
++| CS2_Lumen | `3rd_project/CS2_Lumen_External/Features/Aimbot.h` | 读取实体 spotted 位；在选靶过滤阶段直接跳过不可见目标 |
++| Khytt | `3rd_project/Khytt External v3.0/src/sdk/game.h`、`src/features/aimbot.cpp` | 读取 spotted mask；不可见目标不进入候选集 |
++| Valorant | `3rd_project/Valorant_External/Game/cheat.hpp` | 比较 `last_submit_time` 与 `last_render_time`，以约 0.06 秒阈值判断 |
++| DeltaForce | `3rd_project/DeltaForce_External/DeltaForce_External/Game/Engine.cpp` | `IsVisable(MeshPtr)` 为真时才参与选靶，并按状态绘制颜色 |
++
++四个项目的共同结构是：
++
++```text
++游戏/引擎维护的可见性状态 -> 统一 bool 谓词 -> 选靶过滤 -> 状态着色
++```
++
++它们并不是“对玩家根节点做一条物理射线”。
++
++## 2. UCF 原实现为何会多数黄色
++
++UCF 的 `Frame/PlayerState` 没有原生 `visible` 字段，也没有 dump 中已验证的
++`lastSubmitTime/lastRenderTime` 或 spotted mask。因此不能直接照搬 3rd 的字段。
++
++原实现只能使用：
++
++```text
++Camera.transform.position
++  -> Physics.Linecast(camera, player.get_transform().position)
++  -> RaycastHit.m_Distance 与总距离比较
++```
++
++问题在终点选择，而不只是 `m_Distance` 偏移：玩家根 Transform 通常在脚底或角色容器
++根部，Linecast 可能先撞到目标自己的胶囊体/触发器。此前只给根节点 1.5m 末端容差，
++仍不足以覆盖不同模型的根节点偏移；单条射线也无法表达“脚被矮墙挡住但头仍可见”。
++
++## 3. 本轮采用的通用修复
++
++参考 3rd 的“按瞄准骨位判断可见”思想，但不复制游戏专属字段：
++
++1. 保留 root 作为无骨骼回退点。
++2. 额外尝试现有 `Animator.GetBoneTransform` 的 Head、Chest、Hips。
++3. 每个点独立执行同一条 Unity `Physics.Linecast`。
++4. 任一取点没有命中障碍，或命中位置只落在目标自身末端容差内，则返回 `visible=true`。
++5. 所有有效取点都在目标之前命中，才返回 `visible=false`。
++6. 所有命中距离无效时 fail-open，避免 32-bit bridge 的 `RaycastHit` 回写异常把全场变黄。
++
++参数：
++
++```text
++root: 1.5m       // 根节点可能位于脚底
++bone: 0.35m      // 骨位在身体内部，使用更小的末端容差
++```
++
++## 4. 为什么没有直接采用 render-time/spotted
++
++这些字段属于各自游戏的实体或 Mesh 数据。当前 UCF `dump.cs` 与
++`docs/STATIC_REFERENCE.md` 没有已验证的等价字段；凭名称猜偏移会把未知值伪装成
++可见性，风险高于通用物理取点。因此本轮只改 `frida_dump.js` 的 Unity API 路径，不改
++Frame 契约，不新增未验证偏移。
++
++## 5. 实机诊断
++
++刷新周期仍由 `--vis-refresh-ms` 控制。首次刷新会打印：
++
++```text
++[*] 可见性样本 point/hitDistance/total= bone11 ... visible=true
++```
++
++若仍全部黄色，会看到：
++
++```text
++visible=false（所有取点均被提前命中）
++```
++
++此时应检查 Unity 物理层是否把角色/触发器算作障碍，而不是继续无限增大容差。
++当前 Linecast 使用 `-5` layer mask 和 `QueryTriggerInteraction.UseGlobal`；若确认触发器
++造成误判，应在自研游戏物理层配置中排除触发器或提供已验证的障碍层。
+diff --git a/projects/ucf-esp/docs/PITFALLS.md b/projects/ucf-esp/docs/PITFALLS.md
+index 701fa31..97d3394 100644
+--- a/projects/ucf-esp/docs/PITFALLS.md
++++ b/projects/ucf-esp/docs/PITFALLS.md
+@@ -264,3 +264,9 @@
+ - 命名共享内存会跨进程保留；旧宿主退出后槽位仍可能含最后一帧。生产者启动/退出时把 `cur` 置为 `-1`，C++ 读到后回退 replay/synth，不继续显示 stale shm。
+ - `Physics.Linecast` 终点使用玩家根 Transform 时，命中目标自己的胶囊体不等于墙体。可见性判断要保留目标末端容差；本版本使用 1.5m，并记录首个 `hitDistance/total` 样本供实机校准。
+ - C++ 日志中的 `esp=0` 代表叠加层开关关闭，不是 D3D Present 失败；`present_hr=0` 且 `startup: overlay initialized` 表示窗口和渲染循环正常。
++
++## 2026-09-19 可见性多取点修复
++
++- 3rd 项目通常读取游戏维护的 spotted/render-time 布尔状态；UCF 当前没有已验证的等价字段，不能猜偏移。`Physics.Linecast` 只能作为通用回退。
++- 单独向玩家根 Transform（通常是脚底）发射一条线，会先命中目标自己的胶囊体，导致大多数目标误判黄色。当前改为 root + Head/Chest/Hips 多取点，任一有效射线抵达目标即为 visible；只有所有有效取点都被提前命中才判 BLOCKED。
++- 根节点使用 1.5m 末端容差，骨位使用 0.35m；所有 RaycastHit 距离无效时继续 fail-open。首次样本日志用于判断是自碰撞、触发器还是实际墙体。
+diff --git a/projects/ucf-esp/tests/test_script_config.py b/projects/ucf-esp/tests/test_script_config.py
+index 2d5d8be..0c88c01 100644
+--- a/projects/ucf-esp/tests/test_script_config.py
++++ b/projects/ucf-esp/tests/test_script_config.py
+@@ -209,8 +209,12 @@ def test_perf_guards():
+            "0x18 是 RaycastHit.m_FaceID，不能当作距离")
+     expect("hitDistance <= 0.001" in src and "visible 暂按 true" in src,
+            "无效 RaycastHit 距离必须 fail-open，不能把所有目标过滤掉")
+-    expect("VIS_TARGET_COLLIDER_TOLERANCE = 1.5" in src,
+-           "Linecast 目标末端必须保留碰撞体容差，不能把目标自身当墙")
++    expect("VIS_ROOT_COLLIDER_TOLERANCE = 1.5" in src,
++           "Linecast 根节点必须保留碰撞体容差，不能把目标自身当墙")
++    expect("VIS_BONE_COLLIDER_TOLERANCE = 0.35" in src,
++           "Linecast 骨位必须保留碰撞体容差")
++    expect("VISIBILITY_POINT_BONES = [11, 9, 0]" in src,
++           "Linecast 必须使用头胸髋多取点")
+     print("  PASS 方法缓存 / 骨骼节流 / 分段计时锚点齐全，且骨骼不再每帧无条件读")
+ 
+ 
+diff --git a/projects/ucf-esp/tools/frida_dump.bundle.js b/projects/ucf-esp/tools/frida_dump.bundle.js
+index c7c1439..357da31 100644
+--- a/projects/ucf-esp/tools/frida_dump.bundle.js
++++ b/projects/ucf-esp/tools/frida_dump.bundle.js
+@@ -3657,66 +3657,116 @@ ${this.isEnum ? `enum` : this.isStruct ? `struct` : this.isInterface ? `interfac
+         console.log(`[*] 矩阵读取模式: ${matMode}` + (ok ? "（out 指针，32 位下最稳）" : "（回退：按值返回的公开 getter）"));
+       };
+       let visibilityOrigin = null;
+-      let visibilityWarned = false;
+-      let visibilityHitWarned = false;
+-      let visibilitySampleLogged = false;
+-      const VIS_TARGET_COLLIDER_TOLERANCE = 1.5;
+-      const readVisibilityOf = (targetTransform) => {
+-        if (!visibilityOrigin || !targetTransform) return null;
+-        const vt = perfNow();
+-        try {
+-          const end = callMethod(targetTransform, "get_position", 0);
+-          const hit = Memory.alloc(48);
+-          const hitAny = callStatic(
+-            Physics,
+-            "Linecast",
+-            5,
+-            visibilityOrigin,
+-            end,
+-            hit,
+-            -5,
+-            0
+-          );
+-          if (!hitAny) return true;
+-          const hitDistance = hit.add(28).readFloat();
+-          const sx = visibilityOrigin.field("x").value;
+-          const sy = visibilityOrigin.field("y").value;
+-          const sz = visibilityOrigin.field("z").value;
+-          const ex = end.field("x").value;
+-          const ey = end.field("y").value;
+-          const ez = end.field("z").value;
+-          const total = Math.sqrt((ex - sx) * (ex - sx) + (ey - sy) * (ey - sy) + (ez - sz) * (ez - sz));
+-          if (!Number.isFinite(total) || total <= 0.01 || !Number.isFinite(hitDistance) || hitDistance <= 1e-3 || hitDistance > total + 0.75) {
+-            if (!visibilityHitWarned) {
+-              visibilityHitWarned = true;
+-              console.log("[!] RaycastHit 距离无效，visible 暂按 true，避免全部目标被误过滤:", hitDistance, total);
++          let visibilityWarned = false;
++          let visibilityHitWarned = false;
++          let visibilitySampleLogged = false;
++          const VIS_ROOT_COLLIDER_TOLERANCE = 1.5;
++          const VIS_BONE_COLLIDER_TOLERANCE = 0.35;
++          const VISIBILITY_POINT_BONES = [11, 9, 0];
++          const readVisibilityOf = (player, targetTransform) => {
++            if (!visibilityOrigin || !targetTransform) return null;
++            const vt = perfNow();
++            try {
++              const sx = visibilityOrigin.field("x").value;
++              const sy = visibilityOrigin.field("y").value;
++              const sz = visibilityOrigin.field("z").value;
++              const points = [{
++                label: "root",
++                transform: targetTransform,
++                tolerance: VIS_ROOT_COLLIDER_TOLERANCE
++              }];
++              try {
++                const animator = callMethod(player, "get_characterAnimator", 0);
++                if (alive(animator) && animator.tryMethod("GetBoneTransform", 1)) {
++                  for (const boneIndex of VISIBILITY_POINT_BONES) {
++                    try {
++                      const bone = callMethod(animator, "GetBoneTransform", 1, BONE_IDS[boneIndex]);
++                      if (alive(bone)) points.push({
++                        label: "bone" + boneIndex,
++                        transform: bone,
++                        tolerance: VIS_BONE_COLLIDER_TOLERANCE
++                      });
++                    } catch (e) {
++                    }
++                  }
++                }
++              } catch (e) {
++              }
++              let validSamples = 0;
++              let invalidSamples = 0;
++              let firstSample = null;
++              for (const point of points) {
++                const end = callMethod(point.transform, "get_position", 0);
++                const ex = end.field("x").value;
++                const ey = end.field("y").value;
++                const ez = end.field("z").value;
++                const total = Math.sqrt((ex - sx) * (ex - sx) + (ey - sy) * (ey - sy) + (ez - sz) * (ez - sz));
++                const hit = Memory.alloc(48);
++                const hitAny = callStatic(
++                  Physics,
++                  "Linecast",
++                  5,
++                  visibilityOrigin,
++                  end,
++                  hit,
++                  -5,
++                  0
++                );
++                if (!hitAny) {
++                  if (!visibilitySampleLogged) firstSample = [point.label, null, total, true];
++                  return true;
++                }
++                const hitDistance = hit.add(28).readFloat();
++                if (!Number.isFinite(total) || total <= 0.01 || !Number.isFinite(hitDistance) || hitDistance <= 1e-3 || hitDistance > total + 0.75) {
++                  invalidSamples++;
++                  if (!firstSample) firstSample = [point.label, hitDistance, total, null];
++                  continue;
++                }
++                validSamples++;
++                const pointVisible = hitDistance >= total - point.tolerance;
++                if (!firstSample) firstSample = [point.label, hitDistance, total, pointVisible];
++                if (pointVisible) {
++                  if (!visibilitySampleLogged) {
++                    visibilitySampleLogged = true;
++                    console.log(
++                      "[*] 可见性样本 point/hitDistance/total=",
++                      point.label,
++                      hitDistance,
++                      "/",
++                      total,
++                      "visible=true"
++                    );
++                  }
++                  return true;
++                }
++              }
++              if (validSamples === 0 && invalidSamples > 0) {
++                if (!visibilityHitWarned) {
++                  visibilityHitWarned = true;
++                  console.log("[!] RaycastHit 距离样本无效，visible 暂按 true:", firstSample);
++                }
++                return true;
++              }
++              if (!visibilitySampleLogged) {
++                visibilitySampleLogged = true;
++                console.log(
++                  "[*] 可见性样本 point/hitDistance/total=",
++                  firstSample,
++                  "visible=false（所有取点均被提前命中）"
++                );
++              }
++              return false;
++            } catch (e) {
++              if (!visibilityWarned) {
++                visibilityWarned = true;
++                console.log("[!] Physics.Linecast 不可用，visible 回退为 true:", e.message || e);
++              }
++              return null;
++            } finally {
++              if (PERF_ON) ST.visMs += Date.now() - vt;
+             }
+-            return true;
+-          }
+-          const visible = hitDistance >= total - VIS_TARGET_COLLIDER_TOLERANCE;
+-          if (!visibilitySampleLogged) {
+-            visibilitySampleLogged = true;
+-            console.log(
+-              "[*] 可见性样本 hitDistance/total=",
+-              hitDistance,
+-              "/",
+-              total,
+-              "visible=",
+-              visible
+-            );
+-          }
+-          return visible;
+-        } catch (e) {
+-          if (!visibilityWarned) {
+-            visibilityWarned = true;
+-            console.log("[!] Physics.Linecast 不可用，visible 回退为 true:", e.message || e);
+-          }
+-          return null;
+-        } finally {
+-          if (PERF_ON) ST.visMs += Date.now() - vt;
+-        }
+-      };
+-      const grabMatrices = () => {
++          };
++          const grabMatrices = () => {
+         const cam = callStatic(Camera, "get_main", 0);
+         if (!cam) return null;
+         try {
+@@ -3935,7 +3985,7 @@ ${this.isEnum ? `enum` : this.isStruct ? `struct` : this.isInterface ? `interfac
+           if (!VISIBILITY || !t) {
+             out.visible = null;
+           } else if (visDoRefreshThisFrame) {
+-            out.visible = readVisibilityOf(t);
++            out.visible = readVisibilityOf(p, t);
+             visCache[t.handle.toString()] = out.visible;
+           } else {
+             const k = t.handle.toString();
+diff --git a/projects/ucf-esp/tools/frida_dump.js b/projects/ucf-esp/tools/frida_dump.js
+index 30d28de..f1aa5a0 100644
+--- a/projects/ucf-esp/tools/frida_dump.js
++++ b/projects/ucf-esp/tools/frida_dump.js
+@@ -377,48 +377,89 @@ Il2Cpp.perform(() => {
+   let visibilityWarned = false;
+   let visibilityHitWarned = false;
+   let visibilitySampleLogged = false;
+-  const VIS_TARGET_COLLIDER_TOLERANCE = 1.5;
+-  const readVisibilityOf = (targetTransform) => {
++  // 3rd 项目通常读取引擎维护的 spotted/render-time 布尔状态；本项目的
++  // Unity 契约没有这个字段，因此保留 Physics.Linecast，但不再只测脚底根节点。
++  // 根节点常在脚底，单条射线很容易先撞到目标自己的胶囊体，产生“多数黄色”。
++  const VIS_ROOT_COLLIDER_TOLERANCE = 1.5;
++  const VIS_BONE_COLLIDER_TOLERANCE = 0.35;
++  const VISIBILITY_POINT_BONES = [11, 9, 0]; // Head, Chest, Hips（现有骨骼顺序）
++  const readVisibilityOf = (player, targetTransform) => {
+     if (!visibilityOrigin || !targetTransform) return null;
+     const vt = perfNow();          // 记 Physics.Linecast 这一段花了多少
+     try {
+-      const end = callMethod(targetTransform, "get_position", 0);
+-      const hit = Memory.alloc(0x30);
+-      const hitAny = callStatic(Physics, "Linecast", 5,
+-                                visibilityOrigin, end, hit, -5, 0);
+-      if (!hitAny) return true;
+-      // UnityEngine.RaycastHit: m_FaceID=0x18, m_Distance=0x1c。
+-      const hitDistance = hit.add(0x1c).readFloat();
+       const sx = visibilityOrigin.field("x").value;
+       const sy = visibilityOrigin.field("y").value;
+       const sz = visibilityOrigin.field("z").value;
+-      const ex = end.field("x").value;
+-      const ey = end.field("y").value;
+-      const ez = end.field("z").value;
+-      const total = Math.sqrt((ex-sx)*(ex-sx) + (ey-sy)*(ey-sy) + (ez-sz)*(ez-sz));
+-      // 某些 32-bit bridge/Unity 版本对 out RaycastHit 的回写不完整，会得到
+-      // 0/NaN/越界值。此时不能把“无法解析命中距离”误判成 BLOCKED，
+-      // 否则所有目标都会被过滤，C++ 日志表现为 target=-1；按可见降级，
+-      // 等下一次刷新或显式关闭遮挡检测。
+-      if (!Number.isFinite(total) || total <= 0.01 ||
+-          !Number.isFinite(hitDistance) || hitDistance <= 0.001 ||
+-          hitDistance > total + 0.75) {
++      const points = [{ label: "root", transform: targetTransform,
++                        tolerance: VIS_ROOT_COLLIDER_TOLERANCE }];
++      // 参考成熟项目“按瞄准骨位判断可见”的做法：头/胸/髋分别取样，
++      // 任一瞄准点可达即认为目标可见。这样矮墙挡住脚部时不会把整个人判成墙后。
++      try {
++        const animator = callMethod(player, "get_characterAnimator", 0);
++        if (alive(animator) && animator.tryMethod("GetBoneTransform", 1)) {
++          for (const boneIndex of VISIBILITY_POINT_BONES) {
++            try {
++              const bone = callMethod(animator, "GetBoneTransform", 1, BONE_IDS[boneIndex]);
++              if (alive(bone)) points.push({ label: "bone" + boneIndex,
++                                             transform: bone,
++                                             tolerance: VIS_BONE_COLLIDER_TOLERANCE });
++            } catch (e) { /* 单个骨位缺失，继续测其它点 */ }
++          }
++        }
++      } catch (e) { /* 没有 Animator 时使用 root 回退 */ }
++
++      let validSamples = 0;
++      let invalidSamples = 0;
++      let firstSample = null;
++      for (const point of points) {
++        const end = callMethod(point.transform, "get_position", 0);
++        const ex = end.field("x").value;
++        const ey = end.field("y").value;
++        const ez = end.field("z").value;
++        const total = Math.sqrt((ex-sx)*(ex-sx) + (ey-sy)*(ey-sy) + (ez-sz)*(ez-sz));
++        const hit = Memory.alloc(0x30);
++        const hitAny = callStatic(Physics, "Linecast", 5,
++                                  visibilityOrigin, end, hit, -5, 0);
++        if (!hitAny) {
++          if (!visibilitySampleLogged) firstSample = [point.label, null, total, true];
++          return true;
++        }
++        // UnityEngine.RaycastHit: m_FaceID=0x18, m_Distance=0x1c。
++        const hitDistance = hit.add(0x1c).readFloat();
++        if (!Number.isFinite(total) || total <= 0.01 ||
++            !Number.isFinite(hitDistance) || hitDistance <= 0.001 ||
++            hitDistance > total + 0.75) {
++          invalidSamples++;
++          if (!firstSample) firstSample = [point.label, hitDistance, total, null];
++          continue;
++        }
++        validSamples++;
++        const pointVisible = hitDistance >= total - point.tolerance;
++        if (!firstSample) firstSample = [point.label, hitDistance, total, pointVisible];
++        if (pointVisible) {
++          if (!visibilitySampleLogged) {
++            visibilitySampleLogged = true;
++            console.log("[*] 可见性样本 point/hitDistance/total=", point.label,
++                        hitDistance, "/", total, "visible=true");
++          }
++          return true;
++        }
++      }
++      // 物理回写异常时 fail-open，避免 bridge 的 RaycastHit ABI 差异把全场
++      // 目标变成 BLOCKED；只有至少一个有效样本且全部被提前命中才判遮挡。
++      if (validSamples === 0 && invalidSamples > 0) {
+         if (!visibilityHitWarned) {
+           visibilityHitWarned = true;
+-          console.log("[!] RaycastHit 距离无效，visible 暂按 true，避免全部目标被误过滤:", hitDistance, total);
++          console.log("[!] RaycastHit 距离样本无效，visible 暂按 true:", firstSample);
+         }
+         return true;
+       }
+-      // 目标 Transform 通常在脚底，而 Linecast 命中的是目标胶囊体外缘；
+-      // 0.75m 会把正常可见目标自己的碰撞体误判为墙体。给目标胶囊体留
+-      // 1.5m 末端容差，仍然把更早命中的墙体判为 BLOCKED。
+-      const visible = hitDistance >= total - VIS_TARGET_COLLIDER_TOLERANCE;
+       if (!visibilitySampleLogged) {
+         visibilitySampleLogged = true;
+-        console.log("[*] 可见性样本 hitDistance/total=", hitDistance, "/", total,
+-                    "visible=", visible);
++        console.log("[*] 可见性样本 point/hitDistance/total=", firstSample,
++                    "visible=false（所有取点均被提前命中）");
+       }
+-      return visible;
++      return false;
+     } catch (e) {
+       if (!visibilityWarned) {
+         visibilityWarned = true;
+@@ -688,7 +729,7 @@ Il2Cpp.perform(() => {
+         // 真正的主线程 Physics.Linecast，仅在“重算帧”执行（每 ~150ms 一次）。
+         // 血量字段在本函数后段才读取；这里不能提前用 out.hp 做死亡短路，
+         // 否则该条件永远是 undefined，既没有节省射线，也会误导后续维护。
+-        out.visible = readVisibilityOf(t);
++        out.visible = readVisibilityOf(p, t);
+         visCache[t.handle.toString()] = out.visible;
+       } else {
+         // 非重算帧：复用上次缓存，避免每帧 30 次物理射线拖垮游戏 FPS。

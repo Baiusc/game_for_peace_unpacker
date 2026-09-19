@@ -3657,66 +3657,116 @@ ${this.isEnum ? `enum` : this.isStruct ? `struct` : this.isInterface ? `interfac
         console.log(`[*] 矩阵读取模式: ${matMode}` + (ok ? "（out 指针，32 位下最稳）" : "（回退：按值返回的公开 getter）"));
       };
       let visibilityOrigin = null;
-      let visibilityWarned = false;
-      let visibilityHitWarned = false;
-      let visibilitySampleLogged = false;
-      const VIS_TARGET_COLLIDER_TOLERANCE = 1.5;
-      const readVisibilityOf = (targetTransform) => {
-        if (!visibilityOrigin || !targetTransform) return null;
-        const vt = perfNow();
-        try {
-          const end = callMethod(targetTransform, "get_position", 0);
-          const hit = Memory.alloc(48);
-          const hitAny = callStatic(
-            Physics,
-            "Linecast",
-            5,
-            visibilityOrigin,
-            end,
-            hit,
-            -5,
-            0
-          );
-          if (!hitAny) return true;
-          const hitDistance = hit.add(28).readFloat();
-          const sx = visibilityOrigin.field("x").value;
-          const sy = visibilityOrigin.field("y").value;
-          const sz = visibilityOrigin.field("z").value;
-          const ex = end.field("x").value;
-          const ey = end.field("y").value;
-          const ez = end.field("z").value;
-          const total = Math.sqrt((ex - sx) * (ex - sx) + (ey - sy) * (ey - sy) + (ez - sz) * (ez - sz));
-          if (!Number.isFinite(total) || total <= 0.01 || !Number.isFinite(hitDistance) || hitDistance <= 1e-3 || hitDistance > total + 0.75) {
-            if (!visibilityHitWarned) {
-              visibilityHitWarned = true;
-              console.log("[!] RaycastHit 距离无效，visible 暂按 true，避免全部目标被误过滤:", hitDistance, total);
+          let visibilityWarned = false;
+          let visibilityHitWarned = false;
+          let visibilitySampleLogged = false;
+          const VIS_ROOT_COLLIDER_TOLERANCE = 1.5;
+          const VIS_BONE_COLLIDER_TOLERANCE = 0.35;
+          const VISIBILITY_POINT_BONES = [11, 9, 0];
+          const readVisibilityOf = (player, targetTransform) => {
+            if (!visibilityOrigin || !targetTransform) return null;
+            const vt = perfNow();
+            try {
+              const sx = visibilityOrigin.field("x").value;
+              const sy = visibilityOrigin.field("y").value;
+              const sz = visibilityOrigin.field("z").value;
+              const points = [{
+                label: "root",
+                transform: targetTransform,
+                tolerance: VIS_ROOT_COLLIDER_TOLERANCE
+              }];
+              try {
+                const animator = callMethod(player, "get_characterAnimator", 0);
+                if (alive(animator) && animator.tryMethod("GetBoneTransform", 1)) {
+                  for (const boneIndex of VISIBILITY_POINT_BONES) {
+                    try {
+                      const bone = callMethod(animator, "GetBoneTransform", 1, BONE_IDS[boneIndex]);
+                      if (alive(bone)) points.push({
+                        label: "bone" + boneIndex,
+                        transform: bone,
+                        tolerance: VIS_BONE_COLLIDER_TOLERANCE
+                      });
+                    } catch (e) {
+                    }
+                  }
+                }
+              } catch (e) {
+              }
+              let validSamples = 0;
+              let invalidSamples = 0;
+              let firstSample = null;
+              for (const point of points) {
+                const end = callMethod(point.transform, "get_position", 0);
+                const ex = end.field("x").value;
+                const ey = end.field("y").value;
+                const ez = end.field("z").value;
+                const total = Math.sqrt((ex - sx) * (ex - sx) + (ey - sy) * (ey - sy) + (ez - sz) * (ez - sz));
+                const hit = Memory.alloc(48);
+                const hitAny = callStatic(
+                  Physics,
+                  "Linecast",
+                  5,
+                  visibilityOrigin,
+                  end,
+                  hit,
+                  -5,
+                  0
+                );
+                if (!hitAny) {
+                  if (!visibilitySampleLogged) firstSample = [point.label, null, total, true];
+                  return true;
+                }
+                const hitDistance = hit.add(28).readFloat();
+                if (!Number.isFinite(total) || total <= 0.01 || !Number.isFinite(hitDistance) || hitDistance <= 1e-3 || hitDistance > total + 0.75) {
+                  invalidSamples++;
+                  if (!firstSample) firstSample = [point.label, hitDistance, total, null];
+                  continue;
+                }
+                validSamples++;
+                const pointVisible = hitDistance >= total - point.tolerance;
+                if (!firstSample) firstSample = [point.label, hitDistance, total, pointVisible];
+                if (pointVisible) {
+                  if (!visibilitySampleLogged) {
+                    visibilitySampleLogged = true;
+                    console.log(
+                      "[*] 可见性样本 point/hitDistance/total=",
+                      point.label,
+                      hitDistance,
+                      "/",
+                      total,
+                      "visible=true"
+                    );
+                  }
+                  return true;
+                }
+              }
+              if (validSamples === 0 && invalidSamples > 0) {
+                if (!visibilityHitWarned) {
+                  visibilityHitWarned = true;
+                  console.log("[!] RaycastHit 距离样本无效，visible 暂按 true:", firstSample);
+                }
+                return true;
+              }
+              if (!visibilitySampleLogged) {
+                visibilitySampleLogged = true;
+                console.log(
+                  "[*] 可见性样本 point/hitDistance/total=",
+                  firstSample,
+                  "visible=false（所有取点均被提前命中）"
+                );
+              }
+              return false;
+            } catch (e) {
+              if (!visibilityWarned) {
+                visibilityWarned = true;
+                console.log("[!] Physics.Linecast 不可用，visible 回退为 true:", e.message || e);
+              }
+              return null;
+            } finally {
+              if (PERF_ON) ST.visMs += Date.now() - vt;
             }
-            return true;
-          }
-          const visible = hitDistance >= total - VIS_TARGET_COLLIDER_TOLERANCE;
-          if (!visibilitySampleLogged) {
-            visibilitySampleLogged = true;
-            console.log(
-              "[*] 可见性样本 hitDistance/total=",
-              hitDistance,
-              "/",
-              total,
-              "visible=",
-              visible
-            );
-          }
-          return visible;
-        } catch (e) {
-          if (!visibilityWarned) {
-            visibilityWarned = true;
-            console.log("[!] Physics.Linecast 不可用，visible 回退为 true:", e.message || e);
-          }
-          return null;
-        } finally {
-          if (PERF_ON) ST.visMs += Date.now() - vt;
-        }
-      };
-      const grabMatrices = () => {
+          };
+          const grabMatrices = () => {
         const cam = callStatic(Camera, "get_main", 0);
         if (!cam) return null;
         try {
@@ -3935,7 +3985,7 @@ ${this.isEnum ? `enum` : this.isStruct ? `struct` : this.isInterface ? `interfac
           if (!VISIBILITY || !t) {
             out.visible = null;
           } else if (visDoRefreshThisFrame) {
-            out.visible = readVisibilityOf(t);
+            out.visible = readVisibilityOf(p, t);
             visCache[t.handle.toString()] = out.visible;
           } else {
             const k = t.handle.toString();

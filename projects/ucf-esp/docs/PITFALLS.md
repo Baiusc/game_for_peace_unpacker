@@ -264,3 +264,9 @@
 - 命名共享内存会跨进程保留；旧宿主退出后槽位仍可能含最后一帧。生产者启动/退出时把 `cur` 置为 `-1`，C++ 读到后回退 replay/synth，不继续显示 stale shm。
 - `Physics.Linecast` 终点使用玩家根 Transform 时，命中目标自己的胶囊体不等于墙体。可见性判断要保留目标末端容差；本版本使用 1.5m，并记录首个 `hitDistance/total` 样本供实机校准。
 - C++ 日志中的 `esp=0` 代表叠加层开关关闭，不是 D3D Present 失败；`present_hr=0` 且 `startup: overlay initialized` 表示窗口和渲染循环正常。
+
+## 2026-09-19 可见性多取点修复
+
+- 3rd 项目通常读取游戏维护的 spotted/render-time 布尔状态；UCF 当前没有已验证的等价字段，不能猜偏移。`Physics.Linecast` 只能作为通用回退。
+- 单独向玩家根 Transform（通常是脚底）发射一条线，会先命中目标自己的胶囊体，导致大多数目标误判黄色。当前改为 root + Head/Chest/Hips 多取点，任一有效射线抵达目标即为 visible；只有所有有效取点都被提前命中才判 BLOCKED。
+- 根节点使用 1.5m 末端容差，骨位使用 0.35m；所有 RaycastHit 距离无效时继续 fail-open。首次样本日志用于判断是自碰撞、触发器还是实际墙体。

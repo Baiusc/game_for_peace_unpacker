@@ -1,0 +1,17 @@
+Changed branch/field: visibility sampling branch; root-only Linecast changed to root + Head/Chest/Hips multi-point sampling.
+Reference comparison: CS2_Lumen/Khytt spotted mask, Valorant render-time, DeltaForce IsVisable; UCF has no verified equivalent field, so only generic Unity Physics API was retained.
+Four artifacts: MODIFIED_FILE, DIFF_FILE, VERIFICATION.txt, executable ROLLBACK.sh.
+
+BASELINE exact command:
+git show HEAD:projects/ucf-esp/tools/frida_dump.js >/tmp/frida_dump_visibility_baseline.js && node --check /tmp/frida_dump_visibility_baseline.js
+BASELINE literal result: exit 0; pre-change script syntax accepted.
+
+MODIFIED exact command:
+node --check projects/ucf-esp/tools/frida_dump.js && python3 projects/ucf-esp/tests/test_script_config.py && python3 projects/ucf-esp/tests/test_dump_contract.py
+MODIFIED literal result: exit 0; script syntax, configuration, and dump contract tests passed.
+
+ROLLBACK exact command:
+cp projects/ucf-esp/tools/frida_dump.js /tmp/frida_dump_visibility_modified.js && mkdir -p /tmp/ucf-visibility-rollback && git show HEAD:projects/ucf-esp/tools/frida_dump.js >/tmp/ucf-visibility-rollback/frida_dump.js && node --check /tmp/ucf-visibility-rollback/frida_dump.js && cp /tmp/frida_dump_visibility_modified.js projects/ucf-esp/tools/frida_dump.js
+ROLLBACK literal result: exit 0; rollback copy passed syntax check and working tree was restored to MODIFIED_FILE.
+
+Restored behavior/status: root-only false positives are reduced by testing Head/Chest/Hips; any visible point is visible, all valid points blocked is blocked, invalid RaycastHit samples fail open. No Frame layout or unverified game offset changed.
