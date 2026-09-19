@@ -259,7 +259,7 @@ atexit.register(close_dumper)
 def build_script_source(js, level=DEFAULT_LEVEL, interval_ms=33, discover=False,
                         probe=False, allow_get_instance=False, allow_is_dead=False,
                         main_thread=True, bones=False, bones_refresh_ms=250,
-                        vis_refresh_ms=150, visibility=True):
+                        vis_refresh_ms=50, visibility=True):
     """在脚本最前面拼一行运行配置，供 frida_dump.js 里的 UCFG 读取。
 
     分档（LEVEL）是排查“注入后游戏闪退”的核心手段：逐级放开调用范围，
@@ -669,7 +669,7 @@ def kill_stale_shells(device, game_name):
 def inject(device, js_path, use_overlay, forced_pid=None, wait_seconds=DEFAULT_WAIT_MODULE,
            level=DEFAULT_LEVEL, interval_ms=33, discover=False, silence=10.0,
            probe=False, allow_get_instance=False, allow_is_dead=False,
-           main_thread=True, bones=False, bones_refresh_ms=250, vis_refresh_ms=150,
+           main_thread=True, bones=False, bones_refresh_ms=250, vis_refresh_ms=50,
            visibility=True):
     """挑进程 -> 读脚本 -> attach -> 注入。日志顺序按真实执行顺序打印，便于排查。"""
     global OVERLAY
@@ -748,7 +748,7 @@ def run_live(game, use_overlay, auto=False, no_launch=False, force_launch=False,
              kill_stale=False, level=DEFAULT_LEVEL, interval_ms=33,
              discover=False, silence=10.0, script=None,
              probe=False, allow_get_instance=False, allow_is_dead=False,
-             main_thread=True, bones=False, bones_refresh_ms=250, vis_refresh_ms=150,
+           main_thread=True, bones=False, bones_refresh_ms=250, vis_refresh_ms=50,
              visibility=True):
     global _GAME_PATH
     _GAME_PATH = game
@@ -859,7 +859,7 @@ def main():
                     help="显式关闭骨骼读取（兼容旧命令，优先级高于 --bones）")
     ap.add_argument("--bones-refresh-ms", type=int, default=250,
                     help="骨骼重算周期毫秒（默认 250≈4Hz，帧间复用缓存）")
-    ap.add_argument("--vis-refresh-ms", type=int, default=150,
+    ap.add_argument("--vis-refresh-ms", type=int, default=50,
                     help="遮挡检测(Physics.Linecast)重算周期毫秒（默认 150）")
     ap.add_argument("--no-visibility", action="store_true",
                     help="关闭 Unity Physics.Linecast；用于先验证纯 ESP 帧率")

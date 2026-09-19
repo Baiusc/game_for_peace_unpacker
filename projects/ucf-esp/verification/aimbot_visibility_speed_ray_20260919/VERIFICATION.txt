@@ -1,5 +1,5 @@
 OBJECT: ucf-esp visibility fallback, input speed parameters, top-origin target ray
-CHANGED_BRANCH: Renderer.isVisible=false -> multipoint Linecast fallback; trace/flick speed and max step settings; ray origin fixed to viewport top
+CHANGED_BRANCH: Renderer.isVisible=false -> multipoint Linecast fallback; 50ms visibility refresh; trace/flick speed and max step settings; ray origin fixed to viewport top
 BASELINE_COMMIT: 58766689dab0f071687813ca0d7de012cab4fd9a
 
 BASELINE_COMMAND:
