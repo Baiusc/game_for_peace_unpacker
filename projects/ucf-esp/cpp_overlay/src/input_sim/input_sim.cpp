@@ -74,7 +74,10 @@ void LocalInputSim::move_to(const ScreenPoint& target, const ScreenPoint& crossh
     const float ey = target.y - crosshair.y;
     const float distance = std::sqrt(ex * ex + ey * ey);
     if (distance <= cfg_.align_tolerance_px) return;
-    speed = std::max(0.05f, std::min(1.0f, speed));
+    // Windows.h 的 min/max 宏会污染核心库目标；这里用显式分支避免
+    // std::min/std::max 被展开成非法的 std::(...)。
+    if (speed < 0.05f) speed = 0.05f;
+    if (speed > 1.0f) speed = 1.0f;
     float step_len = distance * speed;
     if (step_len > static_cast<float>(cfg_.max_step_px))
         step_len = static_cast<float>(cfg_.max_step_px);

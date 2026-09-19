@@ -20,3 +20,4 @@ ROLLBACK_LITERAL_OUTPUT:
 (no output; cmp matched)
 ROLLBACK_RESULT: exit 0
 RESTORED_BEHAVIOR: rollback copy exactly matched the modified source after restoration; working tree source remains modified.
+WINDOWS_FIX: input_sim.cpp no longer uses std::min/std::max in the Windows-header-polluted core target; speed clamping uses explicit branches.
