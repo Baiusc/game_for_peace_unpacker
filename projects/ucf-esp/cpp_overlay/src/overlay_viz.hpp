@@ -64,6 +64,7 @@ struct DrawStyle {
     bool show_enemy = true;
     int target_index = -1;
     TargetState target_state = TargetState::Normal;
+    bool show_blocked_state = true;
     bool show_target_ray = false;
     bool ray_from_bottom = true;
     float max_distance = 250.0f;

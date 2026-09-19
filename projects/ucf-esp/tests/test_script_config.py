@@ -215,6 +215,8 @@ def test_perf_guards():
            "Linecast 骨位必须保留碰撞体容差")
     expect("VISIBILITY_POINT_BONES = [11, 9, 0]" in src,
            "Linecast 必须使用头胸髋多取点")
+    expect("get_isVisible" in src and "GetComponentInChildren" in src,
+           "遮挡检测必须优先使用 Unity Renderer.isVisible")
     print("  PASS 方法缓存 / 骨骼节流 / 分段计时锚点齐全，且骨骼不再每帧无条件读")
 
 

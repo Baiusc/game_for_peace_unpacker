@@ -97,6 +97,7 @@ void draw_menu(Settings& s, bool& show_menu, bool& request_exit,
         ImGui::Checkbox("允许队友", &s.aim_teammates);
         ImGui::Checkbox("允许死亡目标", &s.aim_dead);
         ImGui::Checkbox("仅屏幕内目标", &s.aim_visible_only);
+        ImGui::Checkbox("启用隔墙检测", &s.aim_wall_check);
         ImGui::Checkbox("目标死亡后防抖", &s.aim_lock_prevent);
         ImGui::TreePop();
     }

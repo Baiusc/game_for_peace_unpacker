@@ -20,6 +20,7 @@ struct Settings {
     bool  aim_teammates   = false;
     bool  aim_dead        = false;
     bool  aim_visible_only = true;
+    bool  aim_wall_check = true;       // 默认启用上游 Unity Renderer 可见性过滤
     bool  aim_lock_prevent = false;
     bool  input_sim_enabled = false;
     int   input_sim_aim_key = 0x06;  // VK_XBUTTON2

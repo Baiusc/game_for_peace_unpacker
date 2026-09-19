@@ -3529,26 +3529,43 @@ ${this.isEnum ? `enum` : this.isStruct ? `struct` : this.isInterface ? `interfac
       const Camera = camImage.class("UnityEngine.Camera");
       const Screen = camImage.class("UnityEngine.Screen");
       const findPhysicsClass = () => {
-        const names = ["UnityEngine.PhysicsModule", "UnityEngine.CoreModule", "UnityEngine"];
-        for (const nm of names) {
-          try {
-            const cls = Il2Cpp.domain.assembly(nm).image.class("UnityEngine.Physics");
-            if (cls) return cls;
-          } catch (e) {
-          }
-        }
-        return null;
-      };
-      const Physics = findPhysicsClass();
-      if (!Physics) console.log("[!] UnityEngine.Physics 未找到：遮挡检测关闭（visible 回退 true）");
-      else console.log("[*] 遮挡检测 Physics 类已定位（" + (Physics.image ? Physics.image.name : "assembly") + "）");
-      const VISIBILITY = !!Physics && CFG.visibility !== false;
-      const VIS_REFRESH_MS = Number.isFinite(CFG.visRefreshMs) ? CFG.visRefreshMs : 150;
-      let visCache = /* @__PURE__ */ Object.create(null);
-      let visLastRefresh = -1e9;
-      let visDoRefreshThisFrame = false;
-      if (!VISIBILITY) console.log("[*] 遮挡检测已关闭（CFG.visibility=false 或 Physics 未找到）：visible 恒为 true");
-      const GameManager = asmImage.class("GameManager");
+            const names = ["UnityEngine.PhysicsModule", "UnityEngine.CoreModule", "UnityEngine"];
+            for (const nm of names) {
+              try {
+                const cls = Il2Cpp.domain.assembly(nm).image.class("UnityEngine.Physics");
+                if (cls) return cls;
+              } catch (e) {
+              }
+            }
+            return null;
+          };
+          const Physics = findPhysicsClass();
+          if (!Physics) console.log("[!] UnityEngine.Physics 未找到：遮挡检测关闭（visible 回退 true）");
+          else console.log("[*] 遮挡检测 Physics 类已定位（" + (Physics.image ? Physics.image.name : "assembly") + "）");
+          const findUnityClass = (name) => {
+            for (const nm of ["UnityEngine.CoreModule", "UnityEngine"])
+              try {
+                const cls = Il2Cpp.domain.assembly(nm).image.class(name);
+                if (cls) return cls;
+              } catch (e) {
+              }
+            return null;
+          };
+          const Renderer = findUnityClass("UnityEngine.Renderer");
+          const SkinnedMeshRenderer = findUnityClass("UnityEngine.SkinnedMeshRenderer");
+          const RENDERER_VISIBILITY = !!(Renderer || SkinnedMeshRenderer);
+          if (RENDERER_VISIBILITY)
+            console.log("[*] Unity Renderer.isVisible 已定位（优先 SkinnedMeshRenderer）");
+          else
+            console.log("[!] Unity Renderer.isVisible 未定位：可见性回退 Physics.Linecast");
+          const VISIBILITY = (!!Physics || RENDERER_VISIBILITY) && CFG.visibility !== false;
+          const VIS_REFRESH_MS = Number.isFinite(CFG.visRefreshMs) ? CFG.visRefreshMs : 150;
+          let visCache = /* @__PURE__ */ Object.create(null);
+          let rendererCache = /* @__PURE__ */ Object.create(null);
+          let visLastRefresh = -1e9;
+          let visDoRefreshThisFrame = false;
+          if (!VISIBILITY) console.log("[*] 遮挡检测已关闭（CFG.visibility=false 且无可用 Unity 可见性 API）：visible 恒为 true");
+          const GameManager = asmImage.class("GameManager");
       discover(Camera, "Camera");
       discover(GameManager, "GameManager");
       const METHOD_CACHE = /* @__PURE__ */ new Map();
@@ -3663,10 +3680,48 @@ ${this.isEnum ? `enum` : this.isStruct ? `struct` : this.isInterface ? `interfac
           const VIS_ROOT_COLLIDER_TOLERANCE = 1.5;
           const VIS_BONE_COLLIDER_TOLERANCE = 0.35;
           const VISIBILITY_POINT_BONES = [11, 9, 0];
+          const readRendererVisibilityOf = (player) => {
+            if (!RENDERER_VISIBILITY || !player) return null;
+            try {
+              const key = player.handle.toString();
+              let renderer = rendererCache[key];
+              if (!alive(renderer)) {
+                const container = callMethod(player, "get_characterContainer", 0);
+                if (!alive(container)) return null;
+                const rendererClass = SkinnedMeshRenderer || Renderer;
+                renderer = callMethod(
+                  container,
+                  "GetComponentInChildren",
+                  2,
+                  rendererClass.type,
+                  true
+                );
+                if (alive(renderer)) rendererCache[key] = renderer;
+              }
+              if (!alive(renderer)) return null;
+              if (renderer.tryMethod("get_enabled", 0) && callMethod(renderer, "get_enabled", 0) === false) return false;
+              if (!renderer.tryMethod("get_isVisible", 0)) return null;
+              return !!callMethod(renderer, "get_isVisible", 0);
+            } catch (e) {
+              if (!visibilityWarned) {
+                visibilityWarned = true;
+                console.log("[!] Renderer.isVisible 调用失败，回退 Physics.Linecast:", e.message || e);
+              }
+              return null;
+            }
+          };
           const readVisibilityOf = (player, targetTransform) => {
             if (!visibilityOrigin || !targetTransform) return null;
             const vt = perfNow();
             try {
+              const rendererVisible = readRendererVisibilityOf(player);
+              if (rendererVisible !== null) {
+                if (!visibilitySampleLogged) {
+                  visibilitySampleLogged = true;
+                  console.log("[*] 可见性样本 source=Renderer.isVisible visible=", rendererVisible);
+                }
+                return rendererVisible;
+              }
               const sx = visibilityOrigin.field("x").value;
               const sy = visibilityOrigin.field("y").value;
               const sz = visibilityOrigin.field("z").value;

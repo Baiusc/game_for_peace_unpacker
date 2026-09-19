@@ -23,6 +23,7 @@ bool save_settings(const Settings& s, const char* path) {
     fprintf(f, "aim_teammates=%d\n", s.aim_teammates ? 1 : 0);
     fprintf(f, "aim_dead=%d\n", s.aim_dead ? 1 : 0);
     fprintf(f, "aim_visible_only=%d\n", s.aim_visible_only ? 1 : 0);
+    fprintf(f, "aim_wall_check=%d\n", s.aim_wall_check ? 1 : 0);
     fprintf(f, "aim_lock_prevent=%d\n", s.aim_lock_prevent ? 1 : 0);
     fprintf(f, "input_sim_enabled=%d\n", s.input_sim_enabled ? 1 : 0);
     fprintf(f, "input_sim_aim_key=%d\n", s.input_sim_aim_key);
@@ -94,6 +95,7 @@ bool load_settings(Settings& s, const char* path) {
         else if (!std::strcmp(key, "aim_teammates"))  s.aim_teammates = std::atoi(val) != 0;
         else if (!std::strcmp(key, "aim_dead"))       s.aim_dead = std::atoi(val) != 0;
         else if (!std::strcmp(key, "aim_visible_only")) s.aim_visible_only = std::atoi(val) != 0;
+        else if (!std::strcmp(key, "aim_wall_check")) s.aim_wall_check = std::atoi(val) != 0;
         else if (!std::strcmp(key, "aim_lock_prevent")) s.aim_lock_prevent = std::atoi(val) != 0;
         else if (!std::strcmp(key, "input_sim_enabled")) s.input_sim_enabled = std::atoi(val) != 0;
         else if (!std::strcmp(key, "input_sim_aim_key")) s.input_sim_aim_key = std::atoi(val);

@@ -108,7 +108,7 @@ RVA `0x4953F0`；而且 IL2CPP 的共享泛型方法还带一个**隐藏的 `Met
 | Player | `characterContainer` | 0x4C | `Transform` | `get_characterContainer()`（模型挂载点） |
 | Entity | `characterAnimator` | 0x24 | `Animator` | `get_characterAnimator()` |
 | Player（继承 MonoBehaviour） | 世界坐标 | — | `Vector3` | `get_transform().get_position()` |
-| Player（运行时契约） | 遮挡可见性 | — | `bool visible` | Unity 主线程 `Physics.Linecast` 结果 |
+| Player（运行时契约） | 遮挡可见性 | — | `bool visible` | 优先使用 `Renderer.get_isVisible()`；不可用时回退 Unity 主线程 `Physics.Linecast` |
 | Player | `velocity` | 0x80 | `Vector3` | `get_...` / 直接字段 |
 | Player | `spawnPos` | 0xAC | `Vector3` | `get_spawnPos()`（参考点） |
 

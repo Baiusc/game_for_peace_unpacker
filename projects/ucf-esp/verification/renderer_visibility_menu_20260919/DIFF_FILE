@@ -1,0 +1,337 @@
+diff --git a/projects/ucf-esp/cpp_overlay/src/config.cpp b/projects/ucf-esp/cpp_overlay/src/config.cpp
+index f7c3b0f..7c5186e 100644
+--- a/projects/ucf-esp/cpp_overlay/src/config.cpp
++++ b/projects/ucf-esp/cpp_overlay/src/config.cpp
+@@ -23,6 +23,7 @@ bool save_settings(const Settings& s, const char* path) {
+     fprintf(f, "aim_teammates=%d\n", s.aim_teammates ? 1 : 0);
+     fprintf(f, "aim_dead=%d\n", s.aim_dead ? 1 : 0);
+     fprintf(f, "aim_visible_only=%d\n", s.aim_visible_only ? 1 : 0);
++    fprintf(f, "aim_wall_check=%d\n", s.aim_wall_check ? 1 : 0);
+     fprintf(f, "aim_lock_prevent=%d\n", s.aim_lock_prevent ? 1 : 0);
+     fprintf(f, "input_sim_enabled=%d\n", s.input_sim_enabled ? 1 : 0);
+     fprintf(f, "input_sim_aim_key=%d\n", s.input_sim_aim_key);
+@@ -94,6 +95,7 @@ bool load_settings(Settings& s, const char* path) {
+         else if (!std::strcmp(key, "aim_teammates"))  s.aim_teammates = std::atoi(val) != 0;
+         else if (!std::strcmp(key, "aim_dead"))       s.aim_dead = std::atoi(val) != 0;
+         else if (!std::strcmp(key, "aim_visible_only")) s.aim_visible_only = std::atoi(val) != 0;
++        else if (!std::strcmp(key, "aim_wall_check")) s.aim_wall_check = std::atoi(val) != 0;
+         else if (!std::strcmp(key, "aim_lock_prevent")) s.aim_lock_prevent = std::atoi(val) != 0;
+         else if (!std::strcmp(key, "input_sim_enabled")) s.input_sim_enabled = std::atoi(val) != 0;
+         else if (!std::strcmp(key, "input_sim_aim_key")) s.input_sim_aim_key = std::atoi(val);
+diff --git a/projects/ucf-esp/cpp_overlay/src/config.hpp b/projects/ucf-esp/cpp_overlay/src/config.hpp
+index 5657e21..9af44c9 100644
+--- a/projects/ucf-esp/cpp_overlay/src/config.hpp
++++ b/projects/ucf-esp/cpp_overlay/src/config.hpp
+@@ -20,6 +20,7 @@ struct Settings {
+     bool  aim_teammates   = false;
+     bool  aim_dead        = false;
+     bool  aim_visible_only = true;
++    bool  aim_wall_check = true;       // 默认启用上游 Unity Renderer 可见性过滤
+     bool  aim_lock_prevent = false;
+     bool  input_sim_enabled = false;
+     int   input_sim_aim_key = 0x06;  // VK_XBUTTON2
+diff --git a/projects/ucf-esp/cpp_overlay/src/main_win32.cpp b/projects/ucf-esp/cpp_overlay/src/main_win32.cpp
+index 11a6d21..14a5a66 100644
+--- a/projects/ucf-esp/cpp_overlay/src/main_win32.cpp
++++ b/projects/ucf-esp/cpp_overlay/src/main_win32.cpp
+@@ -626,11 +626,12 @@ static void frame() {
+             candidates[i].visible = point_screen_valid && ucf::is_target_visible(p);
+             screen_candidates[i].x = screen_x;
+             screen_candidates[i].y = screen_y;
+-            screen_candidates[i].valid = point_world_valid && candidates[i].visible;
++            screen_candidates[i].valid = point_world_valid && point_screen_valid &&
++                (!g_settings.aim_wall_check || candidates[i].visible);
+             if (!point_world_valid ||
+                 (!g_settings.aim_teammates && p.team == f.local.team) ||
+                 (!g_settings.aim_dead && candidates[i].dead) ||
+-                (g_settings.aim_visible_only && !candidates[i].visible) ||
++                (g_settings.aim_wall_check && g_settings.aim_visible_only && !candidates[i].visible) ||
+                 (g_settings.aim_max_distance > 0.0f && candidates[i].dist > g_settings.aim_max_distance)) {
+                 candidates[i].valid = false;
+                 screen_candidates[i].valid = false;
+@@ -648,6 +649,10 @@ static void frame() {
+         }
+         if (target >= 0) {
+             selected_state = ucf::target_state(candidates[target]);
++            // 关闭隔墙检测时，BLOCKED 只保留为诊断/着色状态，不阻断本地
++            // 调试输入模拟；死亡/无效状态仍然保持硬门。
++            if (!g_settings.aim_wall_check && selected_state == ucf::TargetState::Blocked)
++                selected_state = ucf::TargetState::Normal;
+             output_angles = ucf::smooth_angles(output_angles,
+                 ucf::angles_from_direction(candidates[target].dir),
+                 g_settings.responsiveness);
+@@ -707,6 +712,7 @@ static void frame() {
+         style.show_enemy = g_settings.show_enemy;
+         style.target_index = target >= 0 ? target + 1 : -1;
+         style.target_state = selected_state;
++        style.show_blocked_state = g_settings.aim_wall_check;
+         style.show_target_ray = g_settings.show_target_ray;
+         style.ray_from_bottom = g_settings.ray_from_bottom;
+         style.max_distance = g_settings.max_distance;
+diff --git a/projects/ucf-esp/cpp_overlay/src/menu_win32.cpp b/projects/ucf-esp/cpp_overlay/src/menu_win32.cpp
+index e9c19ea..305f38d 100644
+--- a/projects/ucf-esp/cpp_overlay/src/menu_win32.cpp
++++ b/projects/ucf-esp/cpp_overlay/src/menu_win32.cpp
+@@ -97,6 +97,7 @@ void draw_menu(Settings& s, bool& show_menu, bool& request_exit,
+         ImGui::Checkbox("允许队友", &s.aim_teammates);
+         ImGui::Checkbox("允许死亡目标", &s.aim_dead);
+         ImGui::Checkbox("仅屏幕内目标", &s.aim_visible_only);
++        ImGui::Checkbox("启用隔墙检测", &s.aim_wall_check);
+         ImGui::Checkbox("目标死亡后防抖", &s.aim_lock_prevent);
+         ImGui::TreePop();
+     }
+diff --git a/projects/ucf-esp/cpp_overlay/src/overlay_viz.cpp b/projects/ucf-esp/cpp_overlay/src/overlay_viz.cpp
+index 3d41766..3851d47 100644
+--- a/projects/ucf-esp/cpp_overlay/src/overlay_viz.cpp
++++ b/projects/ucf-esp/cpp_overlay/src/overlay_viz.cpp
+@@ -99,7 +99,7 @@ void build_draw_list(const Viewport& vp, const ScreenMark* marks, int n,
+             b.r = col[0]; b.g = col[1]; b.b = col[2];
+             b.thickness = style.line_thickness;
+             b.selected = selected;
+-            b.blocked = !m.visible;   // 被墙体遮挡 -> 渲染层画橙色虚线框
++            b.blocked = style.show_blocked_state && !m.visible;
+         }
+         if (style.show_health && out.barCount < 64) {
+             BarPrim& bar = out.bars[out.barCount++];
+diff --git a/projects/ucf-esp/cpp_overlay/src/overlay_viz.hpp b/projects/ucf-esp/cpp_overlay/src/overlay_viz.hpp
+index 32a1c4e..69d0cde 100644
+--- a/projects/ucf-esp/cpp_overlay/src/overlay_viz.hpp
++++ b/projects/ucf-esp/cpp_overlay/src/overlay_viz.hpp
+@@ -64,6 +64,7 @@ struct DrawStyle {
+     bool show_enemy = true;
+     int target_index = -1;
+     TargetState target_state = TargetState::Normal;
++    bool show_blocked_state = true;
+     bool show_target_ray = false;
+     bool ray_from_bottom = true;
+     float max_distance = 250.0f;
+diff --git a/projects/ucf-esp/tools/frida_dump.bundle.js b/projects/ucf-esp/tools/frida_dump.bundle.js
+index 357da31..671c149 100644
+--- a/projects/ucf-esp/tools/frida_dump.bundle.js
++++ b/projects/ucf-esp/tools/frida_dump.bundle.js
+@@ -3529,26 +3529,43 @@ ${this.isEnum ? `enum` : this.isStruct ? `struct` : this.isInterface ? `interfac
+       const Camera = camImage.class("UnityEngine.Camera");
+       const Screen = camImage.class("UnityEngine.Screen");
+       const findPhysicsClass = () => {
+-        const names = ["UnityEngine.PhysicsModule", "UnityEngine.CoreModule", "UnityEngine"];
+-        for (const nm of names) {
+-          try {
+-            const cls = Il2Cpp.domain.assembly(nm).image.class("UnityEngine.Physics");
+-            if (cls) return cls;
+-          } catch (e) {
+-          }
+-        }
+-        return null;
+-      };
+-      const Physics = findPhysicsClass();
+-      if (!Physics) console.log("[!] UnityEngine.Physics 未找到：遮挡检测关闭（visible 回退 true）");
+-      else console.log("[*] 遮挡检测 Physics 类已定位（" + (Physics.image ? Physics.image.name : "assembly") + "）");
+-      const VISIBILITY = !!Physics && CFG.visibility !== false;
+-      const VIS_REFRESH_MS = Number.isFinite(CFG.visRefreshMs) ? CFG.visRefreshMs : 150;
+-      let visCache = /* @__PURE__ */ Object.create(null);
+-      let visLastRefresh = -1e9;
+-      let visDoRefreshThisFrame = false;
+-      if (!VISIBILITY) console.log("[*] 遮挡检测已关闭（CFG.visibility=false 或 Physics 未找到）：visible 恒为 true");
+-      const GameManager = asmImage.class("GameManager");
++            const names = ["UnityEngine.PhysicsModule", "UnityEngine.CoreModule", "UnityEngine"];
++            for (const nm of names) {
++              try {
++                const cls = Il2Cpp.domain.assembly(nm).image.class("UnityEngine.Physics");
++                if (cls) return cls;
++              } catch (e) {
++              }
++            }
++            return null;
++          };
++          const Physics = findPhysicsClass();
++          if (!Physics) console.log("[!] UnityEngine.Physics 未找到：遮挡检测关闭（visible 回退 true）");
++          else console.log("[*] 遮挡检测 Physics 类已定位（" + (Physics.image ? Physics.image.name : "assembly") + "）");
++          const findUnityClass = (name) => {
++            for (const nm of ["UnityEngine.CoreModule", "UnityEngine"])
++              try {
++                const cls = Il2Cpp.domain.assembly(nm).image.class(name);
++                if (cls) return cls;
++              } catch (e) {
++              }
++            return null;
++          };
++          const Renderer = findUnityClass("UnityEngine.Renderer");
++          const SkinnedMeshRenderer = findUnityClass("UnityEngine.SkinnedMeshRenderer");
++          const RENDERER_VISIBILITY = !!(Renderer || SkinnedMeshRenderer);
++          if (RENDERER_VISIBILITY)
++            console.log("[*] Unity Renderer.isVisible 已定位（优先 SkinnedMeshRenderer）");
++          else
++            console.log("[!] Unity Renderer.isVisible 未定位：可见性回退 Physics.Linecast");
++          const VISIBILITY = (!!Physics || RENDERER_VISIBILITY) && CFG.visibility !== false;
++          const VIS_REFRESH_MS = Number.isFinite(CFG.visRefreshMs) ? CFG.visRefreshMs : 150;
++          let visCache = /* @__PURE__ */ Object.create(null);
++          let rendererCache = /* @__PURE__ */ Object.create(null);
++          let visLastRefresh = -1e9;
++          let visDoRefreshThisFrame = false;
++          if (!VISIBILITY) console.log("[*] 遮挡检测已关闭（CFG.visibility=false 且无可用 Unity 可见性 API）：visible 恒为 true");
++          const GameManager = asmImage.class("GameManager");
+       discover(Camera, "Camera");
+       discover(GameManager, "GameManager");
+       const METHOD_CACHE = /* @__PURE__ */ new Map();
+@@ -3663,10 +3680,48 @@ ${this.isEnum ? `enum` : this.isStruct ? `struct` : this.isInterface ? `interfac
+           const VIS_ROOT_COLLIDER_TOLERANCE = 1.5;
+           const VIS_BONE_COLLIDER_TOLERANCE = 0.35;
+           const VISIBILITY_POINT_BONES = [11, 9, 0];
++          const readRendererVisibilityOf = (player) => {
++            if (!RENDERER_VISIBILITY || !player) return null;
++            try {
++              const key = player.handle.toString();
++              let renderer = rendererCache[key];
++              if (!alive(renderer)) {
++                const container = callMethod(player, "get_characterContainer", 0);
++                if (!alive(container)) return null;
++                const rendererClass = SkinnedMeshRenderer || Renderer;
++                renderer = callMethod(
++                  container,
++                  "GetComponentInChildren",
++                  2,
++                  rendererClass.type,
++                  true
++                );
++                if (alive(renderer)) rendererCache[key] = renderer;
++              }
++              if (!alive(renderer)) return null;
++              if (renderer.tryMethod("get_enabled", 0) && callMethod(renderer, "get_enabled", 0) === false) return false;
++              if (!renderer.tryMethod("get_isVisible", 0)) return null;
++              return !!callMethod(renderer, "get_isVisible", 0);
++            } catch (e) {
++              if (!visibilityWarned) {
++                visibilityWarned = true;
++                console.log("[!] Renderer.isVisible 调用失败，回退 Physics.Linecast:", e.message || e);
++              }
++              return null;
++            }
++          };
+           const readVisibilityOf = (player, targetTransform) => {
+             if (!visibilityOrigin || !targetTransform) return null;
+             const vt = perfNow();
+             try {
++              const rendererVisible = readRendererVisibilityOf(player);
++              if (rendererVisible !== null) {
++                if (!visibilitySampleLogged) {
++                  visibilitySampleLogged = true;
++                  console.log("[*] 可见性样本 source=Renderer.isVisible visible=", rendererVisible);
++                }
++                return rendererVisible;
++              }
+               const sx = visibilityOrigin.field("x").value;
+               const sy = visibilityOrigin.field("y").value;
+               const sz = visibilityOrigin.field("z").value;
+diff --git a/projects/ucf-esp/tools/frida_dump.js b/projects/ucf-esp/tools/frida_dump.js
+index f1aa5a0..f727948 100644
+--- a/projects/ucf-esp/tools/frida_dump.js
++++ b/projects/ucf-esp/tools/frida_dump.js
+@@ -206,18 +206,36 @@ Il2Cpp.perform(() => {
+   else console.log("[*] 遮挡检测 Physics 类已定位（" +
+                    (Physics.image ? Physics.image.name : "assembly") + "）");
+ 
+-  // 遮挡检测总开关 + 节流配置。
+-  // Physics.Linecast 是跑在 Unity 主线程的真实物理射线，每帧对每个玩家各调一次
+-  // （30 人 × 125Hz ≈ 每秒 3750 次）会严重拖垮游戏本帧 FPS——这就是“进对局掉帧、
+-  // 且隐藏 ESP 也掉”的真凶（瓶颈在游戏进程，不在 C++ 叠层）。
+-  // 改为按墙钟节流：默认每 ~150ms 整批重算一次，结果按玩家 handle 缓存复用
+-  // （遮挡变化很慢，~7Hz 足够）。CFG.visibility=false 可彻底关闭（visible 恒为 true）。
+-  const VISIBILITY = !!Physics && CFG.visibility !== false;
++  // Unity 原生可见性：Renderer.isVisible 是引擎维护的可见性结果。
++  // 优先取角色子树中的 SkinnedMeshRenderer，取不到时再回退到 Renderer。
++  // 这是 Unity 侧成熟的可见性来源；Linecast 仅作为 Renderer 不可用时的回退。
++  const findUnityClass = (name) => {
++    for (const nm of ["UnityEngine.CoreModule", "UnityEngine"])
++      try {
++        const cls = Il2Cpp.domain.assembly(nm).image.class(name);
++        if (cls) return cls;
++      } catch (e) { /* 尝试下一个程序集 */ }
++    return null;
++  };
++  const Renderer = findUnityClass("UnityEngine.Renderer");
++  const SkinnedMeshRenderer = findUnityClass("UnityEngine.SkinnedMeshRenderer");
++  const RENDERER_VISIBILITY = !!(Renderer || SkinnedMeshRenderer);
++  if (RENDERER_VISIBILITY)
++    console.log("[*] Unity Renderer.isVisible 已定位（优先 SkinnedMeshRenderer）");
++  else
++    console.log("[!] Unity Renderer.isVisible 未定位：可见性回退 Physics.Linecast");
++
++  // 遮挡检测总开关 + 节流配置。优先使用 Renderer.isVisible；只有 Renderer
++  // 不可取时才进入 Physics.Linecast 回退。两者都在 Unity 主线程调用，并按墙钟
++  // 节流、按玩家 handle 缓存，避免把可见性查询放进每帧高频路径。
++  // CFG.visibility=false 可彻底关闭（visible 恒为 true）。
++  const VISIBILITY = (!!Physics || RENDERER_VISIBILITY) && CFG.visibility !== false;
+   const VIS_REFRESH_MS = Number.isFinite(CFG.visRefreshMs) ? CFG.visRefreshMs : 150;
+   let visCache = Object.create(null);   // handle 字符串 -> bool
++  let rendererCache = Object.create(null); // player handle -> Renderer
+   let visLastRefresh = -1e9;
+   let visDoRefreshThisFrame = false;     // frameTick 每帧只判定一次
+-  if (!VISIBILITY) console.log("[*] 遮挡检测已关闭（CFG.visibility=false 或 Physics 未找到）：visible 恒为 true");
++  if (!VISIBILITY) console.log("[*] 遮挡检测已关闭（CFG.visibility=false 且无可用 Unity 可见性 API）：visible 恒为 true");
+   const GameManager = asmImage.class("GameManager");
+   discover(Camera, "Camera");
+   discover(GameManager, "GameManager");
+@@ -383,10 +401,47 @@ Il2Cpp.perform(() => {
+   const VIS_ROOT_COLLIDER_TOLERANCE = 1.5;
+   const VIS_BONE_COLLIDER_TOLERANCE = 0.35;
+   const VISIBILITY_POINT_BONES = [11, 9, 0]; // Head, Chest, Hips（现有骨骼顺序）
++
++  const readRendererVisibilityOf = (player) => {
++    if (!RENDERER_VISIBILITY || !player) return null;
++    try {
++      const key = player.handle.toString();
++      let renderer = rendererCache[key];
++      if (!alive(renderer)) {
++        const container = callMethod(player, "get_characterContainer", 0);
++        if (!alive(container)) return null;
++        const rendererClass = SkinnedMeshRenderer || Renderer;
++        // dump.cs 确认这是 Component 的非泛型重载：GetComponentInChildren(Type,bool)。
++        renderer = callMethod(container, "GetComponentInChildren", 2,
++                               rendererClass.type, true);
++        if (alive(renderer)) rendererCache[key] = renderer;
++      }
++      if (!alive(renderer)) return null;
++      if (renderer.tryMethod("get_enabled", 0) &&
++          callMethod(renderer, "get_enabled", 0) === false) return false;
++      if (!renderer.tryMethod("get_isVisible", 0)) return null;
++      return !!callMethod(renderer, "get_isVisible", 0);
++    } catch (e) {
++      if (!visibilityWarned) {
++        visibilityWarned = true;
++        console.log("[!] Renderer.isVisible 调用失败，回退 Physics.Linecast:", e.message || e);
++      }
++      return null;
++    }
++  };
++
+   const readVisibilityOf = (player, targetTransform) => {
+     if (!visibilityOrigin || !targetTransform) return null;
+     const vt = perfNow();          // 记 Physics.Linecast 这一段花了多少
+     try {
++      const rendererVisible = readRendererVisibilityOf(player);
++      if (rendererVisible !== null) {
++        if (!visibilitySampleLogged) {
++          visibilitySampleLogged = true;
++          console.log("[*] 可见性样本 source=Renderer.isVisible visible=", rendererVisible);
++        }
++        return rendererVisible;
++      }
+       const sx = visibilityOrigin.field("x").value;
+       const sy = visibilityOrigin.field("y").value;
+       const sz = visibilityOrigin.field("z").value;
+@@ -919,6 +974,7 @@ Il2Cpp.perform(() => {
+         lastGameManagerHandle = null;
+         bonesCache = Object.create(null);
+         visCache = Object.create(null);
++        rendererCache = Object.create(null);
+         bonesAutoDisabled = false;
+       }
+       // 曾经拿到过又没了 = 退出对局回菜单（实例被销毁），不是“还没创建”，别再干等
+@@ -937,6 +993,7 @@ Il2Cpp.perform(() => {
+       clearMethodCache();
+       bonesCache = Object.create(null);
+       visCache = Object.create(null);
++      rendererCache = Object.create(null);
+       bonesAutoDisabled = false;
+       console.log("[*] GameManager 已切换：清理对象方法缓存");
+     }

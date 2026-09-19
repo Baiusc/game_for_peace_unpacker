@@ -270,3 +270,4 @@
 - 3rd 项目通常读取游戏维护的 spotted/render-time 布尔状态；UCF 当前没有已验证的等价字段，不能猜偏移。`Physics.Linecast` 只能作为通用回退。
 - 单独向玩家根 Transform（通常是脚底）发射一条线，会先命中目标自己的胶囊体，导致大多数目标误判黄色。当前改为 root + Head/Chest/Hips 多取点，任一有效射线抵达目标即为 visible；只有所有有效取点都被提前命中才判 BLOCKED。
 - 根节点使用 1.5m 末端容差，骨位使用 0.35m；所有 RaycastHit 距离无效时继续 fail-open。首次样本日志用于判断是自碰撞、触发器还是实际墙体。
+- 静态复核发现 Unity `Renderer.get_isVisible()`（RVA `0x43C170`）和 `SkinnedMeshRenderer : Renderer` 已在 dump/script.json 中存在。当前脚本优先取角色 `characterContainer` 子树的 SkinnedMeshRenderer；Renderer API 不可用时才回退 Linecast。C++ 菜单的 `aim_wall_check` 默认开启，可单独关闭可见性过滤。

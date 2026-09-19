@@ -626,11 +626,12 @@ static void frame() {
             candidates[i].visible = point_screen_valid && ucf::is_target_visible(p);
             screen_candidates[i].x = screen_x;
             screen_candidates[i].y = screen_y;
-            screen_candidates[i].valid = point_world_valid && candidates[i].visible;
+            screen_candidates[i].valid = point_world_valid && point_screen_valid &&
+                (!g_settings.aim_wall_check || candidates[i].visible);
             if (!point_world_valid ||
                 (!g_settings.aim_teammates && p.team == f.local.team) ||
                 (!g_settings.aim_dead && candidates[i].dead) ||
-                (g_settings.aim_visible_only && !candidates[i].visible) ||
+                (g_settings.aim_wall_check && g_settings.aim_visible_only && !candidates[i].visible) ||
                 (g_settings.aim_max_distance > 0.0f && candidates[i].dist > g_settings.aim_max_distance)) {
                 candidates[i].valid = false;
                 screen_candidates[i].valid = false;
@@ -648,6 +649,10 @@ static void frame() {
         }
         if (target >= 0) {
             selected_state = ucf::target_state(candidates[target]);
+            // 关闭隔墙检测时，BLOCKED 只保留为诊断/着色状态，不阻断本地
+            // 调试输入模拟；死亡/无效状态仍然保持硬门。
+            if (!g_settings.aim_wall_check && selected_state == ucf::TargetState::Blocked)
+                selected_state = ucf::TargetState::Normal;
             output_angles = ucf::smooth_angles(output_angles,
                 ucf::angles_from_direction(candidates[target].dir),
                 g_settings.responsiveness);
@@ -707,6 +712,7 @@ static void frame() {
         style.show_enemy = g_settings.show_enemy;
         style.target_index = target >= 0 ? target + 1 : -1;
         style.target_state = selected_state;
+        style.show_blocked_state = g_settings.aim_wall_check;
         style.show_target_ray = g_settings.show_target_ray;
         style.ray_from_bottom = g_settings.ray_from_bottom;
         style.max_distance = g_settings.max_distance;

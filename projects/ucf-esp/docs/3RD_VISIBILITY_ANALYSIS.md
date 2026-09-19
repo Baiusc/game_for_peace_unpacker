@@ -61,15 +61,34 @@ bone: 0.35m      // 骨位在身体内部，使用更小的末端容差
 可见性，风险高于通用物理取点。因此本轮只改 `frida_dump.js` 的 Unity API 路径，不改
 Frame 契约，不新增未验证偏移。
 
-## 5. 实机诊断
+## 5. Unity 原生 Renderer.isVisible 落地
+
+后续静态复核确认 UCF 自己的 Unity dump 已包含：
+
+```text
+Renderer.isVisible / Renderer.get_isVisible()  RVA 0x43C170
+SkinnedMeshRenderer : Renderer
+Component.GetComponentInChildren(Type, bool)
+Player.characterContainer @ 0x4C
+```
+
+代码现在优先从 `characterContainer` 子树取得 `SkinnedMeshRenderer`，调用
+`get_isVisible()`；取不到 Renderer 或 bridge 调用失败时，才回退到 root + Head/Chest/Hips
+多取点 Linecast。这样不再把 Linecast 作为正常路径的唯一依据。
+
+注意：`Renderer.isVisible` 的语义是“被任意 Camera 认为可见”，不是绝对的主相机无遮挡。
+如果游戏存在小地图或其它 Camera，后续应继续验证 Renderer 来源；当前角色主模型路径
+优先使用 SkinnedMeshRenderer，避免把武器特效当作主体可见性。
+
+## 6. 实机诊断
 
 刷新周期仍由 `--vis-refresh-ms` 控制。首次刷新会打印：
 
 ```text
-[*] 可见性样本 point/hitDistance/total= bone11 ... visible=true
+[*] 可见性样本 source=Renderer.isVisible visible= true
 ```
 
-若仍全部黄色，会看到：
+只有 Renderer 不可用并进入 Linecast 回退时，才会看到：
 
 ```text
 visible=false（所有取点均被提前命中）

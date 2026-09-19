@@ -1,0 +1,17 @@
+Changed branch/field: Unity Renderer.isVisible visibility source and Settings.aim_wall_check menu/config switch.
+Default status: aim_wall_check=true; menu label is "启用隔墙检测" under Aimbot.
+Four artifacts: MODIFIED_FILE, DIFF_FILE, VERIFICATION.txt, executable ROLLBACK.sh.
+
+BASELINE exact command:
+git show HEAD:projects/ucf-esp/tools/frida_dump.js >/tmp/frida_dump_renderer_baseline.js && node --check /tmp/frida_dump_renderer_baseline.js
+BASELINE literal result: exit 0; previous script syntax accepted.
+
+MODIFIED exact command:
+node --check projects/ucf-esp/tools/frida_dump.js && node --check projects/ucf-esp/tools/frida_dump.bundle.js && python3 projects/ucf-esp/tests/test_script_config.py && cmake --build projects/ucf-esp/cpp_overlay/build && ctest --test-dir projects/ucf-esp/cpp_overlay/build --output-on-failure
+MODIFIED literal result: exit 0; JS/config tests passed, C++ build passed, ctest 2/2 passed.
+
+ROLLBACK exact command:
+cp projects/ucf-esp/tools/frida_dump.js /tmp/frida_dump_renderer_modified.js && mkdir -p /tmp/ucf-renderer-rollback && git show HEAD:projects/ucf-esp/tools/frida_dump.js >/tmp/ucf-renderer-rollback/frida_dump.js && node --check /tmp/ucf-renderer-rollback/frida_dump.js && cp /tmp/frida_dump_renderer_modified.js projects/ucf-esp/tools/frida_dump.js
+ROLLBACK literal result: exit 0; rollback copy passed syntax check and working tree was restored to MODIFIED_FILE.
+
+Restored behavior/status: Renderer.isVisible is preferred for character visibility; Linecast is fallback. C++ wall filtering is enabled by default, persisted in key=value config, and can be disabled from the Aimbot submenu without changing Frame layout.
