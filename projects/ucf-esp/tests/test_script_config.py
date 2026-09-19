@@ -164,10 +164,11 @@ def test_defaults():
     # 采样间隔：实测 8ms 时单帧真耗时上百毫秒 -> 主线程被占满、游戏掉到个位数 FPS。
     # 默认必须回到“跑得完”的量级，否则又会重现“注入后卡顿”。
     expect(cfg["interval"] == 33, f"默认采样间隔应为 33ms（≈30Hz），实际 {cfg['interval']}")
-    expect(cfg["bones"] is True, f"骨骼默认开启: {cfg}")
+    expect(cfg["bones"] is False, f"骨骼默认应关闭，需 --bones 显式开启: {cfg}")
     expect(cfg["bonesRefreshMs"] >= 100, f"骨骼应节流（默认 250ms），实际 {cfg['bonesRefreshMs']}")
     expect(cfg["visRefreshMs"] >= 100, f"遮挡应节流（默认 150ms），实际 {cfg['visRefreshMs']}")
-    print(f"  PASS 性能默认值：interval={cfg['interval']}ms 骨骼={cfg['bonesRefreshMs']}ms "
+    expect(cfg["visibility"] is True, f"遮挡检测默认开启且可用 --no-visibility 关闭: {cfg}")
+    print(f"  PASS 性能默认值：interval={cfg['interval']}ms 骨骼默认关闭、刷新={cfg['bonesRefreshMs']}ms "
           f"遮挡={cfg['visRefreshMs']}ms")
 
 
@@ -198,6 +199,14 @@ def test_perf_guards():
     expect("readBonesOf" in src, "缺少骨骼读取")
     expect(src.count("readBonesOf(p)") == 1,
            "readBonesOf 只应在节流分支里被调用一次（每帧都调就又回去了）")
+    expect("const BONES = CFG.bones === true" in src,
+           "骨骼必须显式开启，避免无效模型的失败扫描进入默认取帧路径")
+    expect("hit.add(0x1c).readFloat()" in src,
+           "RaycastHit.m_Distance 必须读取 0x1c")
+    expect("hit, -5, 0" in src,
+           "Linecast 应使用 Unity 默认 Raycast 层掩码 -5")
+    expect("hit.add(0x18).readFloat()" not in src,
+           "0x18 是 RaycastHit.m_FaceID，不能当作距离")
     print("  PASS 方法缓存 / 骨骼节流 / 分段计时锚点齐全，且骨骼不再每帧无条件读")
 
 

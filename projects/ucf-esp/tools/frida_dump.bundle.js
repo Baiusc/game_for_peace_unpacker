@@ -1,5 +1,5 @@
 (() => {
-  // node_modules/frida-il2cpp-bridge/dist/index.js
+  // ../../../../../../../tmp/ucf-esp-build-20260919/node_modules/frida-il2cpp-bridge/dist/index.js
   var __decorate = function(decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -3459,11 +3459,11 @@ ${this.isEnum ? `enum` : this.isStruct ? `struct` : this.isInterface ? `interfac
   })(Il2Cpp2 || (Il2Cpp2 = {}));
   globalThis.Il2Cpp = Il2Cpp2;
 
-  // frida_dump.js
+  // projects/ucf-esp/tools/frida_dump.js
   var CFG = typeof UCFG !== "undefined" && UCFG && typeof UCFG === "object" ? UCFG : {};
   var LEVEL = Number.isFinite(CFG.level) ? CFG.level : 4;
   var INTERVAL_MS = Number.isFinite(CFG.interval) ? CFG.interval : 33;
-  var BONES = CFG.bones !== false;
+  var BONES = CFG.bones === true;
   var BONE_REFRESH_MS = Number.isFinite(CFG.bonesRefreshMs) ? CFG.bonesRefreshMs : 250;
   var PERF_ON = CFG.perf !== false;
   var DISCOVER = CFG.discover === true;
@@ -3552,12 +3552,12 @@ ${this.isEnum ? `enum` : this.isStruct ? `struct` : this.isInterface ? `interfac
       discover(Camera, "Camera");
       discover(GameManager, "GameManager");
       const METHOD_CACHE = /* @__PURE__ */ new Map();
-      const BOUND_CACHE = /* @__PURE__ */ new Map();
+      let BOUND_CACHE = /* @__PURE__ */ new WeakMap();
       const CACHE_LIMIT = 2e4;
       let cacheHits = 0, cacheMisses = 0;
       const clearMethodCache = () => {
         METHOD_CACHE.clear();
-        BOUND_CACHE.clear();
+        BOUND_CACHE = /* @__PURE__ */ new WeakMap();
         cacheHits = 0;
         cacheMisses = 0;
       };
@@ -3585,15 +3585,18 @@ ${this.isEnum ? `enum` : this.isStruct ? `struct` : this.isInterface ? `interfac
       const callMethod = (obj, name, argc, ...args) => {
         if (!obj) return null;
         const klass = obj.class;
-        const hkey = obj.handle.toString();
-        const bkey = klass.handle.toString() + "|" + hkey + "|" + name + "|" + argc;
-        let bound = BOUND_CACHE.get(bkey);
+        const bkey = klass.handle.toString() + "|" + name + "|" + argc;
+        let objectMethods = BOUND_CACHE.get(obj);
+        if (!objectMethods) {
+          objectMethods = /* @__PURE__ */ new Map();
+          BOUND_CACHE.set(obj, objectMethods);
+        }
+        let bound = objectMethods.get(bkey);
         if (bound === void 0) {
           const m = resolveInstanceMethod(klass, name, argc);
           if (!m) throw new Error(`找不到实例方法 ${name}/${argc}（含继承链）`);
           bound = m.bind(obj);
-          if (BOUND_CACHE.size > CACHE_LIMIT) BOUND_CACHE.clear();
-          BOUND_CACHE.set(bkey, bound);
+          objectMethods.set(bkey, bound);
         }
         cacheHits++;
         return bound.invoke(...args);
@@ -3668,11 +3671,11 @@ ${this.isEnum ? `enum` : this.isStruct ? `struct` : this.isInterface ? `interfac
             visibilityOrigin,
             end,
             hit,
-            -1,
+            -5,
             0
           );
           if (!hitAny) return true;
-          const hitDistance = hit.add(24).readFloat();
+          const hitDistance = hit.add(28).readFloat();
           const sx = visibilityOrigin.field("x").value;
           const sy = visibilityOrigin.field("y").value;
           const sz = visibilityOrigin.field("z").value;
@@ -3792,6 +3795,7 @@ ${this.isEnum ? `enum` : this.isStruct ? `struct` : this.isInterface ? `interfac
       let bonesCache = /* @__PURE__ */ Object.create(null);
       let bonesFailStreak = 0;
       let bonesValidLast = 0;
+      let bonesAutoDisabled = false;
       const BONE_FAIL_LIMIT = Number.isFinite(CFG.bonesFailLimit) ? CFG.bonesFailLimit : 0;
       const BONE_NAME_ALIASES = [
         ["Hips", "Bip01 Pelvis", "mixamorig:Hips"],
@@ -3909,7 +3913,7 @@ ${this.isEnum ? `enum` : this.isStruct ? `struct` : this.isInterface ? `interfac
           if (!VISIBILITY || !t) {
             out.visible = null;
           } else if (visDoRefreshThisFrame) {
-            out.visible = out.hp !== null && out.hp !== void 0 && out.hp <= 0 ? false : readVisibilityOf(t);
+            out.visible = readVisibilityOf(t);
             visCache[t.handle.toString()] = out.visible;
           } else {
             const k = t.handle.toString();
@@ -3935,7 +3939,7 @@ ${this.isEnum ? `enum` : this.isStruct ? `struct` : this.isInterface ? `interfac
             out.maxHp = null;
           }
         }
-        if (!BONES || !withHp) {
+        if (!BONES || bonesAutoDisabled || !withHp) {
           out.bones = [];
         } else if (bonesDoRefreshThisFrame) {
           const bt = perfNow();
@@ -3973,6 +3977,7 @@ ${this.isEnum ? `enum` : this.isStruct ? `struct` : this.isInterface ? `interfac
       let tick = 0;
       let sent = 0;
       let everHadGm = false;
+      let lastGameManagerHandle = null;
       let lastWarn = 0;
       let lastReport = 0;
       let lastErr = 0;
@@ -4100,6 +4105,13 @@ ${this.isEnum ? `enum` : this.isStruct ? `struct` : this.isInterface ? `interfac
         }
         const gm = getGameManager();
         if (!gm) {
+          if (lastGameManagerHandle !== null) {
+            clearMethodCache();
+            lastGameManagerHandle = null;
+            bonesCache = /* @__PURE__ */ Object.create(null);
+            visCache = /* @__PURE__ */ Object.create(null);
+            bonesAutoDisabled = false;
+          }
           if (now - lastWarn > WARN_MS) {
             console.log(everHadGm ? "[*] 不在对局中（GameManager 实例已销毁，进对局后自动恢复）..." : "[*] 等待 GameManager 实例（尚未创建，进对局后再按 INS 注入更省事）...");
             lastWarn = now;
@@ -4108,6 +4120,15 @@ ${this.isEnum ? `enum` : this.isStruct ? `struct` : this.isInterface ? `interfac
           return;
         }
         everHadGm = true;
+        const gmHandle = gm.handle.toString();
+        if (lastGameManagerHandle !== null && lastGameManagerHandle !== gmHandle) {
+          clearMethodCache();
+          bonesCache = /* @__PURE__ */ Object.create(null);
+          visCache = /* @__PURE__ */ Object.create(null);
+          bonesAutoDisabled = false;
+          console.log("[*] GameManager 已切换：清理对象方法缓存");
+        }
+        lastGameManagerHandle = gmHandle;
         const myPlayer = getMyPlayer();
         const allPlayers = getAllPlayers(gm);
         const frame = {
@@ -4148,6 +4169,10 @@ ${this.isEnum ? `enum` : this.isStruct ? `struct` : this.isInterface ? `interfac
           if (tick <= 3) {
             console.log(`[*] allPlayers length=${n} 有效=${frame.players.length}（null 槽位 ${n - frame.players.length}）取元素=${useGet ? ".get(i)" : "下标"}`);
           }
+        }
+        if (BONES && bonesDoRefreshThisFrame && bonesValidLast === 0) {
+          bonesAutoDisabled = true;
+          console.log("[!] 本局骨骼读取全部无效，停止重复骨骼扫描；需要重新探测请切换对局或显式重启脚本");
         }
         const st = perfNow();
         send(frame);

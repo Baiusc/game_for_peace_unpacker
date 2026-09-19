@@ -655,3 +655,13 @@ ucf_overlay_win32.exe
 真实帧的 `visible` 由 Unity 主线程 `Physics.Linecast` 产生。若日志出现
 `Physics.Linecast 不可用`，共享内存写端会把未知状态按 `true` 传递；这表示当前版本没有遮挡证据，
 不是确认可见。
+
+## 2026-09-19 实机稳定性排查参数
+
+默认取帧不读取骨骼，避免非 Humanoid 模型反复执行失败的 `GetBoneTransform`/`Transform.Find` 扫描。需要验证骨骼时显式使用 `--bones`；若实机再次卡顿，先使用：
+
+```powershell
+python tools\frida_host.py --shm --interval 100 --no-bones --no-visibility
+```
+
+该组合只保留矩阵、玩家、血量和共享内存传输，用于隔离主线程读取成本。遮挡检测恢复时使用 `--vis-refresh-ms 300`；骨骼恢复时使用 `--bones --bones-refresh-ms 500`。实机日志应同时确认 Frida 的 `perf` 行、C++ 的 `src=shm` 和 `players` 数量，不能只看叠加层是否显示。

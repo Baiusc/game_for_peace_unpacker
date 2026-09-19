@@ -245,3 +245,10 @@
   - **采样间隔默认 8ms → 33ms（≈30Hz）**：单帧真实耗时就是几十毫秒，8ms 的预算根本跑不完，只会把主线程占满。间隔必须 ≥ 单帧真实耗时。
   - 新增帧内分段计时：心跳里多打一行 `perf: 单帧 Xms（玩家 … / 骨骼 … / 遮挡 … / send …）… 调用命中/缺失 … 实际 N FPS`。以后再遇到“卡”，先看这行，不用猜。
 - **重打包坑（务必记住）**：`esbuild` 用 `--platform=neutral` 时默认 charset 是 ASCII，会把源码里的中文转义成 `\uXXXX`，于是 `test_script_config.py` 里按中文锚点做的“源码与 bundle 是否同步”检查全部失败（表现为 `bundle.js 缺少 level0 的锚点 'level0 心跳'`）。**打包命令必须带 `--charset=utf8`**：`esbuild frida_dump.js --bundle --format=iife --platform=neutral --charset=utf8 --outfile=...`。
+
+## 2026-09-19 实机掉帧与 ESP 空帧修复
+
+- `frida_dump.js` 的取帧在 Unity 主线程执行；`interval=33ms` 不是单帧耗时上限。未确认 Humanoid 的模型不能默认执行 19 根骨骼读取和递归 `Transform.Find`，骨骼改为 `--bones` 显式开启，并在本局整批无效后停止重复失败扫描。
+- 对象绑定 Method 不能用对象地址字符串做长期强引用缓存。Unity 换场景后地址可能复用；绑定缓存改为 `WeakMap`，并在 GameManager 切换/离开对局时清理。
+- `RaycastHit` 的 `m_Distance` 是 `0x1c`，`0x18` 是 `m_FaceID`。遮挡检测使用 `0x1c`，LayerMask 使用 `-5`，避免把 FaceID 当距离导致隔墙状态随机。
+- `sendStatus(no-camera/matrix-error)` 是清屏状态，不应被误判为正常实体帧；实机排查时同时观察 `inGame`、`playerCount`、`src=shm` 与 Frida perf 行。纯 ESP 性能隔离可使用 `--no-bones --no-visibility --interval 100`。

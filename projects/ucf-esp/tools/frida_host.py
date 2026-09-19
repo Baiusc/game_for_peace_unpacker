@@ -251,8 +251,8 @@ atexit.register(close_dumper)
 
 def build_script_source(js, level=DEFAULT_LEVEL, interval_ms=33, discover=False,
                         probe=False, allow_get_instance=False, allow_is_dead=False,
-                        main_thread=True, bones=True, bones_refresh_ms=250,
-                        vis_refresh_ms=150):
+                        main_thread=True, bones=False, bones_refresh_ms=250,
+                        vis_refresh_ms=150, visibility=True):
     """在脚本最前面拼一行运行配置，供 frida_dump.js 里的 UCFG 读取。
 
     分档（LEVEL）是排查“注入后游戏闪退”的核心手段：逐级放开调用范围，
@@ -277,8 +277,9 @@ def build_script_source(js, level=DEFAULT_LEVEL, interval_ms=33, discover=False,
     的一长串 bridge 调用，8ms 的预算跑不完 —— 结果每帧占用主线程上百毫秒，游戏掉到
     个位数 FPS。30Hz 对 ESP/自动瞄准完全够用。
 
-    bones 默认 True（骨架），按 bones_refresh_ms 节流；vis_refresh_ms 是 Physics.Linecast
-    遮挡检测的重算周期。两者都是“按墙钟整批重算 + 缓存复用”，不随采样率线性放大开销。
+    bones 默认 False（骨架需显式 --bones），避免未确认 Humanoid 模型时把失败扫描放进
+    默认路径；vis_refresh_ms 是 Physics.Linecast 遮挡检测的重算周期。两者都是按墙钟
+    整批重算 + 缓存复用，不随采样率线性放大开销。
     """
     cfg = json.dumps({"level": int(level), "interval": int(interval_ms),
                       "discover": bool(discover), "probe": bool(probe),
@@ -287,7 +288,8 @@ def build_script_source(js, level=DEFAULT_LEVEL, interval_ms=33, discover=False,
                       "mainThread": bool(main_thread),
                       "bones": bool(bones),
                       "bonesRefreshMs": int(bones_refresh_ms),
-                      "visRefreshMs": int(vis_refresh_ms)})
+                      "visRefreshMs": int(vis_refresh_ms),
+                      "visibility": bool(visibility)})
     return f"const UCFG = {cfg};\n" + js
 
 
@@ -660,7 +662,8 @@ def kill_stale_shells(device, game_name):
 def inject(device, js_path, use_overlay, forced_pid=None, wait_seconds=DEFAULT_WAIT_MODULE,
            level=DEFAULT_LEVEL, interval_ms=33, discover=False, silence=10.0,
            probe=False, allow_get_instance=False, allow_is_dead=False,
-           main_thread=True, bones=True, bones_refresh_ms=250, vis_refresh_ms=150):
+           main_thread=True, bones=False, bones_refresh_ms=250, vis_refresh_ms=150,
+           visibility=True):
     """挑进程 -> 读脚本 -> attach -> 注入。日志顺序按真实执行顺序打印，便于排查。"""
     global OVERLAY
 
@@ -685,7 +688,7 @@ def inject(device, js_path, use_overlay, forced_pid=None, wait_seconds=DEFAULT_W
                              probe=probe, allow_get_instance=allow_get_instance,
                              allow_is_dead=allow_is_dead, main_thread=main_thread,
                              bones=bones, bones_refresh_ms=bones_refresh_ms,
-                             vis_refresh_ms=vis_refresh_ms)
+                             vis_refresh_ms=vis_refresh_ms, visibility=visibility)
     extra = []
     if probe:
         extra.append("单步探测")
@@ -738,7 +741,8 @@ def run_live(game, use_overlay, auto=False, no_launch=False, force_launch=False,
              kill_stale=False, level=DEFAULT_LEVEL, interval_ms=33,
              discover=False, silence=10.0, script=None,
              probe=False, allow_get_instance=False, allow_is_dead=False,
-             main_thread=True, bones=True, bones_refresh_ms=250, vis_refresh_ms=150):
+             main_thread=True, bones=False, bones_refresh_ms=250, vis_refresh_ms=150,
+             visibility=True):
     global _GAME_PATH
     _GAME_PATH = game
 
@@ -794,7 +798,7 @@ def run_live(game, use_overlay, auto=False, no_launch=False, force_launch=False,
                probe=probe, allow_get_instance=allow_get_instance,
                allow_is_dead=allow_is_dead, main_thread=main_thread,
                bones=bones, bones_refresh_ms=bones_refresh_ms,
-               vis_refresh_ms=vis_refresh_ms)
+               vis_refresh_ms=vis_refresh_ms, visibility=visibility)
     except Exception as e:
         print("[!] 注入失败:", e)
 
@@ -842,13 +846,16 @@ def main():
                     help="每帧采样间隔毫秒（默认 33≈30Hz）。取帧是主线程上的一长串托管调用，"
                          "采样间隔不能低于单帧真实耗时，否则会持续占用主线程把游戏拖卡；"
                          "想更跟手可试 16~20，想更省可加大到 50~100")
+    ap.add_argument("--bones", action="store_true",
+                    help="显式开启骨骼读取；默认关闭，避免未支持 Humanoid 的模型反复失败扫描")
     ap.add_argument("--no-bones", action="store_true",
-                    help="完全不读骨骼（省掉每玩家 19 次 GetBoneTransform + 兜底 Transform.Find）。"
-                         "模型非 Humanoid 时骨骼本来就读不到，关掉可省主线程开销")
+                    help="显式关闭骨骼读取（兼容旧命令，优先级高于 --bones）")
     ap.add_argument("--bones-refresh-ms", type=int, default=250,
                     help="骨骼重算周期毫秒（默认 250≈4Hz，帧间复用缓存）")
     ap.add_argument("--vis-refresh-ms", type=int, default=150,
                     help="遮挡检测(Physics.Linecast)重算周期毫秒（默认 150）")
+    ap.add_argument("--no-visibility", action="store_true",
+                    help="关闭 Unity Physics.Linecast；用于先验证纯 ESP 帧率")
     ap.add_argument("--discover", action="store_true",
                     help="打印 Camera/GameManager 的真实方法名与字段名（对齐版本用）")
     ap.add_argument("--probe", action="store_true",
@@ -942,8 +949,10 @@ def main():
              discover=args.discover, silence=args.silence, script=args.script,
              probe=args.probe, allow_get_instance=args.allow_get_instance,
              allow_is_dead=args.allow_is_dead, main_thread=not args.no_main_thread,
-             bones=not args.no_bones, bones_refresh_ms=args.bones_refresh_ms,
-             vis_refresh_ms=args.vis_refresh_ms)
+             bones=args.bones and not args.no_bones,
+             bones_refresh_ms=args.bones_refresh_ms,
+             vis_refresh_ms=args.vis_refresh_ms,
+             visibility=not args.no_visibility)
 
 
 if __name__ == "__main__":

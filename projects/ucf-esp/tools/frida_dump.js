@@ -113,7 +113,9 @@ const LEVEL = Number.isFinite(CFG.level) ? CFG.level : 4;
 // 30Hz 对 ESP 叠加与自动瞄准完全够用（人眼/屏幕刷新 60Hz，目标位置误差可忽略）。
 const INTERVAL_MS = Number.isFinite(CFG.interval) ? CFG.interval : 33;
 // 骨骼读取总开关与刷新周期（见 readBonesOf 上方的性能说明）
-const BONES = CFG.bones !== false;
+// 骨骼读取改为显式 opt-in：实机模型未确认支持 Humanoid 前，不应把失败的
+// GetBoneTransform/Transform.Find 扫描放进默认取帧路径。需要骨骼时由宿主传 bones=true。
+const BONES = CFG.bones === true;
 const BONE_REFRESH_MS = Number.isFinite(CFG.bonesRefreshMs) ? CFG.bonesRefreshMs : 250;
 // 帧内分段计时：每 5s 随心跳打一行耗时明细，用来定位「卡在哪一段」。
 // CFG.perf === false 可关（省一点点开销）。
@@ -231,19 +233,19 @@ Il2Cpp.perform(() => {
   // 8ms 间隔下主线程被执行到 ~190ms/帧，游戏实测掉到 5 FPS —— 这才是“注入后卡顿”
   // 的真正大头（不是 Physics.Linecast，那条只是其中一小项）。
   //
-  // 这里按 (类指针 | 对象指针 | 名字 | 参数个数) 缓存**已绑定**的 Method，稳态下
-  // callMethod 只剩 Map.get + invoke。对象指针就是内存地址，句柄复用后语义依然正确
-  // （同一个地址上的对象，本来就该被作用到）。换局时实例被销毁会换地址，缓存由
-  // clearMethodCache() 主动清空，再加一个尺寸上限兜底。
+  // 方法解析按类缓存；绑定 Method 只放在 WeakMap 对象键中，避免跨场景持有旧对象。
+  // GameManager 切换时还会显式清理两级缓存。
   // ---------------------------------------------------------------------
   const METHOD_CACHE = new Map();     // (类|名字|参数个数) -> 未绑定 Method（可能为 null=确认不存在）
-  const BOUND_CACHE = new Map();      // (类|对象|名字|参数个数) -> 已绑定 Method
+  // WeakMap 不持有 Unity 对象生命周期；不要用对象地址字符串作为长期缓存键。
+  // Unity 换场景后地址可能复用，旧绑定不能跨对象保留。
+  let BOUND_CACHE = new WeakMap();    // object -> ((类|名字|参数个数) -> 已绑定 Method)
   const CACHE_LIMIT = 20000;
   let cacheHits = 0, cacheMisses = 0;
 
   const clearMethodCache = () => {
     METHOD_CACHE.clear();
-    BOUND_CACHE.clear();
+    BOUND_CACHE = new WeakMap();
     cacheHits = 0;
     cacheMisses = 0;
   };
@@ -275,15 +277,18 @@ Il2Cpp.perform(() => {
     // objectGetClass，native 但便宜），换来地址复用时的绝对安全 —— 类链进 key，
     // 地址被复用成别的类时自然 miss，重新解析。
     const klass = obj.class;
-    const hkey = obj.handle.toString();
-    const bkey = klass.handle.toString() + "|" + hkey + "|" + name + "|" + argc;
-    let bound = BOUND_CACHE.get(bkey);
+    const bkey = klass.handle.toString() + "|" + name + "|" + argc;
+    let objectMethods = BOUND_CACHE.get(obj);
+    if (!objectMethods) {
+      objectMethods = new Map();
+      BOUND_CACHE.set(obj, objectMethods);
+    }
+    let bound = objectMethods.get(bkey);
     if (bound === undefined) {
       const m = resolveInstanceMethod(klass, name, argc);
       if (!m) throw new Error(`找不到实例方法 ${name}/${argc}（含继承链）`);
       bound = m.bind(obj);
-      if (BOUND_CACHE.size > CACHE_LIMIT) BOUND_CACHE.clear();
-      BOUND_CACHE.set(bkey, bound);
+      objectMethods.set(bkey, bound);
     }
     cacheHits++;
     return bound.invoke(...args);
@@ -377,9 +382,10 @@ Il2Cpp.perform(() => {
       const end = callMethod(targetTransform, "get_position", 0);
       const hit = Memory.alloc(0x30);
       const hitAny = callStatic(Physics, "Linecast", 5,
-                                visibilityOrigin, end, hit, -1, 0);
+                                visibilityOrigin, end, hit, -5, 0);
       if (!hitAny) return true;
-      const hitDistance = hit.add(0x18).readFloat();
+      // UnityEngine.RaycastHit: m_FaceID=0x18, m_Distance=0x1c。
+      const hitDistance = hit.add(0x1c).readFloat();
       const sx = visibilityOrigin.field("x").value;
       const sy = visibilityOrigin.field("y").value;
       const sz = visibilityOrigin.field("z").value;
@@ -511,6 +517,7 @@ Il2Cpp.perform(() => {
   let bonesCache = Object.create(null);     // playerHandle -> bones[]
   let bonesFailStreak = 0;                  // 连续整批无效次数（仅用于诊断日志）
   let bonesValidLast = 0;
+  let bonesAutoDisabled = false;            // 本模型整批无效后，本局停止重复失败扫描
   const BONE_FAIL_LIMIT = Number.isFinite(CFG.bonesFailLimit) ? CFG.bonesFailLimit : 0;
   const BONE_NAME_ALIASES = [
     ["Hips", "Bip01 Pelvis", "mixamorig:Hips"],
@@ -654,9 +661,9 @@ Il2Cpp.perform(() => {
         out.visible = null;                 // 关闭遮挡检测 / 无 transform：全部视为可见
       } else if (visDoRefreshThisFrame) {
         // 真正的主线程 Physics.Linecast，仅在“重算帧”执行（每 ~150ms 一次）。
-        // 死亡玩家不需要射线（隔墙也无关紧要），直接判可见=false 省一次检测。
-        out.visible = (out.hp !== null && out.hp !== undefined && out.hp <= 0)
-          ? false : readVisibilityOf(t);
+        // 血量字段在本函数后段才读取；这里不能提前用 out.hp 做死亡短路，
+        // 否则该条件永远是 undefined，既没有节省射线，也会误导后续维护。
+        out.visible = readVisibilityOf(t);
         visCache[t.handle.toString()] = out.visible;
       } else {
         // 非重算帧：复用上次缓存，避免每帧 30 次物理射线拖垮游戏 FPS。
@@ -675,7 +682,7 @@ Il2Cpp.perform(() => {
       } catch (e) { out.hp = null; out.maxHp = null; }
     }
     // 骨骼：只在「重算帧」真正读取（每 ~250ms 一次），其余帧复用缓存。
-    if (!BONES || !withHp) {
+    if (!BONES || bonesAutoDisabled || !withHp) {
       out.bones = [];
     } else if (bonesDoRefreshThisFrame) {
       const bt = perfNow();
@@ -718,6 +725,7 @@ Il2Cpp.perform(() => {
   let tick = 0;
   let sent = 0;
   let everHadGm = false;   // 曾经拿到过 GameManager 实例 => 现在没了就是退出对局
+  let lastGameManagerHandle = null;
   let lastWarn = 0;        // 用时间戳节流告警，避免高频刷屏
   let lastReport = 0;
   let lastErr = 0;
@@ -840,6 +848,13 @@ Il2Cpp.perform(() => {
 
     const gm = getGameManager();
     if (!gm) {
+      if (lastGameManagerHandle !== null) {
+        clearMethodCache();
+        lastGameManagerHandle = null;
+        bonesCache = Object.create(null);
+        visCache = Object.create(null);
+        bonesAutoDisabled = false;
+      }
       // 曾经拿到过又没了 = 退出对局回菜单（实例被销毁），不是“还没创建”，别再干等
       if (now - lastWarn > WARN_MS) {
         console.log(everHadGm
@@ -851,6 +866,15 @@ Il2Cpp.perform(() => {
       return;
     }
     everHadGm = true;
+    const gmHandle = gm.handle.toString();
+    if (lastGameManagerHandle !== null && lastGameManagerHandle !== gmHandle) {
+      clearMethodCache();
+      bonesCache = Object.create(null);
+      visCache = Object.create(null);
+      bonesAutoDisabled = false;
+      console.log("[*] GameManager 已切换：清理对象方法缓存");
+    }
+    lastGameManagerHandle = gmHandle;
 
     const myPlayer = getMyPlayer();
     const allPlayers = getAllPlayers(gm);
@@ -888,6 +912,10 @@ Il2Cpp.perform(() => {
         console.log(`[*] allPlayers length=${n} 有效=${frame.players.length}` +
           `（null 槽位 ${n - frame.players.length}）取元素=${useGet ? ".get(i)" : "下标"}`);
       }
+    }
+    if (BONES && bonesDoRefreshThisFrame && bonesValidLast === 0) {
+      bonesAutoDisabled = true;
+      console.log("[!] 本局骨骼读取全部无效，停止重复骨骼扫描；需要重新探测请切换对局或显式重启脚本");
     }
     const st = perfNow();
     send(frame); // 发给宿主做投影 / 叠加
