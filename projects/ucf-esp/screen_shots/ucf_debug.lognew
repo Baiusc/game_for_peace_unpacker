@@ -1,0 +1,32 @@
+init: flip_hr=0x887A0001 used=0 blt_hr=0x00000000 dwm_hr=0x00000000 clear=black-colorkey
+dev: replay loaded
+startup: overlay initialized
+[1] mode=BLT menu=1 esp=0 aim=1 target=-1 win=1536x864 frame=800x600 players=10 viewport=192,0 1152x864 scale=1.440x1.440 fit=auto src=replay clear=black present_hr=0x00000000
+[121] mode=BLT menu=1 esp=1 aim=1 target=7 win=1536x864 frame=800x600 players=10 viewport=192,0 1152x864 scale=1.440x1.440 fit=auto src=replay clear=black present_hr=0x00000000
+[241] mode=BLT menu=1 esp=1 aim=1 target=7 win=1536x864 frame=800x600 players=10 viewport=192,0 1152x864 scale=1.440x1.440 fit=auto src=replay clear=black present_hr=0x00000000
+[361] mode=BLT menu=1 esp=1 aim=1 target=4 win=1536x864 frame=800x600 players=10 viewport=192,0 1152x864 scale=1.440x1.440 fit=auto src=replay clear=black present_hr=0x00000000
+[481] mode=BLT menu=1 esp=1 aim=1 target=4 win=1536x864 frame=800x600 players=10 viewport=192,0 1152x864 scale=1.440x1.440 fit=auto src=replay clear=black present_hr=0x00000000
+[601] mode=BLT menu=1 esp=1 aim=1 target=-1 win=1536x864 frame=1280x720 players=1 viewport=448,263 640x360 scale=0.500x0.500 fit=auto src=shm clear=black present_hr=0x00000000
+[721] mode=BLT menu=1 esp=1 aim=1 target=-1 win=1536x864 frame=1280x720 players=1 viewport=448,263 640x360 scale=0.500x0.500 fit=auto src=shm clear=black present_hr=0x00000000
+[841] mode=BLT menu=1 esp=1 aim=1 target=-1 win=1536x864 frame=1280x720 players=1 viewport=448,263 640x360 scale=0.500x0.500 fit=auto src=shm clear=black present_hr=0x00000000
+[961] mode=BLT menu=1 esp=1 aim=1 target=-1 win=1536x864 frame=1600x1200 players=10 viewport=448,203 640x480 scale=0.400x0.400 fit=auto src=shm clear=black present_hr=0x00000000
+[1081] mode=BLT menu=1 esp=1 aim=1 target=-1 win=1536x864 frame=1600x1200 players=10 viewport=448,203 640x480 scale=0.400x0.400 fit=auto src=shm clear=black present_hr=0x00000000
+[1201] mode=BLT menu=1 esp=1 aim=1 target=-1 win=1536x864 frame=1600x1200 players=10 viewport=448,203 640x480 scale=0.400x0.400 fit=auto src=shm clear=black present_hr=0x00000000
+[1321] mode=BLT menu=1 esp=1 aim=1 target=-1 win=1536x864 frame=1600x1200 players=10 viewport=448,203 640x480 scale=0.400x0.400 fit=auto src=shm clear=black present_hr=0x00000000
+[1441] mode=BLT menu=1 esp=1 aim=1 target=-1 win=1536x864 frame=1600x1200 players=10 viewport=448,203 640x480 scale=0.400x0.400 fit=auto src=shm clear=black present_hr=0x00000000
+[1561] mode=BLT menu=1 esp=1 aim=1 target=-1 win=1536x864 frame=1600x1200 players=10 viewport=448,203 640x480 scale=0.400x0.400 fit=auto src=shm clear=black present_hr=0x00000000
+[1681] mode=BLT menu=1 esp=1 aim=1 target=-1 win=1536x864 frame=1600x1200 players=10 viewport=448,203 640x480 scale=0.400x0.400 fit=auto src=shm clear=black present_hr=0x00000000
+[1801] mode=BLT menu=1 esp=1 aim=1 target=-1 win=1536x864 frame=1600x1200 players=10 viewport=448,203 640x480 scale=0.400x0.400 fit=auto src=shm clear=black present_hr=0x00000000
+[1921] mode=BLT menu=1 esp=1 aim=1 target=-1 win=1536x864 frame=1600x1200 players=10 viewport=448,203 640x480 scale=0.400x0.400 fit=auto src=shm clear=black present_hr=0x00000000
+[2041] mode=BLT menu=1 esp=1 aim=1 target=-1 win=1536x864 frame=1600x1200 players=10 viewport=448,203 640x480 scale=0.400x0.400 fit=auto src=shm clear=black present_hr=0x00000000
+[2161] mode=BLT menu=1 esp=1 aim=1 target=-1 win=1536x864 frame=1600x1200 players=10 viewport=448,203 640x480 scale=0.400x0.400 fit=auto src=shm clear=black present_hr=0x00000000
+[2281] mode=BLT menu=1 esp=1 aim=1 target=-1 win=1536x864 frame=1600x1200 players=10 viewport=448,203 640x480 scale=0.400x0.400 fit=auto src=shm clear=black present_hr=0x00000000
+[2401] mode=BLT menu=1 esp=1 aim=1 target=-1 win=1536x864 frame=1600x1200 players=10 viewport=448,203 640x480 scale=0.400x0.400 fit=auto src=shm clear=black present_hr=0x00000000
+[2521] mode=BLT menu=1 esp=1 aim=1 target=-1 win=1536x864 frame=1600x1200 players=10 viewport=448,203 640x480 scale=0.400x0.400 fit=auto src=shm clear=black present_hr=0x00000000
+exit: saving settings
+exit: recording closed
+exit: settings saved
+exit: shared memory mapping closed
+exit: window destroyed
+exit: imgui shutdown
+exit: d3d destroyed
