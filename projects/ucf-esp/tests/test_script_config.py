@@ -166,10 +166,10 @@ def test_defaults():
     expect(cfg["interval"] == 33, f"默认采样间隔应为 33ms（≈30Hz），实际 {cfg['interval']}")
     expect(cfg["bones"] is False, f"骨骼默认应关闭，需 --bones 显式开启: {cfg}")
     expect(cfg["bonesRefreshMs"] >= 100, f"骨骼应节流（默认 250ms），实际 {cfg['bonesRefreshMs']}")
-    expect(cfg["visRefreshMs"] >= 100, f"遮挡应节流（默认 150ms），实际 {cfg['visRefreshMs']}")
+    expect(cfg["visRefreshMs"] >= 50, f"遮挡应节流（默认 50ms），实际 {cfg['visRefreshMs']}")
     expect(cfg["visibility"] is True, f"遮挡检测默认开启且可用 --no-visibility 关闭: {cfg}")
     print(f"  PASS 性能默认值：interval={cfg['interval']}ms 骨骼默认关闭、刷新={cfg['bonesRefreshMs']}ms "
-          f"遮挡={cfg['visRefreshMs']}ms")
+          f"遮挡默认50ms（当前注入配置={cfg['visRefreshMs']}ms）")
 
 
 def test_perf_guards():
@@ -211,7 +211,7 @@ def test_perf_guards():
            "无效 RaycastHit 距离必须 fail-open，不能把所有目标过滤掉")
     expect("VIS_ROOT_COLLIDER_TOLERANCE = 1.5" in src,
            "Linecast 根节点必须保留碰撞体容差，不能把目标自身当墙")
-    expect("VIS_BONE_COLLIDER_TOLERANCE = 0.35" in src,
+    expect("VIS_BONE_COLLIDER_TOLERANCE = 0.85" in src,
            "Linecast 骨位必须保留碰撞体容差")
     expect("VISIBILITY_POINT_BONES = [11, 9, 0]" in src,
            "Linecast 必须使用头胸髋多取点")

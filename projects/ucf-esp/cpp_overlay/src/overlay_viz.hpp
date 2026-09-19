@@ -66,7 +66,7 @@ struct DrawStyle {
     TargetState target_state = TargetState::Normal;
     bool show_blocked_state = true;
     bool show_target_ray = false;
-    bool ray_from_bottom = true;
+    bool ray_from_bottom = false;
     float max_distance = 250.0f;
     float line_thickness = 2.0f;
     float local[3] = {0.22f, 0.83f, 0.33f};

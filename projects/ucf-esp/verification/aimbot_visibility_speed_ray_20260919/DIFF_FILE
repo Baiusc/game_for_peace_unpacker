@@ -1,0 +1,221 @@
+diff --git a/projects/ucf-esp/cpp_overlay/src/config.cpp b/projects/ucf-esp/cpp_overlay/src/config.cpp
+index 7c5186e..8b62b5e 100644
+--- a/projects/ucf-esp/cpp_overlay/src/config.cpp
++++ b/projects/ucf-esp/cpp_overlay/src/config.cpp
+@@ -30,6 +30,9 @@ bool save_settings(const Settings& s, const char* path) {
+     fprintf(f, "input_sim_fire_key=%d\n", s.input_sim_fire_key);
+     fprintf(f, "input_sim_tolerance_px=%.3f\n", s.input_sim_tolerance_px);
+     fprintf(f, "input_sim_jitter_px=%d\n", s.input_sim_jitter_px);
++    fprintf(f, "input_trace_speed=%.3f\n", s.input_trace_speed);
++    fprintf(f, "input_flick_speed=%.3f\n", s.input_flick_speed);
++    fprintf(f, "input_max_step_px=%d\n", s.input_max_step_px);
+     fprintf(f, "fov_deg=%.3f\n",      s.fov_deg);
+     fprintf(f, "show_target_ray=%d\n", s.show_target_ray ? 1 : 0);
+     fprintf(f, "ray_from_bottom=%d\n", s.ray_from_bottom ? 1 : 0);
+@@ -102,6 +105,9 @@ bool load_settings(Settings& s, const char* path) {
+         else if (!std::strcmp(key, "input_sim_fire_key")) s.input_sim_fire_key = std::atoi(val);
+         else if (!std::strcmp(key, "input_sim_tolerance_px")) s.input_sim_tolerance_px = std::atof(val);
+         else if (!std::strcmp(key, "input_sim_jitter_px")) s.input_sim_jitter_px = std::atoi(val);
++        else if (!std::strcmp(key, "input_trace_speed")) s.input_trace_speed = std::atof(val);
++        else if (!std::strcmp(key, "input_flick_speed")) s.input_flick_speed = std::atof(val);
++        else if (!std::strcmp(key, "input_max_step_px")) s.input_max_step_px = std::atoi(val);
+         else if (!std::strcmp(key, "fov_deg"))        s.fov_deg        = std::atof(val);
+         else if (!std::strcmp(key, "show_target_ray")) s.show_target_ray = std::atoi(val) != 0;
+         else if (!std::strcmp(key, "ray_from_bottom")) s.ray_from_bottom = std::atoi(val) != 0;
+@@ -150,6 +156,11 @@ bool load_settings(Settings& s, const char* path) {
+     if (s.aim_max_distance < 0.0f) s.aim_max_distance = 0.0f;
+     if (s.input_sim_tolerance_px < 0.0f) s.input_sim_tolerance_px = 0.0f;
+     if (s.input_sim_jitter_px < 0) s.input_sim_jitter_px = 0;
++    if (s.input_trace_speed < 0.05f) s.input_trace_speed = 0.05f;
++    if (s.input_trace_speed > 1.0f) s.input_trace_speed = 1.0f;
++    if (s.input_flick_speed < 0.05f) s.input_flick_speed = 0.05f;
++    if (s.input_flick_speed > 1.0f) s.input_flick_speed = 1.0f;
++    if (s.input_max_step_px < 1) s.input_max_step_px = 1;
+     if (s.dev_record_max_frames < 0) s.dev_record_max_frames = 0;
+     if (s.dev_record_every < 1) s.dev_record_every = 1;
+     if (s.dev_record_duration < 0.0f) s.dev_record_duration = 0.0f;
+@@ -157,6 +168,8 @@ bool load_settings(Settings& s, const char* path) {
+     if (s.aim_selection_mode < 0 || s.aim_selection_mode > 1) s.aim_selection_mode = 0;
+     if (s.aim_point_mode < 0 || s.aim_point_mode > 3) s.aim_point_mode = 1;
+     if (s.aim_bone_id < 0 || s.aim_bone_id >= 19) s.aim_bone_id = 11;
++    // 射线方向已统一为屏幕顶部；旧 key 仅保留兼容，不再改变运行时方向。
++    s.ray_from_bottom = false;
+     return true;
+ }
+ 
+diff --git a/projects/ucf-esp/cpp_overlay/src/config.hpp b/projects/ucf-esp/cpp_overlay/src/config.hpp
+index 9af44c9..c4b4410 100644
+--- a/projects/ucf-esp/cpp_overlay/src/config.hpp
++++ b/projects/ucf-esp/cpp_overlay/src/config.hpp
+@@ -27,9 +27,12 @@ struct Settings {
+     int   input_sim_fire_key = 0x05; // VK_XBUTTON1（触发键配置；输出为左键）
+     float input_sim_tolerance_px = 4.0f;
+     int   input_sim_jitter_px = 2;
++    float input_trace_speed = 0.85f;
++    float input_flick_speed = 0.95f;
++    int   input_max_step_px = 160;
+     float fov_deg         = 90.0f;
+     bool  show_target_ray = true;
+-    bool  ray_from_bottom = true;
++    bool  ray_from_bottom = false;
+     int   aim_selection_mode = 0; // 0=屏幕空间距屏心，1=角度空间FOV
+     int   aim_point_mode = 1;     // 0=身体中心，1=头，2=胸，3=指定骨骼
+     int   aim_bone_id = 11;       // HumanBodyBones.Head 槽位
+diff --git a/projects/ucf-esp/cpp_overlay/src/input_sim/input_sim.cpp b/projects/ucf-esp/cpp_overlay/src/input_sim/input_sim.cpp
+index 87dfbef..8874397 100644
+--- a/projects/ucf-esp/cpp_overlay/src/input_sim/input_sim.cpp
++++ b/projects/ucf-esp/cpp_overlay/src/input_sim/input_sim.cpp
+@@ -1,5 +1,6 @@
+ #include "input_sim.hpp"
+ 
++#include <algorithm>
+ #include <cmath>
+ #include <cstdlib>
+ 
+@@ -61,17 +62,20 @@ void LocalInputSim::set_config(const Config& config) {
+     cfg_ = config;
+     if (cfg_.align_tolerance_px < 0.0f) cfg_.align_tolerance_px = 0.0f;
+     if (cfg_.jitter_px < 0) cfg_.jitter_px = 0;
+-    if (cfg_.smooth_factor < 0.05f) cfg_.smooth_factor = 0.05f;
+-    if (cfg_.smooth_factor > 1.0f) cfg_.smooth_factor = 1.0f;
++    if (cfg_.trace_smooth_factor < 0.05f) cfg_.trace_smooth_factor = 0.05f;
++    if (cfg_.trace_smooth_factor > 1.0f) cfg_.trace_smooth_factor = 1.0f;
++    if (cfg_.flick_smooth_factor < 0.05f) cfg_.flick_smooth_factor = 0.05f;
++    if (cfg_.flick_smooth_factor > 1.0f) cfg_.flick_smooth_factor = 1.0f;
+     if (cfg_.max_step_px < 1) cfg_.max_step_px = 1;
+ }
+ 
+-void LocalInputSim::move_to(const ScreenPoint& target, const ScreenPoint& crosshair) {
++void LocalInputSim::move_to(const ScreenPoint& target, const ScreenPoint& crosshair, float speed) {
+     const float ex = target.x - crosshair.x;
+     const float ey = target.y - crosshair.y;
+     const float distance = std::sqrt(ex * ex + ey * ey);
+     if (distance <= cfg_.align_tolerance_px) return;
+-    float step_len = distance * cfg_.smooth_factor;
++    speed = std::max(0.05f, std::min(1.0f, speed));
++    float step_len = distance * speed;
+     if (step_len > static_cast<float>(cfg_.max_step_px))
+         step_len = static_cast<float>(cfg_.max_step_px);
+     const float ux = ex / distance;
+@@ -105,7 +109,7 @@ bool LocalInputSim::aligned(const ScreenPoint& target, const ScreenPoint& crossh
+ void LocalInputSim::on_hold_trace(const ScreenPoint& target_screen) {
+     if (!cfg_.enabled) return;
+     // 按住分支只有移动路径，明确不触发 button_down/up。
+-    move_to(target_screen, crosshair_);
++    move_to(target_screen, crosshair_, cfg_.trace_smooth_factor);
+ }
+ 
+ void LocalInputSim::release_fire() {
+@@ -116,7 +120,7 @@ void LocalInputSim::on_flick(const ScreenPoint& target_screen) {
+     if (!cfg_.enabled) return;
+     // 持续平滑（含 move_to 内的小幅随机扰动）移向目标，模拟人手非线性移动；
+     // 进入容差后保持按住左键 -> 自动开火（自动武器即持续射击），不再只点一下就停。
+-    move_to(target_screen, crosshair_);
++    move_to(target_screen, crosshair_, cfg_.flick_smooth_factor);
+     if (aligned(target_screen, crosshair_)) {
+         if (!firing_) { sender_->button_down(0); firing_ = true; }
+     } else if (firing_) {
+diff --git a/projects/ucf-esp/cpp_overlay/src/main_win32.cpp b/projects/ucf-esp/cpp_overlay/src/main_win32.cpp
+index 14a5a66..a35e3aa 100644
+--- a/projects/ucf-esp/cpp_overlay/src/main_win32.cpp
++++ b/projects/ucf-esp/cpp_overlay/src/main_win32.cpp
+@@ -674,7 +674,9 @@ static void frame() {
+         input_cfg.fire_key = g_settings.input_sim_fire_key;
+         input_cfg.align_tolerance_px = g_settings.input_sim_tolerance_px;
+         input_cfg.jitter_px = std::min(g_settings.input_sim_jitter_px, 2);
+-        input_cfg.smooth_factor = g_settings.responsiveness;
++        input_cfg.trace_smooth_factor = g_settings.input_trace_speed;
++        input_cfg.flick_smooth_factor = g_settings.input_flick_speed;
++        input_cfg.max_step_px = g_settings.input_max_step_px;
+         g_input_sim.set_config(input_cfg);
+         const bool aim_key_down = (GetAsyncKeyState(input_cfg.aim_key) & 0x8000) != 0;
+         const bool fire_key_down = (GetAsyncKeyState(input_cfg.fire_key) & 0x8000) != 0;
+@@ -714,7 +716,8 @@ static void frame() {
+         style.target_state = selected_state;
+         style.show_blocked_state = g_settings.aim_wall_check;
+         style.show_target_ray = g_settings.show_target_ray;
+-        style.ray_from_bottom = g_settings.ray_from_bottom;
++        // 射线固定从屏幕顶部开始，避免旧 ini 中的 ray_from_bottom=1 继续生效。
++        style.ray_from_bottom = false;
+         style.max_distance = g_settings.max_distance;
+         style.line_thickness = g_settings.line_thickness;
+         std::copy(g_settings.color_local, g_settings.color_local + 3, style.local);
+diff --git a/projects/ucf-esp/cpp_overlay/src/menu_win32.cpp b/projects/ucf-esp/cpp_overlay/src/menu_win32.cpp
+index 305f38d..e9538f0 100644
+--- a/projects/ucf-esp/cpp_overlay/src/menu_win32.cpp
++++ b/projects/ucf-esp/cpp_overlay/src/menu_win32.cpp
+@@ -88,7 +88,7 @@ void draw_menu(Settings& s, bool& show_menu, bool& request_exit,
+         ImGui::Checkbox("Aimbot 开关", &s.aimbot_enabled);
+         ImGui::SliderFloat("瞄准 FOV", &s.fov_deg, 5.0f, 180.0f);
+         ImGui::Checkbox("显示目标射线", &s.show_target_ray);
+-        ImGui::Checkbox("射线从屏幕底部", &s.ray_from_bottom);
++        ImGui::TextUnformatted("目标射线：屏幕顶部 -> 当前目标");
+         ImGui::SliderFloat("瞄准最大距离", &s.aim_max_distance, 0.0f, 1000.0f, "%.0f m");
+         ImGui::Combo("选靶方案", &s.aim_selection_mode, "屏幕空间距屏心\0角度空间FOV\0");
+         ImGui::Combo("取点", &s.aim_point_mode, "身体中心\0头部\0胸部\0指定骨骼\0");
+@@ -99,6 +99,9 @@ void draw_menu(Settings& s, bool& show_menu, bool& request_exit,
+         ImGui::Checkbox("仅屏幕内目标", &s.aim_visible_only);
+         ImGui::Checkbox("启用隔墙检测", &s.aim_wall_check);
+         ImGui::Checkbox("目标死亡后防抖", &s.aim_lock_prevent);
++        ImGui::SliderFloat("Trace速度", &s.input_trace_speed, 0.05f, 1.0f, "%.2f");
++        ImGui::SliderFloat("甩枪速度", &s.input_flick_speed, 0.05f, 1.0f, "%.2f");
++        ImGui::SliderInt("单帧最大移动(px)", &s.input_max_step_px, 8, 512);
+         ImGui::TreePop();
+     }
+     ImGui::SliderFloat("平滑系数",   &s.responsiveness, 0.05f, 1.0f);
+diff --git a/projects/ucf-esp/cpp_overlay/src/overlay_viz.cpp b/projects/ucf-esp/cpp_overlay/src/overlay_viz.cpp
+index 3851d47..62fa172 100644
+--- a/projects/ucf-esp/cpp_overlay/src/overlay_viz.cpp
++++ b/projects/ucf-esp/cpp_overlay/src/overlay_viz.cpp
+@@ -139,7 +139,7 @@ void build_draw_list(const Viewport& vp, const ScreenMark* marks, int n,
+         if (selected && style.show_target_ray && out.rayCount < 1) {
+             RayPrim& ray = out.rays[out.rayCount++];
+             ray.x1 = vp.x + vp.w * 0.5f;
+-            ray.y1 = style.ray_from_bottom ? vp.y + vp.h : vp.y + vp.h * 0.5f;
++            ray.y1 = style.ray_from_bottom ? vp.y + vp.h : vp.y;
+             ray.x2 = px; ray.y2 = py;
+             if (style.target_state != TargetState::Normal) {
+                 ray.r = 1.0f; ray.g = 0.85f; ray.b = 0.1f;
+diff --git a/projects/ucf-esp/tools/frida_dump.js b/projects/ucf-esp/tools/frida_dump.js
+index f727948..9418a90 100644
+--- a/projects/ucf-esp/tools/frida_dump.js
++++ b/projects/ucf-esp/tools/frida_dump.js
+@@ -230,7 +230,7 @@ Il2Cpp.perform(() => {
+   // 节流、按玩家 handle 缓存，避免把可见性查询放进每帧高频路径。
+   // CFG.visibility=false 可彻底关闭（visible 恒为 true）。
+   const VISIBILITY = (!!Physics || RENDERER_VISIBILITY) && CFG.visibility !== false;
+-  const VIS_REFRESH_MS = Number.isFinite(CFG.visRefreshMs) ? CFG.visRefreshMs : 150;
++  const VIS_REFRESH_MS = Number.isFinite(CFG.visRefreshMs) ? CFG.visRefreshMs : 50;
+   let visCache = Object.create(null);   // handle 字符串 -> bool
+   let rendererCache = Object.create(null); // player handle -> Renderer
+   let visLastRefresh = -1e9;
+@@ -399,7 +399,7 @@ Il2Cpp.perform(() => {
+   // Unity 契约没有这个字段，因此保留 Physics.Linecast，但不再只测脚底根节点。
+   // 根节点常在脚底，单条射线很容易先撞到目标自己的胶囊体，产生“多数黄色”。
+   const VIS_ROOT_COLLIDER_TOLERANCE = 1.5;
+-  const VIS_BONE_COLLIDER_TOLERANCE = 0.35;
++  const VIS_BONE_COLLIDER_TOLERANCE = 0.85;
+   const VISIBILITY_POINT_BONES = [11, 9, 0]; // Head, Chest, Hips（现有骨骼顺序）
+ 
+   const readRendererVisibilityOf = (player) => {
+@@ -435,12 +435,18 @@ Il2Cpp.perform(() => {
+     const vt = perfNow();          // 记 Physics.Linecast 这一段花了多少
+     try {
+       const rendererVisible = readRendererVisibilityOf(player);
+-      if (rendererVisible !== null) {
++      if (rendererVisible === true) {
+         if (!visibilitySampleLogged) {
+           visibilitySampleLogged = true;
+           console.log("[*] 可见性样本 source=Renderer.isVisible visible=", rendererVisible);
+         }
+-        return rendererVisible;
++        return true;
++      }
++      // isVisible=false 不是严格的视线遮挡结论：LOD、多个 Renderer、边缘裁剪
++      // 都可能导致 false。交给多点 Linecast 复核，避免正常目标长期变黄色。
++      if (rendererVisible === false && !visibilitySampleLogged) {
++        visibilitySampleLogged = true;
++        console.log("[*] Renderer.isVisible=false，转用多点 Linecast 复核遮挡");
+       }
+       const sx = visibilityOrigin.field("x").value;
+       const sy = visibilityOrigin.field("y").value;

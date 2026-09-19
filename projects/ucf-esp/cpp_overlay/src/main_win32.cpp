@@ -674,7 +674,9 @@ static void frame() {
         input_cfg.fire_key = g_settings.input_sim_fire_key;
         input_cfg.align_tolerance_px = g_settings.input_sim_tolerance_px;
         input_cfg.jitter_px = std::min(g_settings.input_sim_jitter_px, 2);
-        input_cfg.smooth_factor = g_settings.responsiveness;
+        input_cfg.trace_smooth_factor = g_settings.input_trace_speed;
+        input_cfg.flick_smooth_factor = g_settings.input_flick_speed;
+        input_cfg.max_step_px = g_settings.input_max_step_px;
         g_input_sim.set_config(input_cfg);
         const bool aim_key_down = (GetAsyncKeyState(input_cfg.aim_key) & 0x8000) != 0;
         const bool fire_key_down = (GetAsyncKeyState(input_cfg.fire_key) & 0x8000) != 0;
@@ -714,7 +716,8 @@ static void frame() {
         style.target_state = selected_state;
         style.show_blocked_state = g_settings.aim_wall_check;
         style.show_target_ray = g_settings.show_target_ray;
-        style.ray_from_bottom = g_settings.ray_from_bottom;
+        // 射线固定从屏幕顶部开始，避免旧 ini 中的 ray_from_bottom=1 继续生效。
+        style.ray_from_bottom = false;
         style.max_distance = g_settings.max_distance;
         style.line_thickness = g_settings.line_thickness;
         std::copy(g_settings.color_local, g_settings.color_local + 3, style.local);

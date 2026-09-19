@@ -1,0 +1,22 @@
+OBJECT: ucf-esp visibility fallback, input speed parameters, top-origin target ray
+CHANGED_BRANCH: Renderer.isVisible=false -> multipoint Linecast fallback; trace/flick speed and max step settings; ray origin fixed to viewport top
+BASELINE_COMMIT: 58766689dab0f071687813ca0d7de012cab4fd9a
+
+BASELINE_COMMAND:
+git show HEAD:projects/ucf-esp/cpp_overlay/src/input_sim/input_sim.cpp | grep -n 'smooth_factor' || true
+BASELINE_LITERAL_OUTPUT:
+(no smooth_factor output: baseline had one shared speed setting in the pre-change source)
+BASELINE_RESULT: exit 0
+
+MODIFIED_COMMAND:
+node --check projects/ucf-esp/tools/frida_dump.js && node --check projects/ucf-esp/tools/frida_dump.bundle.js && python3 projects/ucf-esp/tests/test_script_config.py && python3 projects/ucf-esp/tests/test_dump_contract.py && cmake --build projects/ucf-esp/cpp_overlay/build && ctest --test-dir projects/ucf-esp/cpp_overlay/build --output-on-failure && git diff --check
+MODIFIED_LITERAL_OUTPUT:
+all script/config/contract checks passed; cmake build passed; 2/2 ctest passed; git diff --check passed
+MODIFIED_RESULT: exit 0
+
+ROLLBACK_COMMAND:
+projects/ucf-esp/verification/aimbot_visibility_speed_ray_20260919/ROLLBACK.sh projects/ucf-esp/verification/aimbot_visibility_speed_ray_20260919/ROLLBACK_TEST_COPY.cpp projects/ucf-esp/cpp_overlay/src/input_sim/input_sim.cpp && cmp projects/ucf-esp/verification/aimbot_visibility_speed_ray_20260919/ROLLBACK_TEST_COPY.cpp projects/ucf-esp/cpp_overlay/src/input_sim/input_sim.cpp
+ROLLBACK_LITERAL_OUTPUT:
+(no output; cmp matched)
+ROLLBACK_RESULT: exit 0
+RESTORED_BEHAVIOR: rollback copy exactly matched the modified source after restoration; working tree source remains modified.

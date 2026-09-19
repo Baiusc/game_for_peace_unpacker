@@ -102,6 +102,7 @@ static void test_draw_list() {
     ucf::build_draw_list(vp, marks, 2, highlight, dl);
     CHECK(dl.boxCount == 2 && dl.boxes[0].selected && !dl.boxes[1].selected);
     CHECK(dl.rayCount == 1 && dl.boneLineCount == 36);
+    CHECK(approx(dl.rays[0].y1, 0.0f)); // 默认从视口顶部发射
 
     ucf::DrawStyle style{};
     style.show_box = false;
@@ -214,6 +215,7 @@ static void test_config_roundtrip() {
     s.aim_lock_prevent = true;
     s.input_sim_enabled = true; s.input_sim_aim_key = 6; s.input_sim_fire_key = 5;
     s.input_sim_tolerance_px = 6.0f; s.input_sim_jitter_px = 3;
+    s.input_trace_speed = 0.72f; s.input_flick_speed = 0.93f; s.input_max_step_px = 240;
     s.exit_delete_config = true;
     CHECK(ucf::save_settings(s, "settings_test.txt"));
     ucf::Settings r{};
@@ -229,6 +231,8 @@ static void test_config_roundtrip() {
     CHECK(r.aim_lock_prevent);
     CHECK(r.input_sim_enabled && r.input_sim_aim_key == 6 && r.input_sim_fire_key == 5);
     CHECK(approx(r.input_sim_tolerance_px, 6.0f) && r.input_sim_jitter_px == 3);
+    CHECK(approx(r.input_trace_speed, 0.72f) && approx(r.input_flick_speed, 0.93f));
+    CHECK(r.input_max_step_px == 240 && !r.ray_from_bottom);
     CHECK(r.exit_delete_config && !r.exit_delete_log);
     std::remove("settings_test.txt");
 }

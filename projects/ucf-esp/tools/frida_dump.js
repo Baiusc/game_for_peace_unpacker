@@ -230,7 +230,7 @@ Il2Cpp.perform(() => {
   // 节流、按玩家 handle 缓存，避免把可见性查询放进每帧高频路径。
   // CFG.visibility=false 可彻底关闭（visible 恒为 true）。
   const VISIBILITY = (!!Physics || RENDERER_VISIBILITY) && CFG.visibility !== false;
-  const VIS_REFRESH_MS = Number.isFinite(CFG.visRefreshMs) ? CFG.visRefreshMs : 150;
+  const VIS_REFRESH_MS = Number.isFinite(CFG.visRefreshMs) ? CFG.visRefreshMs : 50;
   let visCache = Object.create(null);   // handle 字符串 -> bool
   let rendererCache = Object.create(null); // player handle -> Renderer
   let visLastRefresh = -1e9;
@@ -399,7 +399,7 @@ Il2Cpp.perform(() => {
   // Unity 契约没有这个字段，因此保留 Physics.Linecast，但不再只测脚底根节点。
   // 根节点常在脚底，单条射线很容易先撞到目标自己的胶囊体，产生“多数黄色”。
   const VIS_ROOT_COLLIDER_TOLERANCE = 1.5;
-  const VIS_BONE_COLLIDER_TOLERANCE = 0.35;
+  const VIS_BONE_COLLIDER_TOLERANCE = 0.85;
   const VISIBILITY_POINT_BONES = [11, 9, 0]; // Head, Chest, Hips（现有骨骼顺序）
 
   const readRendererVisibilityOf = (player) => {
@@ -435,12 +435,18 @@ Il2Cpp.perform(() => {
     const vt = perfNow();          // 记 Physics.Linecast 这一段花了多少
     try {
       const rendererVisible = readRendererVisibilityOf(player);
-      if (rendererVisible !== null) {
+      if (rendererVisible === true) {
         if (!visibilitySampleLogged) {
           visibilitySampleLogged = true;
           console.log("[*] 可见性样本 source=Renderer.isVisible visible=", rendererVisible);
         }
-        return rendererVisible;
+        return true;
+      }
+      // isVisible=false 不是严格的视线遮挡结论：LOD、多个 Renderer、边缘裁剪
+      // 都可能导致 false。交给多点 Linecast 复核，避免正常目标长期变黄色。
+      if (rendererVisible === false && !visibilitySampleLogged) {
+        visibilitySampleLogged = true;
+        console.log("[*] Renderer.isVisible=false，转用多点 Linecast 复核遮挡");
       }
       const sx = visibilityOrigin.field("x").value;
       const sy = visibilityOrigin.field("y").value;

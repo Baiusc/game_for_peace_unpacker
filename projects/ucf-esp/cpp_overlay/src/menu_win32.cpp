@@ -88,7 +88,7 @@ void draw_menu(Settings& s, bool& show_menu, bool& request_exit,
         ImGui::Checkbox("Aimbot 开关", &s.aimbot_enabled);
         ImGui::SliderFloat("瞄准 FOV", &s.fov_deg, 5.0f, 180.0f);
         ImGui::Checkbox("显示目标射线", &s.show_target_ray);
-        ImGui::Checkbox("射线从屏幕底部", &s.ray_from_bottom);
+        ImGui::TextUnformatted("目标射线：屏幕顶部 -> 当前目标");
         ImGui::SliderFloat("瞄准最大距离", &s.aim_max_distance, 0.0f, 1000.0f, "%.0f m");
         ImGui::Combo("选靶方案", &s.aim_selection_mode, "屏幕空间距屏心\0角度空间FOV\0");
         ImGui::Combo("取点", &s.aim_point_mode, "身体中心\0头部\0胸部\0指定骨骼\0");
@@ -99,6 +99,9 @@ void draw_menu(Settings& s, bool& show_menu, bool& request_exit,
         ImGui::Checkbox("仅屏幕内目标", &s.aim_visible_only);
         ImGui::Checkbox("启用隔墙检测", &s.aim_wall_check);
         ImGui::Checkbox("目标死亡后防抖", &s.aim_lock_prevent);
+        ImGui::SliderFloat("Trace速度", &s.input_trace_speed, 0.05f, 1.0f, "%.2f");
+        ImGui::SliderFloat("甩枪速度", &s.input_flick_speed, 0.05f, 1.0f, "%.2f");
+        ImGui::SliderInt("单帧最大移动(px)", &s.input_max_step_px, 8, 512);
         ImGui::TreePop();
     }
     ImGui::SliderFloat("平滑系数",   &s.responsiveness, 0.05f, 1.0f);

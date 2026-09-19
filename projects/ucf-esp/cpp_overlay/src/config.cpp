@@ -30,6 +30,9 @@ bool save_settings(const Settings& s, const char* path) {
     fprintf(f, "input_sim_fire_key=%d\n", s.input_sim_fire_key);
     fprintf(f, "input_sim_tolerance_px=%.3f\n", s.input_sim_tolerance_px);
     fprintf(f, "input_sim_jitter_px=%d\n", s.input_sim_jitter_px);
+    fprintf(f, "input_trace_speed=%.3f\n", s.input_trace_speed);
+    fprintf(f, "input_flick_speed=%.3f\n", s.input_flick_speed);
+    fprintf(f, "input_max_step_px=%d\n", s.input_max_step_px);
     fprintf(f, "fov_deg=%.3f\n",      s.fov_deg);
     fprintf(f, "show_target_ray=%d\n", s.show_target_ray ? 1 : 0);
     fprintf(f, "ray_from_bottom=%d\n", s.ray_from_bottom ? 1 : 0);
@@ -102,6 +105,9 @@ bool load_settings(Settings& s, const char* path) {
         else if (!std::strcmp(key, "input_sim_fire_key")) s.input_sim_fire_key = std::atoi(val);
         else if (!std::strcmp(key, "input_sim_tolerance_px")) s.input_sim_tolerance_px = std::atof(val);
         else if (!std::strcmp(key, "input_sim_jitter_px")) s.input_sim_jitter_px = std::atoi(val);
+        else if (!std::strcmp(key, "input_trace_speed")) s.input_trace_speed = std::atof(val);
+        else if (!std::strcmp(key, "input_flick_speed")) s.input_flick_speed = std::atof(val);
+        else if (!std::strcmp(key, "input_max_step_px")) s.input_max_step_px = std::atoi(val);
         else if (!std::strcmp(key, "fov_deg"))        s.fov_deg        = std::atof(val);
         else if (!std::strcmp(key, "show_target_ray")) s.show_target_ray = std::atoi(val) != 0;
         else if (!std::strcmp(key, "ray_from_bottom")) s.ray_from_bottom = std::atoi(val) != 0;
@@ -150,6 +156,11 @@ bool load_settings(Settings& s, const char* path) {
     if (s.aim_max_distance < 0.0f) s.aim_max_distance = 0.0f;
     if (s.input_sim_tolerance_px < 0.0f) s.input_sim_tolerance_px = 0.0f;
     if (s.input_sim_jitter_px < 0) s.input_sim_jitter_px = 0;
+    if (s.input_trace_speed < 0.05f) s.input_trace_speed = 0.05f;
+    if (s.input_trace_speed > 1.0f) s.input_trace_speed = 1.0f;
+    if (s.input_flick_speed < 0.05f) s.input_flick_speed = 0.05f;
+    if (s.input_flick_speed > 1.0f) s.input_flick_speed = 1.0f;
+    if (s.input_max_step_px < 1) s.input_max_step_px = 1;
     if (s.dev_record_max_frames < 0) s.dev_record_max_frames = 0;
     if (s.dev_record_every < 1) s.dev_record_every = 1;
     if (s.dev_record_duration < 0.0f) s.dev_record_duration = 0.0f;
@@ -157,6 +168,8 @@ bool load_settings(Settings& s, const char* path) {
     if (s.aim_selection_mode < 0 || s.aim_selection_mode > 1) s.aim_selection_mode = 0;
     if (s.aim_point_mode < 0 || s.aim_point_mode > 3) s.aim_point_mode = 1;
     if (s.aim_bone_id < 0 || s.aim_bone_id >= 19) s.aim_bone_id = 11;
+    // 射线方向已统一为屏幕顶部；旧 key 仅保留兼容，不再改变运行时方向。
+    s.ray_from_bottom = false;
     return true;
 }
 

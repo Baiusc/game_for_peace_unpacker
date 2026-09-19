@@ -27,9 +27,12 @@ struct Settings {
     int   input_sim_fire_key = 0x05; // VK_XBUTTON1（触发键配置；输出为左键）
     float input_sim_tolerance_px = 4.0f;
     int   input_sim_jitter_px = 2;
+    float input_trace_speed = 0.85f;
+    float input_flick_speed = 0.95f;
+    int   input_max_step_px = 160;
     float fov_deg         = 90.0f;
     bool  show_target_ray = true;
-    bool  ray_from_bottom = true;
+    bool  ray_from_bottom = false;
     int   aim_selection_mode = 0; // 0=屏幕空间距屏心，1=角度空间FOV
     int   aim_point_mode = 1;     // 0=身体中心，1=头，2=胸，3=指定骨骼
     int   aim_bone_id = 11;       // HumanBodyBones.Head 槽位

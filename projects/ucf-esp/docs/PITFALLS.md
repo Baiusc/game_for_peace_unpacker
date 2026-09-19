@@ -271,3 +271,9 @@
 - 单独向玩家根 Transform（通常是脚底）发射一条线，会先命中目标自己的胶囊体，导致大多数目标误判黄色。当前改为 root + Head/Chest/Hips 多取点，任一有效射线抵达目标即为 visible；只有所有有效取点都被提前命中才判 BLOCKED。
 - 根节点使用 1.5m 末端容差，骨位使用 0.35m；所有 RaycastHit 距离无效时继续 fail-open。首次样本日志用于判断是自碰撞、触发器还是实际墙体。
 - 静态复核发现 Unity `Renderer.get_isVisible()`（RVA `0x43C170`）和 `SkinnedMeshRenderer : Renderer` 已在 dump/script.json 中存在。当前脚本优先取角色 `characterContainer` 子树的 SkinnedMeshRenderer；Renderer API 不可用时才回退 Linecast。C++ 菜单的 `aim_wall_check` 默认开启，可单独关闭可见性过滤。
+
+## 2026-09-19：可见性复核、输入速度与目标射线
+
+- `Renderer.isVisible=false` 不能直接等同于“隔墙”：LOD、多个 Renderer、边缘裁剪都可能让首个 SkinnedMeshRenderer 返回 false。现在 false 会继续走头/胸/髋多点 Linecast，只有 Linecast 也确认被提前命中时才标记 BLOCKED；骨骼端点命中自身碰撞体时使用较小容差消除误判。
+- 输入模拟不再复用角度平滑 `responsiveness`。Trace 速度、甩枪速度、单帧最大移动分别进入 Settings 和 Aimbot 菜单，并持久化，避免低响应系数导致侧键按住时跟不上移动目标。
+- 目标射线统一从屏幕顶部开始。旧 `ray_from_bottom` key 保留用于读取旧配置，但运行时强制顶部，避免旧 ini 让实机仍从底部绘制。

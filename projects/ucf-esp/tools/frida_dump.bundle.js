@@ -3559,7 +3559,7 @@ ${this.isEnum ? `enum` : this.isStruct ? `struct` : this.isInterface ? `interfac
           else
             console.log("[!] Unity Renderer.isVisible 未定位：可见性回退 Physics.Linecast");
           const VISIBILITY = (!!Physics || RENDERER_VISIBILITY) && CFG.visibility !== false;
-          const VIS_REFRESH_MS = Number.isFinite(CFG.visRefreshMs) ? CFG.visRefreshMs : 150;
+          const VIS_REFRESH_MS = Number.isFinite(CFG.visRefreshMs) ? CFG.visRefreshMs : 50;
           let visCache = /* @__PURE__ */ Object.create(null);
           let rendererCache = /* @__PURE__ */ Object.create(null);
           let visLastRefresh = -1e9;
@@ -3678,7 +3678,7 @@ ${this.isEnum ? `enum` : this.isStruct ? `struct` : this.isInterface ? `interfac
           let visibilityHitWarned = false;
           let visibilitySampleLogged = false;
           const VIS_ROOT_COLLIDER_TOLERANCE = 1.5;
-          const VIS_BONE_COLLIDER_TOLERANCE = 0.35;
+          const VIS_BONE_COLLIDER_TOLERANCE = 0.85;
           const VISIBILITY_POINT_BONES = [11, 9, 0];
           const readRendererVisibilityOf = (player) => {
             if (!RENDERER_VISIBILITY || !player) return null;
@@ -3715,12 +3715,18 @@ ${this.isEnum ? `enum` : this.isStruct ? `struct` : this.isInterface ? `interfac
             const vt = perfNow();
             try {
               const rendererVisible = readRendererVisibilityOf(player);
-              if (rendererVisible !== null) {
+              if (rendererVisible === true) {
                 if (!visibilitySampleLogged) {
                   visibilitySampleLogged = true;
                   console.log("[*] 可见性样本 source=Renderer.isVisible visible=", rendererVisible);
                 }
-                return rendererVisible;
+                return true;
+              }
+              // isVisible=false 不是严格的视线遮挡结论：LOD、多个 Renderer、边缘裁剪
+              // 都可能导致 false。交给多点 Linecast 复核，避免正常目标长期变黄色。
+              if (rendererVisible === false && !visibilitySampleLogged) {
+                visibilitySampleLogged = true;
+                console.log("[*] Renderer.isVisible=false，转用多点 Linecast 复核遮挡");
               }
               const sx = visibilityOrigin.field("x").value;
               const sy = visibilityOrigin.field("y").value;

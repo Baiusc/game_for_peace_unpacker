@@ -18,8 +18,9 @@ struct Config {
     int fire_key = kXButton1;
     float align_tolerance_px = 4.0f;
     int jitter_px = 2;
-    float smooth_factor = 0.35f;
-    int max_step_px = 96;
+    float trace_smooth_factor = 0.85f;
+    float flick_smooth_factor = 0.95f;
+    int max_step_px = 160;
 };
 
 class Sender {
@@ -48,7 +49,7 @@ public:
     void reset_lock();
 
 private:
-    void move_to(const ScreenPoint& target, const ScreenPoint& crosshair);
+    void move_to(const ScreenPoint& target, const ScreenPoint& crosshair, float speed);
     bool aligned(const ScreenPoint& target, const ScreenPoint& crosshair) const;
     void release_fire();
 

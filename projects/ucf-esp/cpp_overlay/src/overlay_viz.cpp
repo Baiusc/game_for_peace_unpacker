@@ -139,7 +139,7 @@ void build_draw_list(const Viewport& vp, const ScreenMark* marks, int n,
         if (selected && style.show_target_ray && out.rayCount < 1) {
             RayPrim& ray = out.rays[out.rayCount++];
             ray.x1 = vp.x + vp.w * 0.5f;
-            ray.y1 = style.ray_from_bottom ? vp.y + vp.h : vp.y + vp.h * 0.5f;
+            ray.y1 = style.ray_from_bottom ? vp.y + vp.h : vp.y;
             ray.x2 = px; ray.y2 = py;
             if (style.target_state != TargetState::Normal) {
                 ray.r = 1.0f; ray.g = 0.85f; ray.b = 0.1f;
