@@ -207,6 +207,8 @@ def test_perf_guards():
            "Linecast 应使用 Unity 默认 Raycast 层掩码 -5")
     expect("hit.add(0x18).readFloat()" not in src,
            "0x18 是 RaycastHit.m_FaceID，不能当作距离")
+    expect("hitDistance <= 0.001" in src and "visible 暂按 true" in src,
+           "无效 RaycastHit 距离必须 fail-open，不能把所有目标过滤掉")
     print("  PASS 方法缓存 / 骨骼节流 / 分段计时锚点齐全，且骨骼不再每帧无条件读")
 
 

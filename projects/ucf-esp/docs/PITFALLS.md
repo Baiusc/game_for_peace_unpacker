@@ -252,3 +252,9 @@
 - 对象绑定 Method 不能用对象地址字符串做长期强引用缓存。Unity 换场景后地址可能复用；绑定缓存改为 `WeakMap`，并在 GameManager 切换/离开对局时清理。
 - `RaycastHit` 的 `m_Distance` 是 `0x1c`，`0x18` 是 `m_FaceID`。遮挡检测使用 `0x1c`，LayerMask 使用 `-5`，避免把 FaceID 当距离导致隔墙状态随机。
 - `sendStatus(no-camera/matrix-error)` 是清屏状态，不应被误判为正常实体帧；实机排查时同时观察 `inGame`、`playerCount`、`src=shm` 与 Frida perf 行。纯 ESP 性能隔离可使用 `--no-bones --no-visibility --interval 100`。
+
+## 2026-09-19 RaycastHit 无效距离导致 target=-1
+
+- 实机日志显示 `src=shm`、`players=10`、投影有多个 `onscreen=True`，但启用遮挡检测时 C++ 长时间 `target=-1`；关闭 `--no-visibility` 后可选靶和输入恢复。
+- 不能把 `Physics.Linecast` 的 out `RaycastHit.m_Distance` 返回值中的 `0`、`NaN` 或越界值当作“命中墙体”。32-bit bridge/Unity 组合可能没有正确回写结构体；这类值必须 fail-open 为 visible=true，否则所有目标会被误过滤。
+- 实机采样 50ms 约 20FPS，100ms 约 10FPS；即使不掉游戏主线程帧，ESP 仍会有明显跟手延迟。需要低于 33ms 的有效采样预算后再尝试 20~33ms，不能用 100ms 作为实时叠加层默认值。

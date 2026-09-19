@@ -375,6 +375,7 @@ Il2Cpp.perform(() => {
 
   let visibilityOrigin = null;
   let visibilityWarned = false;
+  let visibilityHitWarned = false;
   const readVisibilityOf = (targetTransform) => {
     if (!visibilityOrigin || !targetTransform) return null;
     const vt = perfNow();          // 记 Physics.Linecast 这一段花了多少
@@ -393,7 +394,20 @@ Il2Cpp.perform(() => {
       const ey = end.field("y").value;
       const ez = end.field("z").value;
       const total = Math.sqrt((ex-sx)*(ex-sx) + (ey-sy)*(ey-sy) + (ez-sz)*(ez-sz));
-      return !(Number.isFinite(hitDistance) && hitDistance < total - 0.75);
+      // 某些 32-bit bridge/Unity 版本对 out RaycastHit 的回写不完整，会得到
+      // 0/NaN/越界值。此时不能把“无法解析命中距离”误判成 BLOCKED，
+      // 否则所有目标都会被过滤，C++ 日志表现为 target=-1；按可见降级，
+      // 等下一次刷新或显式关闭遮挡检测。
+      if (!Number.isFinite(total) || total <= 0.01 ||
+          !Number.isFinite(hitDistance) || hitDistance <= 0.001 ||
+          hitDistance > total + 0.75) {
+        if (!visibilityHitWarned) {
+          visibilityHitWarned = true;
+          console.log("[!] RaycastHit 距离无效，visible 暂按 true，避免全部目标被误过滤:", hitDistance, total);
+        }
+        return true;
+      }
+      return hitDistance >= total - 0.75;
     } catch (e) {
       if (!visibilityWarned) {
         visibilityWarned = true;
