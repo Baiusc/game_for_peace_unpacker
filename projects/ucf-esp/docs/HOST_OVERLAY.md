@@ -665,3 +665,11 @@ python tools\frida_host.py --shm --interval 100 --no-bones --no-visibility
 ```
 
 该组合只保留矩阵、玩家、血量和共享内存传输，用于隔离主线程读取成本。遮挡检测恢复时使用 `--vis-refresh-ms 300`；骨骼恢复时使用 `--bones --bones-refresh-ms 500`。实机日志应同时确认 Frida 的 `perf` 行、C++ 的 `src=shm` 和 `players` 数量，不能只看叠加层是否显示。
+
+## 2026-09-19 启动无显示与遮挡误判
+
+如果 C++ 日志显示 `startup: overlay initialized`、`present_hr=0x00000000`，但同时 `esp=0`，说明窗口和 D3D 循环正常，只是 ESP 显示开关关闭；按 `DELETE` 或在菜单打开“ESP 总开关”。如果日志显示 `src=shm players=1`，还要检查是否是上一次会话留下的旧共享内存帧。
+
+共享内存生产者现在用 `cur=-1` 表示“没有当前生产者帧”。宿主启动和退出都会写入该标记，C++ 遇到它会回退到 replay/synth，不再把上一局的旧帧当作实时数据。
+
+遮挡检测首个有效命中会输出 `hitDistance/total` 样本。玩家根 Transform 常在脚底，命中玩家自身胶囊体时保留 1.5m 末端容差；只有明显早于目标的命中才标记为阻挡。

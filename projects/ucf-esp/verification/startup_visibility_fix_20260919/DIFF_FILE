@@ -1,0 +1,76 @@
+diff --git a/projects/ucf-esp/cpp_overlay/src/shared_state.cpp b/projects/ucf-esp/cpp_overlay/src/shared_state.cpp
+index 6f088a7..09e14db 100644
+--- a/projects/ucf-esp/cpp_overlay/src/shared_state.cpp
++++ b/projects/ucf-esp/cpp_overlay/src/shared_state.cpp
+@@ -39,7 +39,14 @@ void SharedTransport::write(const Frame& f) {
+ 
+ void SharedTransport::read(Frame& out) const {
+     if (!mapped_) return;
+-    out = mapped_->slots[mapped_->cur.load(std::memory_order_acquire)];
++    const int cur = mapped_->cur.load(std::memory_order_acquire);
++    // Python 宿主用 -1 表示尚无生产者帧/生产者已退出；不要把旧槽位继续
++    // 当作实时数据，否则 C++ 启动时会卡在 stale shm，replay/synth 永远接不上。
++    if (cur != 0 && cur != 1) {
++        out = Frame{};
++        return;
++    }
++    out = mapped_->slots[cur];
+ }
+ 
+ } // namespace ucf
+diff --git a/projects/ucf-esp/tools/frida_dump.js b/projects/ucf-esp/tools/frida_dump.js
+index 0aca2cb..30d28de 100644
+--- a/projects/ucf-esp/tools/frida_dump.js
++++ b/projects/ucf-esp/tools/frida_dump.js
+@@ -376,6 +376,8 @@ Il2Cpp.perform(() => {
+   let visibilityOrigin = null;
+   let visibilityWarned = false;
+   let visibilityHitWarned = false;
++  let visibilitySampleLogged = false;
++  const VIS_TARGET_COLLIDER_TOLERANCE = 1.5;
+   const readVisibilityOf = (targetTransform) => {
+     if (!visibilityOrigin || !targetTransform) return null;
+     const vt = perfNow();          // 记 Physics.Linecast 这一段花了多少
+@@ -407,7 +409,16 @@ Il2Cpp.perform(() => {
+         }
+         return true;
+       }
+-      return hitDistance >= total - 0.75;
++      // 目标 Transform 通常在脚底，而 Linecast 命中的是目标胶囊体外缘；
++      // 0.75m 会把正常可见目标自己的碰撞体误判为墙体。给目标胶囊体留
++      // 1.5m 末端容差，仍然把更早命中的墙体判为 BLOCKED。
++      const visible = hitDistance >= total - VIS_TARGET_COLLIDER_TOLERANCE;
++      if (!visibilitySampleLogged) {
++        visibilitySampleLogged = true;
++        console.log("[*] 可见性样本 hitDistance/total=", hitDistance, "/", total,
++                    "visible=", visible);
++      }
++      return visible;
+     } catch (e) {
+       if (!visibilityWarned) {
+         visibilityWarned = true;
+diff --git a/projects/ucf-esp/tools/frida_host.py b/projects/ucf-esp/tools/frida_host.py
+index 0ffa005..38eb416 100644
+--- a/projects/ucf-esp/tools/frida_host.py
++++ b/projects/ucf-esp/tools/frida_host.py
+@@ -164,6 +164,9 @@ class SharedFrameWriter:
+         self.frame_size = codec.FRAME_FMT.size
+         self.shm = mmap.mmap(-1, codec.SHM_SIZE, tagname=name)
+         self.closed = False
++        # -1 明确表示当前没有生产者帧，避免旧会话留下的 Frame 抢在
++        # replay/synth 之前被 C++ 当成实时 shm 数据。
++        struct.pack_into("<i", self.shm, 0, -1)
+ 
+     def write(self, frame):
+         if self.closed:
+@@ -191,6 +194,10 @@ class SharedFrameWriter:
+     def close(self):
+         if not self.closed:
+             self.closed = True
++            try:
++                struct.pack_into("<i", self.shm, 0, -1)
++            except (TypeError, ValueError):
++                pass
+             self.shm.close()
+ 
+ 

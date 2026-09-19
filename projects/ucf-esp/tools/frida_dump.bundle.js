@@ -3659,6 +3659,8 @@ ${this.isEnum ? `enum` : this.isStruct ? `struct` : this.isInterface ? `interfac
       let visibilityOrigin = null;
       let visibilityWarned = false;
       let visibilityHitWarned = false;
+      let visibilitySampleLogged = false;
+      const VIS_TARGET_COLLIDER_TOLERANCE = 1.5;
       const readVisibilityOf = (targetTransform) => {
         if (!visibilityOrigin || !targetTransform) return null;
         const vt = perfNow();
@@ -3691,7 +3693,19 @@ ${this.isEnum ? `enum` : this.isStruct ? `struct` : this.isInterface ? `interfac
             }
             return true;
           }
-          return hitDistance >= total - 0.75;
+          const visible = hitDistance >= total - VIS_TARGET_COLLIDER_TOLERANCE;
+          if (!visibilitySampleLogged) {
+            visibilitySampleLogged = true;
+            console.log(
+              "[*] 可见性样本 hitDistance/total=",
+              hitDistance,
+              "/",
+              total,
+              "visible=",
+              visible
+            );
+          }
+          return visible;
         } catch (e) {
           if (!visibilityWarned) {
             visibilityWarned = true;

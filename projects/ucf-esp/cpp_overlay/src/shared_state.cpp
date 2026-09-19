@@ -39,7 +39,14 @@ void SharedTransport::write(const Frame& f) {
 
 void SharedTransport::read(Frame& out) const {
     if (!mapped_) return;
-    out = mapped_->slots[mapped_->cur.load(std::memory_order_acquire)];
+    const int cur = mapped_->cur.load(std::memory_order_acquire);
+    // Python 宿主用 -1 表示尚无生产者帧/生产者已退出；不要把旧槽位继续
+    // 当作实时数据，否则 C++ 启动时会卡在 stale shm，replay/synth 永远接不上。
+    if (cur != 0 && cur != 1) {
+        out = Frame{};
+        return;
+    }
+    out = mapped_->slots[cur];
 }
 
 } // namespace ucf

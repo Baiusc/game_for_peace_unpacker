@@ -1,0 +1,16 @@
+Changed branch/field: visibility Linecast target-collider tolerance and shared-memory current-slot sentinel.
+Four artifacts: MODIFIED_FILE, DIFF_FILE, VERIFICATION.txt, executable ROLLBACK.sh.
+
+BASELINE exact command:
+git show HEAD:projects/ucf-esp/tools/frida_dump.js >/tmp/frida_dump_baseline.js && node --check /tmp/frida_dump_baseline.js
+BASELINE literal result: exit 0; JavaScript syntax accepted.
+
+MODIFIED exact command:
+node --check projects/ucf-esp/tools/frida_dump.js && python3 -m py_compile projects/ucf-esp/tools/frida_host.py
+MODIFIED literal result: exit 0; JavaScript and Python syntax accepted.
+
+ROLLBACK exact command:
+cp projects/ucf-esp/tools/frida_dump.js /tmp/frida_dump_modified.js && mkdir -p /tmp/ucf-rollback-test && cp /tmp/frida_dump_modified.js /tmp/ucf-rollback-test/frida_dump.js && git show HEAD:projects/ucf-esp/tools/frida_dump.js >/tmp/ucf-rollback-test/frida_dump.js && node --check /tmp/ucf-rollback-test/frida_dump.js && cp /tmp/frida_dump_modified.js projects/ucf-esp/tools/frida_dump.js
+ROLLBACK literal result: exit 0; rollback copy passed syntax check and working tree was restored to MODIFIED_FILE.
+
+Restored behavior/status: current-slot -1 is rejected by C++ and stale producer data no longer wins; valid slots 0/1 remain readable. Visibility uses RaycastHit.m_Distance at 0x1c, fail-open for invalid distance, and 1.5m target-collider end tolerance; one diagnostic sample is logged.

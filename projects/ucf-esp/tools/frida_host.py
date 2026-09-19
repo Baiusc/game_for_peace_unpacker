@@ -164,6 +164,9 @@ class SharedFrameWriter:
         self.frame_size = codec.FRAME_FMT.size
         self.shm = mmap.mmap(-1, codec.SHM_SIZE, tagname=name)
         self.closed = False
+        # -1 明确表示当前没有生产者帧，避免旧会话留下的 Frame 抢在
+        # replay/synth 之前被 C++ 当成实时 shm 数据。
+        struct.pack_into("<i", self.shm, 0, -1)
 
     def write(self, frame):
         if self.closed:
@@ -191,6 +194,10 @@ class SharedFrameWriter:
     def close(self):
         if not self.closed:
             self.closed = True
+            try:
+                struct.pack_into("<i", self.shm, 0, -1)
+            except (TypeError, ValueError):
+                pass
             self.shm.close()
 
 

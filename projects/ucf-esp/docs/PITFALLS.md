@@ -258,3 +258,9 @@
 - 实机日志显示 `src=shm`、`players=10`、投影有多个 `onscreen=True`，但启用遮挡检测时 C++ 长时间 `target=-1`；关闭 `--no-visibility` 后可选靶和输入恢复。
 - 不能把 `Physics.Linecast` 的 out `RaycastHit.m_Distance` 返回值中的 `0`、`NaN` 或越界值当作“命中墙体”。32-bit bridge/Unity 组合可能没有正确回写结构体；这类值必须 fail-open 为 visible=true，否则所有目标会被误过滤。
 - 实机采样 50ms 约 20FPS，100ms 约 10FPS；即使不掉游戏主线程帧，ESP 仍会有明显跟手延迟。需要低于 33ms 的有效采样预算后再尝试 20~33ms，不能用 100ms 作为实时叠加层默认值。
+
+## 2026-09-19 stale shm 与目标胶囊体误判
+
+- 命名共享内存会跨进程保留；旧宿主退出后槽位仍可能含最后一帧。生产者启动/退出时把 `cur` 置为 `-1`，C++ 读到后回退 replay/synth，不继续显示 stale shm。
+- `Physics.Linecast` 终点使用玩家根 Transform 时，命中目标自己的胶囊体不等于墙体。可见性判断要保留目标末端容差；本版本使用 1.5m，并记录首个 `hitDistance/total` 样本供实机校准。
+- C++ 日志中的 `esp=0` 代表叠加层开关关闭，不是 D3D Present 失败；`present_hr=0` 且 `startup: overlay initialized` 表示窗口和渲染循环正常。

@@ -43,12 +43,13 @@ static void test_input_sim() {
     CHECK(mock.moves == 2 && mock.downs == 0 && mock.ups == 0);
     sim.update(false, false, far, center, ucf::TargetState::Normal);
     sim.update(false, true, near, center, ucf::TargetState::Normal);
-    CHECK(mock.downs == 1 && mock.ups == 1);
+    CHECK(mock.downs == 1 && mock.ups == 0);
     sim.update(false, true, near, center, ucf::TargetState::Normal);
-    CHECK(mock.downs == 1 && mock.ups == 1); // 触发键持续按住不重复开火
+    CHECK(mock.downs == 1 && mock.ups == 0); // 触发键持续按住不重复按下
     sim.update(false, false, near, center, ucf::TargetState::Normal);
+    CHECK(mock.downs == 1 && mock.ups == 1); // 松开触发键释放左键
     sim.update(false, true, near, center, ucf::TargetState::Normal);
-    CHECK(mock.downs == 2 && mock.ups == 2); // 松开后再次点按才触发
+    CHECK(mock.downs == 2 && mock.ups == 1); // 再次按住重新触发
     const int moves_before_blocked = mock.moves;
     sim.update(true, true, near, center, ucf::TargetState::Blocked);
     CHECK(mock.moves == moves_before_blocked && mock.downs == 2 && mock.ups == 2);
